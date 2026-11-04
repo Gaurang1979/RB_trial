@@ -36,6 +36,14 @@ jobs:
           path: vcpkg-cache
           key: vcpkg-x64-windows-static-md-a073c28e-${{ hashFiles('engine/vcpkg.json') }}
 
+      - name: Hikrobot MVS installer (release mvs-5.1.1) into the package's prereqs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download mvs-5.1.1 -R ${{ github.repository }} -D third_party\installers
+          Get-ChildItem third_party\installers
+
       - name: Inno Setup
         shell: pwsh
         run: |

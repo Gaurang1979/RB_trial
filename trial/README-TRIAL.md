@@ -71,8 +71,17 @@ Either:
   The first build compiles OpenCV (20–40 min). The result is in `C:\src\RB_trial\dist`.
 
 The remote-service code is included as plain files (no submodule), so no other repository access
-is needed. Put the Hikrobot MVS installer in `third_party\installers\` first if the installer
-should carry it.
+is needed.
+
+**Hikrobot MVS installer.** MVS 5.1.1 (camera SDK 4.9.0.3, signed by Hangzhou Hikrobot Co., Ltd.)
+is attached to the private RB_trial Release `mvs-5.1.1`, with its `SHA256SUMS.txt`. It is not in
+git: it is 800 MB. Before building, put both files in `third_party\installers\`:
+```
+gh release download mvs-5.1.1 -R Gaurang1979/RB_trial -D C:\src\RB_trial\third_party\installers
+```
+Or download them from the GitHub page RB_trial → Releases. The build copies them into the
+installer's `prereqs\`. On the line PC, the pre-install check verifies the signature and checksum,
+then installs MVS if it is missing or older than 4.8.2. The GitHub build fetches them by itself.
 
 ## Step 2. Line PC network
 

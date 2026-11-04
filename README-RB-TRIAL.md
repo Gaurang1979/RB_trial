@@ -28,8 +28,11 @@ The engine is C++ and needs Microsoft's compiler, so the installer is built on W
 
 1. **GitHub Actions:** Actions → *RB trial Windows installer* → *Run workflow*. Download the artifact
    `VisionSystem-RB-trial-win-x64` (installer, zip, build log). It also runs on every push to `main`.
-2. **Any Windows 10/11 PC:** `git clone https://github.com/Gaurang1979/RB_trial.git C:\src\RB_trial`,
-   then double-click `tools\windows\build-windows.bat`. The output goes to `dist\`.
+2. **Any Windows 10/11 PC:** `git clone https://github.com/Gaurang1979/RB_trial.git C:\src\RB_trial`.
+   Download the Hikrobot MVS installer into the build:
+   `gh release download mvs-5.1.1 -R Gaurang1979/RB_trial -D C:\src\RB_trial\third_party\installers`
+   (or RB_trial → Releases → `mvs-5.1.1`). Then double-click `tools\windows\build-windows.bat`.
+   The output goes to `dist\`.
 
 ## Trial steps
 

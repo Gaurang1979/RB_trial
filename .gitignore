@@ -41,3 +41,7 @@ licence-private.pem
 # the plant server's own images (dashboard icons, presentation graphics) are not customer data
 !plant_server/dashboard/*.png
 !plant_server/docs/**/*.png
+
+# supporting installers (Hikrobot MVS, ~800 MB): GitHub Release "mvs-5.1.1", never in git. After the
+# third_party re-include above, or that rule would pull them back in.
+/third_party/installers/
