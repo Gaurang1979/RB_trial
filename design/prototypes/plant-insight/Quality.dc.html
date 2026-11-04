@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>OEE and quality</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E151C}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 32px; background: #121C25; border-bottom: 1px solid #22303D">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 14px; min-height: 40px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>Floor map</a>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700">OEE and quality</h1>
+    <nav aria-label="Range" style="display: flex; gap: 6px; flex-wrap: wrap">
+      <button style="background: #1F3A57; color: #E6EDF3; border: 1px solid #2F5A86; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">This shift</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">Today</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">7 days</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">30 days</button>
+    </nav>
+    <div style="flex: 1 1 auto"></div>
+    <button style="background: transparent; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; min-height: 40px">Export PDF</button>
+    <button style="background: transparent; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; min-height: 40px">Export Excel</button>
+  </header>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 24px 32px 40px; box-sizing: border-box; display: flex; flex-direction: column; gap: 24px">
+    <section aria-label="OEE" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+      <sc-for list="{{oee}}" as="o" hint-placeholder-count="4">
+        <div style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <div style="font-size: 13px; color: #9FB0C0; text-transform: uppercase; letter-spacing: 0.6px">{{o.label}}</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 34px; font-weight: 600; margin-top: 4px">{{o.value}}</div>
+          <div style="height: 8px; background: #22303D; border-radius: 4px; margin-top: 10px"><div style="height: 8px; width: {{o.value}}; background: {{o.color}}; border-radius: 4px"></div></div>
+          <div style="font-size: 13px; color: #9FB0C0; margin-top: 8px">{{o.sub}}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+      <section aria-label="Control chart" style="flex: 999 1 640px; min-width: 0; background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600">Line 4 · label offset (mm) · X̄ chart, 5 parts per point</h2>
+          <span style="font-size: 14px; color: #E3B341; font-weight: 600">! 7 points rising: act before the limit</span>
+        </div>
+        <svg width="100%" viewBox="0 0 800 280" role="img" aria-label="Control chart of label offset: points rise steadily toward the upper control limit over the last hour, still inside the limits" style="margin-top: 12px">
+          <rect x="40" y="10" width="750" height="240" fill="#121C25"></rect>
+          <line x1="40" y1="40" x2="790" y2="40" stroke="#FF7B72" stroke-width="1.5" stroke-dasharray="6 4"></line>
+          <line x1="40" y1="220" x2="790" y2="220" stroke="#FF7B72" stroke-width="1.5" stroke-dasharray="6 4"></line>
+          <line x1="40" y1="130" x2="790" y2="130" stroke="#5A7088" stroke-width="1"></line>
+          <text x="34" y="44" fill="#C4D0DB" font-size="12" text-anchor="end" font-family="IBM Plex Mono">+0.50</text>
+          <text x="34" y="134" fill="#C4D0DB" font-size="12" text-anchor="end" font-family="IBM Plex Mono">0.00</text>
+          <text x="34" y="224" fill="#C4D0DB" font-size="12" text-anchor="end" font-family="IBM Plex Mono">−0.50</text>
+          <polyline fill="none" stroke="#58A6FF" stroke-width="2" points="60,140 90,128 120,150 150,132 180,138 210,120 240,142 270,126 300,134 330,118 360,136 390,124 420,130 450,112 480,122 510,104 540,98 570,90 600,84 630,76 660,72 690,66 720,60"></polyline>
+          <g fill="#58A6FF"><circle cx="60" cy="140" r="3.5"></circle><circle cx="120" cy="150" r="3.5"></circle><circle cx="180" cy="138" r="3.5"></circle><circle cx="240" cy="142" r="3.5"></circle><circle cx="300" cy="134" r="3.5"></circle><circle cx="360" cy="136" r="3.5"></circle><circle cx="420" cy="130" r="3.5"></circle><circle cx="480" cy="122" r="3.5"></circle></g>
+          <g fill="#E3B341"><circle cx="540" cy="98" r="5"></circle><circle cx="570" cy="90" r="5"></circle><circle cx="600" cy="84" r="5"></circle><circle cx="630" cy="76" r="5"></circle><circle cx="660" cy="72" r="5"></circle><circle cx="690" cy="66" r="5"></circle><circle cx="720" cy="60" r="5"></circle></g>
+          <text x="790" y="34" fill="#FF7B72" font-size="12" text-anchor="end">Upper limit</text>
+          <text x="60" y="272" fill="#9FB0C0" font-size="12" font-family="IBM Plex Mono">16:40</text>
+          <text x="720" y="272" fill="#9FB0C0" font-size="12" font-family="IBM Plex Mono" text-anchor="middle">17:40</text>
+        </svg>
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 8px; font-size: 14px">
+          <span>Cp <b style="font-family: 'IBM Plex Mono', monospace">1.48</b></span>
+          <span>Cpk <b style="font-family: 'IBM Plex Mono', monospace; color: #E3B341">1.12</b></span>
+          <span>Mean <b style="font-family: 'IBM Plex Mono', monospace">+0.29 mm</b></span>
+          <span style="color: #9FB0C0">Likely cause: label roll guide moved. Suggested: check guide on labeller 2.</span>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <section aria-label="Where OEE was lost" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">Where OEE was lost</h2>
+          <sc-for list="{{losses}}" as="l" hint-placeholder-count="5">
+            <div style="margin: 8px 0">
+              <div style="display: flex; justify-content: space-between; font-size: 14px"><span>{{l.k}}</span><span style="font-family: 'IBM Plex Mono', monospace">{{l.v}}</span></div>
+              <div style="height: 8px; background: #22303D; border-radius: 4px; margin-top: 4px"><div style="height: 8px; width: {{l.pct}}; background: #F0883E; border-radius: 4px"></div></div>
+            </div>
+          </sc-for>
+        </section>
+        <section aria-label="Defect map" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">Where on the carton</h2>
+          <svg width="100%" viewBox="0 0 300 170" role="img" aria-label="Defect map: most NG marks cluster at the lower right corner of the label">
+            <rect x="10" y="10" width="280" height="150" rx="6" fill="#2A3846" stroke="#4A5E72"></rect>
+            <rect x="30" y="80" width="170" height="60" fill="none" stroke="#5A7088" stroke-dasharray="4 3"></rect>
+            <circle cx="186" cy="128" r="22" fill="#FF7B72" opacity="0.55"></circle>
+            <circle cx="190" cy="130" r="10" fill="#FF7B72"></circle>
+            <circle cx="60" cy="40" r="8" fill="#FF7B72" opacity="0.45"></circle>
+            <circle cx="240" cy="50" r="6" fill="#FF7B72" opacity="0.35"></circle>
+          </svg>
+        </section>
+      </aside>
+    </div>
+
+    <section aria-label="Lines compared" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+      <h2 style="margin: 0 0 12px; font-size: 17px; font-weight: 600">Lines compared</h2>
+      <div style="overflow-x: auto">
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; min-width: 720px">
+          <thead><tr style="color: #9FB0C0; text-align: left"><th style="padding: 8px; font-weight: 500">Line</th><th style="padding: 8px; font-weight: 500">OEE</th><th style="padding: 8px; font-weight: 500">Availability</th><th style="padding: 8px; font-weight: 500">Performance</th><th style="padding: 8px; font-weight: 500">Quality</th><th style="padding: 8px; font-weight: 500">Worst Cpk</th><th style="padding: 8px; font-weight: 500">Changeover</th></tr></thead>
+          <tbody>
+            <sc-for list="{{table}}" as="r" hint-placeholder-count="5">
+              <tr style="border-top: 1px solid #22303D; font-family: 'IBM Plex Mono', monospace"><td style="padding: 8px; font-family: 'IBM Plex Sans', sans-serif; font-weight: 600">{{r.line}}</td><td style="padding: 8px">{{r.oee}}</td><td style="padding: 8px">{{r.a}}</td><td style="padding: 8px">{{r.p}}</td><td style="padding: 8px">{{r.q}}</td><td style="padding: 8px; color: {{r.cpkColor}}">{{r.cpk}}</td><td style="padding: 8px">{{r.co}}</td></tr>
+            </sc-for>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ok = '#3FB950', warn = '#E3B341';
+    return {
+      oee: [
+        { label: 'OEE', value: '78%', sub: 'Plant, this shift · target 80%', color: '#58A6FF' },
+        { label: 'Availability', value: '88%', sub: '57 min stopped of 7 h 42 min', color: '#58A6FF' },
+        { label: 'Performance', value: '90%', sub: 'Parts made against ideal cycle', color: '#58A6FF' },
+        { label: 'Quality', value: '99%', sub: 'Good parts of all inspected', color: ok }
+      ],
+      losses: [
+        { k: 'PLC link lost (Line 5)', v: '12 min', pct: '100%' },
+        { k: 'Changeovers', v: '9 min', pct: '75%' },
+        { k: 'Slow cycles (Line 3)', v: '8 min', pct: '66%' },
+        { k: 'Rejects', v: '6 min', pct: '50%' },
+        { k: 'Material wait', v: '4 min', pct: '33%' }
+      ],
+      table: [
+        { line: 'Line 1', oee: '84%', a: '93%', p: '91%', q: '99.6%', cpk: '1.71', cpkColor: ok, co: '—' },
+        { line: 'Line 3', oee: '66%', a: '92%', p: '73%', q: '98.1%', cpk: '1.35', cpkColor: ok, co: '—' },
+        { line: 'Line 4', oee: '79%', a: '90%', p: '89%', q: '99.0%', cpk: '1.12', cpkColor: warn, co: '8 min' },
+        { line: 'Line 5', oee: '42%', a: '45%', p: '95%', q: '97.8%', cpk: '1.40', cpkColor: ok, co: '—' },
+        { line: 'Line 8', oee: '—', a: '—', p: '—', q: '—', cpk: '—', cpkColor: '#9FB0C0', co: '6 min (now)' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

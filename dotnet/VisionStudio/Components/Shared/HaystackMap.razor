@@ -1,0 +1,406 @@
+@using VisionCore
+@using System.Globalization
+@using VisionCore.Security
+
+<div class="haystack-container" @attributes="Extra">
+    <div class="haystack-header">
+        <div class="haystack-title-group">
+            <span class="haystack-icon">🧭</span>
+            <strong>@CamouflageLabels.GetSafeToolLabel("haystack")</strong>
+            <span class="point-counter">@((Points?.Count ?? 0)) Captures</span>
+        </div>
+
+        @if (PendingAmbiguousCount > 0)
+        {
+            <div class="triage-alert-badge" @onclick="SelectFirstAmbiguous">
+                <span class="pulse-dot"></span>
+                <strong>★ @PendingAmbiguousCount Borderline Parts Mined</strong>
+                <span class="triage-action-hint">(Click to Triage)</span>
+            </div>
+        }
+    </div>
+
+    <div class="haystack-body">
+        <div class="map-viewport">
+            <svg viewBox="-110 -110 220 220" class="haystack-svg">
+                <!-- Coordinate Grid -->
+                <circle cx="0" cy="0" r="100" class="svg-boundary" />
+                <line x1="-100" y1="0" x2="100" y2="0" class="svg-axis" />
+                <line x1="0" y1="-100" x2="0" y2="100" class="svg-axis" />
+
+                <!-- Ambiguity Margin Ring -->
+                <circle cx="0" cy="0" r="@((GoldenRadius + AmbiguityMargin) * 100)" class="svg-ambiguity-ring" />
+
+                <!-- Golden OK Cluster Manifold -->
+                <circle cx="0" cy="0" r="@(GoldenRadius * 100)" class="svg-golden-cluster" />
+
+                <!-- Registered Defect Clusters -->
+                @if (Clusters != null)
+                {
+                    @foreach (var cl in Clusters.Where(c => c.ClusterId > 0))
+                    {
+                        <circle cx="@(cl.CenterU * 100)" cy="@(cl.CenterV * 100)" r="@(cl.Radius * 100)" class="svg-defect-cluster" />
+                    }
+                }
+
+                <!-- Inspection Capture Dots -->
+                @if (Points != null)
+                {
+                    @foreach (var pt in Points)
+                    {
+                        var cx = pt.U * 100f;
+                        var cy = pt.V * 100f;
+                        var isSelected = (_selectedPoint?.ImageId == pt.ImageId);
+                        var dotClass = pt.Verdict switch
+                        {
+                            HaystackVerdict.Ok => "dot-ok",
+                            HaystackVerdict.Ambiguous => "dot-ambiguous",
+                            _ => "dot-ng"
+                        };
+                        if (isSelected) dotClass += " dot-selected";
+
+                        <circle cx="@cx.ToString("0.#", CultureInfo.InvariantCulture)"
+                                cy="@cy.ToString("0.#", CultureInfo.InvariantCulture)"
+                                r="@(isSelected ? "5" : "3")"
+                                class="haystack-dot @dotClass"
+                                @onclick="() => SelectPoint(pt)">
+                            <title>ID: @pt.ImageId | @pt.DefectName | Conf: @((pt.Confidence * 100).ToString("0.#"))%</title>
+                        </circle>
+                    }
+                }
+            </svg>
+
+            <!-- Map Legend -->
+            <div class="map-legend">
+                <span class="legend-item"><span class="legend-dot dot-ok"></span> Golden OK</span>
+                <span class="legend-item"><span class="legend-dot dot-ambiguous"></span> Borderline Uncertainty</span>
+                <span class="legend-item"><span class="legend-dot dot-ng"></span> Known Defect</span>
+            </div>
+        </div>
+
+        <!-- Selected Part Details & Active Learning Panel -->
+        <div class="haystack-sidebar">
+            @if (_selectedPoint != null)
+            {
+                <div class="selected-card">
+                    <div class="card-header">
+                        <span class="card-id">Capture #@_selectedPoint.ImageId</span>
+                        <span class="card-badge @(_selectedPoint.Verdict == HaystackVerdict.Ok ? "badge-ok" : _selectedPoint.Verdict == HaystackVerdict.Ambiguous ? "badge-amb" : "badge-ng")">
+                            @_selectedPoint.Verdict
+                        </span>
+                    </div>
+
+                    <div class="card-field">
+                        <span class="field-label">Assigned Mode:</span>
+                        <strong>@_selectedPoint.DefectName</strong>
+                    </div>
+
+                    <div class="card-field">
+                        <span class="field-label">2D Manifold Coords:</span>
+                        <code>u: @_selectedPoint.U.ToString("+0.00;-0.00"), v: @_selectedPoint.V.ToString("+0.00;-0.00")</code>
+                    </div>
+
+                    <div class="card-field">
+                        <span class="field-label">Manifold Distance:</span>
+                        <span>@_selectedPoint.DistanceToCenter.ToString("0.000")</span>
+                    </div>
+
+                    <div class="card-field">
+                        <span class="field-label">Confidence:</span>
+                        <span>@((_selectedPoint.Confidence * 100).ToString("0.#"))%</span>
+                    </div>
+
+                    <div class="card-field">
+                        <span class="field-label">Status:</span>
+                        <span>@(_selectedPoint.IsTriaged ? "✓ Human Triaged" : "🤖 Automated Inference")</span>
+                    </div>
+
+                    <!-- 1-Click Active Learning Triage Controls -->
+                    <div class="triage-actions">
+                        <span class="triage-title">1-Click Active Learning Triage:</span>
+                        <div class="triage-btn-group">
+                            <button type="button" class="btn-triage btn-approve" @onclick="ApproveVariation">
+                                ✓ Approve as Golden Variation
+                            </button>
+                            <button type="button" class="btn-triage btn-reject" @onclick="ConfirmDefect">
+                                ✗ Confirm as Defect
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="empty-selection">
+                    <p>Click any dot on the 2D feature manifold to inspect borderline uncertainty or retrain in 1-click.</p>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<style>
+.haystack-container {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 8px;
+    padding: 14px;
+    color: #e4e4e7;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.haystack-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+.haystack-title-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+.haystack-icon { font-size: 16px; }
+.point-counter {
+    background: #27272a;
+    color: #a1a1aa;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.triage-alert-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #78350f;
+    border: 1px solid #f59e0b;
+    color: #fef3c7;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+.triage-alert-badge:hover { transform: scale(1.02); }
+.pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: #f59e0b;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #f59e0b;
+}
+.triage-action-hint {
+    color: #fde68a;
+    font-size: 10px;
+}
+.haystack-body {
+    display: grid;
+    grid-template-columns: 1fr 280px;
+    gap: 14px;
+}
+@@media (max-width: 768px) {
+    .haystack-body { grid-template-columns: 1fr; }
+}
+.map-viewport {
+    position: relative;
+    background: #09090b;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.haystack-svg {
+    width: 100%;
+    max-width: 440px;
+    height: auto;
+    aspect-ratio: 1 / 1;
+}
+.svg-boundary {
+    fill: #121214;
+    stroke: #27272a;
+    stroke-width: 0.5;
+}
+.svg-axis {
+    stroke: #27272a;
+    stroke-width: 0.4;
+    stroke-dasharray: 2 2;
+}
+.svg-ambiguity-ring {
+    fill: none;
+    stroke: #f59e0b;
+    stroke-width: 0.75;
+    stroke-dasharray: 3 3;
+    opacity: 0.5;
+}
+.svg-golden-cluster {
+    fill: rgba(34, 197, 94, 0.08);
+    stroke: #22c55e;
+    stroke-width: 1;
+}
+.svg-defect-cluster {
+    fill: rgba(239, 68, 68, 0.12);
+    stroke: #ef4444;
+    stroke-width: 0.8;
+}
+.haystack-dot {
+    cursor: pointer;
+    transition: r 0.1s ease, filter 0.1s ease;
+}
+.dot-ok { fill: #22c55e; }
+.dot-ng { fill: #ef4444; }
+.dot-ambiguous {
+    fill: #f59e0b;
+    filter: drop-shadow(0 0 2px #f59e0b);
+}
+.dot-selected {
+    stroke: #ffffff;
+    stroke-width: 1.5;
+}
+.map-legend {
+    display: flex;
+    gap: 14px;
+    margin-top: 8px;
+    font-size: 11px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #a1a1aa;
+}
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+.haystack-sidebar {
+    background: #121214;
+    border: 1px solid #27272a;
+    border-radius: 6px;
+    padding: 12px;
+}
+.selected-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #27272a;
+}
+.card-id {
+    font-weight: 600;
+    font-size: 13px;
+    color: #ffffff;
+}
+.card-badge {
+    font-size: 10px;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+.badge-ok { background: #166534; color: #bbf7d0; }
+.badge-amb { background: #854d0e; color: #fef08a; }
+.badge-ng { background: #991b1b; color: #fecaca; }
+.card-field {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+}
+.field-label { color: #71717a; }
+.triage-actions {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #27272a;
+}
+.triage-title {
+    display: block;
+    font-size: 11px;
+    color: #f59e0b;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+.triage-btn-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.btn-triage {
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    text-align: left;
+    transition: opacity 0.15s ease;
+}
+.btn-triage:hover { opacity: 0.9; }
+.btn-approve {
+    background: #16a34a;
+    color: #ffffff;
+}
+.btn-reject {
+    background: #dc2626;
+    color: #ffffff;
+}
+.empty-selection {
+    color: #71717a;
+    font-size: 12px;
+    text-align: center;
+    padding: 40px 10px;
+}
+</style>
+
+@code {
+    [Parameter] public IReadOnlyList<HaystackPoint>? Points { get; set; }
+    [Parameter] public IReadOnlyList<HaystackCluster>? Clusters { get; set; }
+    [Parameter] public float GoldenRadius { get; set; } = 0.35f;
+    [Parameter] public float AmbiguityMargin { get; set; } = 0.15f;
+    [Parameter] public EventCallback<(ulong ImageId, HaystackVerdict Verdict, int ClusterId, string DefectName)> OnTriage { get; set; }
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Extra { get; set; }
+
+    private HaystackPoint? _selectedPoint;
+
+    private int PendingAmbiguousCount => Points?.Count(p => p.Verdict == HaystackVerdict.Ambiguous && !p.IsTriaged) ?? 0;
+
+    private void SelectPoint(HaystackPoint pt)
+    {
+        _selectedPoint = pt;
+    }
+
+    private void SelectFirstAmbiguous()
+    {
+        var amb = Points?.FirstOrDefault(p => p.Verdict == HaystackVerdict.Ambiguous && !p.IsTriaged);
+        if (amb != null) _selectedPoint = amb;
+    }
+
+    private Task ApproveVariation() => TriageSelected(HaystackVerdict.Ok, 0, "Approved Golden Variation");
+    private Task ConfirmDefect() => TriageSelected(HaystackVerdict.Ng, 1, "Confirmed Defect");
+
+    private async Task TriageSelected(HaystackVerdict verdict, int clusterId, string defectName)
+    {
+        if (_selectedPoint == null) return;
+        ulong id = _selectedPoint.ImageId;
+        _selectedPoint = _selectedPoint with
+        {
+            Verdict = verdict,
+            ClusterId = clusterId,
+            DefectName = defectName,
+            IsTriaged = true
+        };
+
+        if (OnTriage.HasDelegate)
+        {
+            await OnTriage.InvokeAsync((id, verdict, clusterId, defectName));
+        }
+    }
+}

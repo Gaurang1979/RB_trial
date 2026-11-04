@@ -1,0 +1,826 @@
+<!-- Engineer workspace (UI-UX-SPEC.md 4.19), dense and VisionPro-style: menu bar and toolbar; the job tree
+     and toolbox on the left; the camera tabs and the tried picture in the middle (drag to draw the
+     selected tool's area); the property table and the tool's result on the right; Results, Lines read,
+     Image set, Tool times and Messages docked below; a status bar. Panels resize with the splitters and
+     hide from the View menu. Engineers and admins only: the runtime refuses everyone else. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:rt="using:VisionSystem.Studio.Runtime"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             xmlns:v="using:VisionSystem.Studio.Views"
+             x:Class="VisionSystem.Studio.Views.DesignerView"
+             x:DataType="vm:DesignerViewModel">
+  <UserControl.Styles>
+    <!-- Property table: a category header, then label | value rows of the compact height. -->
+    <Style Selector="Border.pcat">
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="8,4" />
+    </Style>
+    <Style Selector="Border.pcat TextBlock">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Grid.prow">
+      <Setter Property="Margin" Value="8,2,6,2" />
+      <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    </Style>
+    <Style Selector="Grid.prow > TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+      <Setter Property="Margin" Value="0,0,6,0" />
+    </Style>
+    <Style Selector="Grid.prow ComboBox, Grid.prow TextBox, Grid.prow NumericUpDown">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+      <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Small}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+      <Setter Property="Margin" Value="8,2,8,4" />
+    </Style>
+    <!-- Toolbar icon buttons: 32 px square with a tooltip. -->
+    <Style Selector=":is(Button).tool">
+      <Setter Property="MinWidth" Value="{DynamicResource Vs.Size.Touch}" />
+      <Setter Property="Height" Value="{DynamicResource Vs.Size.Touch}" />
+      <Setter Property="Padding" Value="8,0" />
+      <Setter Property="Margin" Value="1,0" />
+    </Style>
+    <Style Selector=":is(Button).tool PathIcon">
+      <Setter Property="Width" Value="16" />
+      <Setter Property="Height" Value="16" />
+    </Style>
+    <!-- Job tree rows. -->
+    <Style Selector="Button.node">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="4,0" />
+      <Setter Property="MinHeight" Value="26" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.S}" />
+    </Style>
+    <Style Selector="Button.node.selected">
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.Accent}" />
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnAccent}" />
+    </Style>
+    <Style Selector="Border.row">
+      <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="Padding" Value="6,3" />
+    </Style>
+    <Style Selector="Border.headrow">
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+      <Setter Property="Padding" Value="6,3" />
+    </Style>
+    <Style Selector="Border.headrow TextBlock">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <!-- Rows and headers the property search or the Essential switch leaves out. -->
+    <Style Selector="Grid.prow.filtered, Border.pcat.filtered, TextBlock.hint.filtered, ItemsControl.filtered, Button.filtered">
+      <Setter Property="IsVisible" Value="False" />
+    </Style>
+    <Style Selector="GridSplitter">
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.Border}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+
+    <!-- Menu bar. -->
+    <Menu Grid.Row="0" Name="WorkspaceMenu" Background="{DynamicResource Vs.Brush.Surface}" IsEnabled="{Binding !Busy}">
+      <MenuItem Header="{l:T ws.menu.file}">
+        <MenuItem Header="{l:T design.save}" Command="{Binding SaveCommand}" InputGesture="Ctrl+S" />
+        <MenuItem Header="{l:T design.save_as}" Command="{Binding SaveAsCommand}" />
+        <MenuItem Header="{l:T design.reload}" Command="{Binding ReloadCommand}" />
+        <Separator />
+        <MenuItem Header="{l:T ws.back_to_run}" Command="{Binding CloseCommand}" />
+      </MenuItem>
+      <MenuItem Header="{l:T ws.menu.edit}">
+        <MenuItem Header="{l:T ws.undo}" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" InputGesture="Ctrl+Z" Name="UndoMenu" />
+        <MenuItem Header="{l:T ws.redo}" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" InputGesture="Ctrl+Y" Name="RedoMenu" />
+        <Separator />
+        <MenuItem Header="{l:T ws.add_camera}" Command="{Binding AddCameraCommand}" />
+        <MenuItem Header="{l:T design.add_read_code}" Command="{Binding AddReadCodeCommand}" />
+        <MenuItem Header="{l:T design.add_read_text}" Command="{Binding AddReadTextCommand}" />
+        <MenuItem Header="{l:T design.add_check_text}" Command="{Binding AddCheckTextCommand}" />
+        <MenuItem Header="{l:T design.add_blob}" Command="{Binding AddBlobCommand}" />
+        <MenuItem Header="{l:T ws.add_line}" Command="{Binding AddLineCommand}" IsEnabled="{Binding HasTool}" />
+        <Separator />
+        <MenuItem Header="{l:T ws.remove_tool}" Command="{Binding RemoveToolCommand}" IsEnabled="{Binding HasTool}" InputGesture="Delete" />
+      </MenuItem>
+      <MenuItem Header="{l:T ws.menu.view}">
+        <MenuItem Header="{l:T ws.panel.job}" Command="{Binding ToggleJobPanelCommand}" />
+        <MenuItem Header="{l:T ws.panel.properties}" Command="{Binding TogglePropertiesPanelCommand}" />
+        <MenuItem Header="{l:T ws.panel.docks}" Command="{Binding ToggleDocksCommand}" />
+        <Separator />
+        <MenuItem Header="{l:T ws.reset_layout}" Command="{Binding ResetLayoutCommand}" />
+      </MenuItem>
+      <MenuItem Header="{l:T ws.menu.run}">
+        <MenuItem Header="{l:T design.try}" Command="{Binding TryCommand}" InputGesture="F5" />
+        <MenuItem Header="{l:T design.run_all_button}" Command="{Binding RunAllCommand}" InputGesture="F6" />
+        <MenuItem Header="{l:T design.teach}" Command="{Binding TeachCommand}" InputGesture="F7" />
+        <Separator />
+        <MenuItem Header="{l:T ws.tip.previous}" Command="{Binding PreviousPictureCommand}" InputGesture="PageUp" />
+        <MenuItem Header="{l:T ws.tip.next}" Command="{Binding NextPictureCommand}" InputGesture="PageDown" />
+        <MenuItem Header="{l:T design.refresh_pictures}" Command="{Binding LoadPicturesCommand}" />
+      </MenuItem>
+    </Menu>
+
+    <!-- Toolbar: icons with tooltips, then the job's name and PLC number and Save. -->
+    <Border Grid.Row="1" Classes="bar" BorderThickness="0,1,0,1" Padding="4">
+      <DockPanel LastChildFill="False" ClipToBounds="True" Name="DesignerToolbar">
+        <!-- The right-docked name, number and Save come first, so a narrow window never puts the left buttons under them (1366 x 768). -->
+        <Button DockPanel.Dock="Right" Classes="vs tool" IsVisible="{Binding HasJob}" Name="JobMenu">
+          <TextBlock Text="{l:T design.job_menu}" VerticalAlignment="Center" />
+          <Button.Flyout>
+            <MenuFlyout>
+              <MenuItem Header="{l:T design.save_as}" Command="{Binding SaveAsCommand}" />
+              <MenuItem Header="{l:T design.reload}" Command="{Binding ReloadCommand}" />
+            </MenuFlyout>
+          </Button.Flyout>
+        </Button>
+        <Button DockPanel.Dock="Right" Classes="vs tool primary" Command="{Binding SaveCommand}" IsEnabled="{Binding !Busy}" IsVisible="{Binding HasJob}"
+                Name="SaveJob" ToolTip.Tip="{l:T ws.tip.save}">
+          <TextBlock Text="{l:T design.save}" VerticalAlignment="Center" />
+        </Button>
+        <TextBox DockPanel.Dock="Right" Text="{Binding JobNumber}" IsVisible="{Binding HasJob}" Name="JobNumber" Width="64" Margin="4,0" />
+        <TextBlock DockPanel.Dock="Right" Text="{l:T design.number}" VerticalAlignment="Center" Classes="muted" IsVisible="{Binding HasJob}" />
+        <TextBox DockPanel.Dock="Right" Text="{Binding JobName}" IsVisible="{Binding HasJob}" Name="JobName" Watermark="{l:T design.name}" Width="150" Margin="4,0" />
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding CloseCommand}" Name="DesignerClose" ToolTip.Tip="{l:T ws.tip.back}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T ws.back_short}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" Name="UndoButton" ToolTip.Tip="{l:T ws.tip.undo}">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Undo}, Converter={x:Static ui:IconConverter.Instance}}" />
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding RedoCommand}" IsEnabled="{Binding CanRedo}" Name="RedoButton" ToolTip.Tip="{l:T ws.tip.redo}">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Redo}, Converter={x:Static ui:IconConverter.Instance}}" />
+        </Button>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <Button DockPanel.Dock="Left" Classes="vs tool primary" Command="{Binding TryCommand}" IsEnabled="{Binding !Busy}" Name="TryButton" ToolTip.Tip="{l:T ws.tip.try}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Play}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T design.try}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding RunAllCommand}" IsEnabled="{Binding !Busy}" Name="RunAllButton" ToolTip.Tip="{l:T ws.tip.try_all}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.TryAll}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T ws.try_all_short}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding TeachCommand}" IsEnabled="{Binding HasTool}" Name="TeachButton" ToolTip.Tip="{l:T ws.tip.teach}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Teach}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T ws.teach_short}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding WholePictureCommand}" IsEnabled="{Binding HasTool}" ToolTip.Tip="{l:T ws.tip.whole}">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Fit}, Converter={x:Static ui:IconConverter.Instance}}" />
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Classes.primary="{Binding PictureCheckOn}" Command="{Binding TogglePictureCheckCommand}"
+                Name="PictureCheckButton" ToolTip.Tip="{l:T ws.tip.picture_check}">
+          <TextBlock Text="{l:T ws.picture_check_short}" VerticalAlignment="Center" />
+        </Button>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <!-- One-click new job: take a picture, let auto find offer the tools (UI-UX-SPEC.md 4.6 steps 2-3). -->
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding GrabCommand}" IsEnabled="{Binding !Busy}" Name="GrabButton" ToolTip.Tip="{l:T ws.tip.grab}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Camera}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T design.grab}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding FindEverythingCommand}" IsEnabled="{Binding !Busy}" Name="FindAllButton" ToolTip.Tip="{l:T ws.tip.find_all}">
+          <TextBlock Text="{l:T ws.find_all_short}" VerticalAlignment="Center" />
+        </Button>
+        <ToggleButton DockPanel.Dock="Left" Classes="vs tool" IsChecked="{Binding FindInWindow}" IsEnabled="{Binding !Busy}" Name="FindWindowButton" ToolTip.Tip="{l:T ws.tip.find_window}">
+          <TextBlock Text="{l:T ws.find_window_short}" VerticalAlignment="Center" />
+        </ToggleButton>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding PreviousPictureCommand}" IsEnabled="{Binding !Busy}" ToolTip.Tip="{l:T ws.tip.previous}">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Previous}, Converter={x:Static ui:IconConverter.Instance}}" />
+        </Button>
+        <TextBlock DockPanel.Dock="Left" Text="{Binding PictureText}" VerticalAlignment="Center" Margin="6,0" MaxWidth="220"
+                   TextTrimming="CharacterEllipsis" Name="PictureText" />
+        <Button DockPanel.Dock="Left" Classes="vs tool" Command="{Binding NextPictureCommand}" IsEnabled="{Binding !Busy}" ToolTip.Tip="{l:T ws.tip.next}">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Next}, Converter={x:Static ui:IconConverter.Instance}}" />
+        </Button>
+
+      </DockPanel>
+    </Border>
+
+    <!-- Save as, a question before changes are dropped, and the latest message. -->
+    <StackPanel Grid.Row="2">
+      <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding SavingAs}" Name="SaveAsRow" Margin="6,4">
+        <TextBlock Text="{l:T design.save_as_name}" VerticalAlignment="Center" />
+        <TextBox Text="{Binding SaveAsName}" Width="280" Name="SaveAsName" />
+        <Button Classes="vs primary" Command="{Binding SaveAsConfirmCommand}" IsEnabled="{Binding !Busy}" Name="SaveAsConfirm">
+          <TextBlock Text="{l:T design.save_as}" />
+        </Button>
+        <Button Classes="vs" Command="{Binding SaveAsCancelCommand}"><TextBlock Text="{l:T common.back}" /></Button>
+      </StackPanel>
+      <Border Classes="toned" ui:Ui.Tone="Warn" Padding="8,4"
+              IsVisible="{Binding Question, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" Name="DesignQuestion">
+        <StackPanel Orientation="Horizontal" Spacing="10">
+          <TextBlock Text="{Binding Question}" VerticalAlignment="Center" FontWeight="SemiBold" />
+          <Button Classes="vs" Command="{Binding AnswerYesCommand}" Name="QuestionYes"><TextBlock Text="{l:T design.drop_yes}" /></Button>
+          <Button Classes="vs primary" Command="{Binding AnswerNoCommand}" Name="QuestionNo"><TextBlock Text="{l:T common.no}" /></Button>
+        </StackPanel>
+      </Border>
+      <Border Classes="toned" ui:Ui.Tone="{Binding MessageTone}" Padding="8,3" Name="DesignMessage"
+              IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+      </Border>
+    </StackPanel>
+
+    <!-- Docked panels; the column and row sizes follow the View menu (DesignerView.axaml.cs). -->
+    <Grid Grid.Row="3" Name="Docks" ColumnDefinitions="232,4,*,4,344" RowDefinitions="*,4,200" Margin="4">
+
+      <!-- Left: the job tree and the toolbox. -->
+      <Border Grid.Column="0" Grid.RowSpan="3" Classes="card" Padding="0" Name="JobPanel" IsVisible="{Binding ShowJobPanel}">
+        <TabControl Classes="compact">
+          <TabItem Header="{l:T ws.tab.job}">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="6">
+                <ComboBox ItemsSource="{Binding Jobs}" SelectedItem="{Binding SelectedJob}" Name="JobPicker" IsEnabled="{Binding !Busy}"
+                          PlaceholderText="{l:T design.open}" HorizontalAlignment="Stretch" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                  <TextBox Text="{Binding NewJobName}" Watermark="{l:T design.new_name}" Name="NewJobName" />
+                  <Button Grid.Column="1" Classes="vs" Command="{Binding NewJobCommand}" IsEnabled="{Binding !Busy}" Name="NewJobButton" ToolTip.Tip="{l:T ws.tip.new}">
+                    <TextBlock Text="{l:T design.new}" />
+                  </Button>
+                </Grid>
+              </StackPanel>
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Tree}" Name="JobTree" Margin="4,0,4,4" IsEnabled="{Binding !Busy}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:TreeNode">
+                      <Button Classes="node" Classes.selected="{Binding Selected}"
+                              Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).SelectNodeCommand}" CommandParameter="{Binding}">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto" Margin="{Binding Indent, Converter={x:Static ui:IndentConverter.Instance}}">
+                          <PathIcon Width="14" Height="14" Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                          <TextBlock Grid.Column="2" Text="{Binding Name}" Margin="6,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="3" Text="{Binding Mark}" FontWeight="Bold" Classes="glyph" ui:Ui.Tone="{Binding Tone}" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="4" Text="{Binding Time}" Classes="hint" Margin="6,0,2,0" VerticalAlignment="Center" />
+                          <TextBlock Grid.Column="5" Text="{Binding Pixels}" Classes="glyph" ui:Ui.Tone="Warn" Margin="4,0,2,0" VerticalAlignment="Center"
+                                     IsVisible="{Binding Pixels, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        </Grid>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{l:T ws.tab.toolbox}" Name="ToolboxTab">
+            <!-- Drag a tile onto the picture (it snaps to the code or text there), or click it and draw the area. -->
+            <StackPanel Spacing="2" Margin="6" IsEnabled="{Binding !Busy}" Name="Toolbox">
+              <TextBlock Text="{l:T ws.toolbox.read}" Classes="hint" FontWeight="SemiBold" Margin="2,4,2,2" />
+              <Button Classes="vs" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding AddReadCodeCommand}" Name="AddReadCode"
+                      ToolTip.Tip="{l:T ws.tip.toolbox_tile}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Code}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T design.add_read_code}" />
+                </StackPanel>
+              </Button>
+              <Button Classes="vs" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding AddReadTextCommand}" Name="AddReadText"
+                      ToolTip.Tip="{l:T ws.tip.toolbox_tile}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Text}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T design.add_read_text}" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="{l:T ws.toolbox.check}" Classes="hint" FontWeight="SemiBold" Margin="2,8,2,2" />
+              <Button Classes="vs" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding AddCheckTextCommand}" Name="AddCheckText"
+                      ToolTip.Tip="{l:T ws.tip.toolbox_tile}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Text}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T design.add_check_text}" />
+                </StackPanel>
+              </Button>
+              <Button Classes="vs" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding AddBlobCommand}" Name="AddBlob"
+                      ToolTip.Tip="{l:T ws.tip.toolbox_tile}">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Blob}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T design.add_blob}" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="{l:T ws.toolbox.more}" Classes="hint" Margin="2,10,2,0" />
+            </StackPanel>
+          </TabItem>
+        </TabControl>
+      </Border>
+      <GridSplitter Grid.Column="1" Grid.RowSpan="3" ResizeDirection="Columns" IsVisible="{Binding ShowJobPanel}" />
+
+      <!-- Middle: the camera tabs and the tried picture. -->
+      <Border Grid.Column="2" Grid.Row="0" Classes="card" Padding="0" Name="CanvasPanel">
+        <DockPanel IsVisible="{Binding HasJob}">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,4,6,0">
+          <ListBox ItemsSource="{Binding Cameras}" SelectedIndex="{Binding CameraIndex}" Name="CameraList" IsEnabled="{Binding !Busy}"
+                   Background="Transparent">
+            <ListBox.ItemsPanel>
+              <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="2" /></ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+              <DataTemplate DataType="vm:CameraDraft">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Camera}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{Binding Name}" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+            <Button Classes="vs tool" Name="ZoomOutButton" ToolTip.Tip="{l:T ws.zoom_out}"><TextBlock Text="−" FontWeight="Bold" /></Button>
+            <!-- logarithmic: 0 = fit, 4 = 16 times -->
+            <Slider Name="ZoomSlider" Minimum="0" Maximum="4" Width="96" Height="28" MinHeight="0" VerticalAlignment="Center" Margin="2,-4"
+                    ToolTip.Tip="{l:T ws.zoom_slider}" />
+            <Button Classes="vs tool" Name="ZoomInButton" ToolTip.Tip="{l:T ws.zoom_in}"><TextBlock Text="+" FontWeight="Bold" /></Button>
+            <TextBlock Text="{Binding ZoomText}" VerticalAlignment="Center" MinWidth="44" TextAlignment="Center" Name="ZoomText" />
+            <Button Classes="vs tool" Name="ZoomFitButton" ToolTip.Tip="{l:T ws.zoom_fit}">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Fit}, Converter={x:Static ui:IconConverter.Instance}}" />
+            </Button>
+            <Button Classes="vs tool" Name="Zoom100Button" ToolTip.Tip="{l:T ws.zoom_100}"><TextBlock Text="100 %" /></Button>
+            <ToggleButton Classes="vs tool" Name="PanToolButton" ToolTip.Tip="{l:T ws.pan_tool}">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Pan}, Converter={x:Static ui:IconConverter.Instance}}" />
+            </ToggleButton>
+          </StackPanel>
+          </Grid>
+          <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" Margin="6,2,6,4">
+            <TextBlock Text="{Binding Summary}" Name="Summary" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+          </Grid>
+          <!-- Picture check (AS-13): one line of advice for the lens and the light, above the picture. -->
+          <Border DockPanel.Dock="Top" Classes="toned" ui:Ui.Tone="Warn" Padding="8,3" Margin="4,2,4,0" Name="PictureAdvice"
+                  IsVisible="{Binding PictureAdvice, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding PictureAdvice}" TextWrapping="Wrap" />
+          </Border>
+          <!-- What auto find offers on this picture: each a ready tool, accepted or left out (nothing is added until accepted). -->
+          <Border DockPanel.Dock="Bottom" Classes="toned" ui:Ui.Tone="Info" Padding="6,4" Margin="4,0" IsVisible="{Binding HasSuggestions}" Name="SuggestionsPanel">
+            <DockPanel>
+              <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="6" Margin="0,0,0,4">
+                <TextBlock Text="{l:T design.suggestions}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Button Classes="vs primary" Command="{Binding AcceptAllSuggestionsCommand}" IsEnabled="{Binding !Busy}" Name="AcceptAll">
+                  <TextBlock Text="{l:T design.accept_all}" />
+                </Button>
+                <Button Classes="vs" Command="{Binding DismissAllSuggestionsCommand}"><TextBlock Text="{l:T design.dismiss_all}" /></Button>
+              </StackPanel>
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="132">
+                <ItemsControl ItemsSource="{Binding Suggestions}" Name="SuggestionList">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:SuggestionItem">
+                      <Border Classes="card" Padding="6,4" MinWidth="180" MaxWidth="320">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding Summary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Text="{Binding ReadText}" Classes="hint" TextWrapping="Wrap" MaxHeight="60" />
+                          <StackPanel Orientation="Horizontal" Spacing="4">
+                            <Button Classes="vs primary" CommandParameter="{Binding}"
+                                    Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).AcceptSuggestionCommand}">
+                              <TextBlock Text="{l:T design.accept}" />
+                            </Button>
+                            <Button Classes="vs" CommandParameter="{Binding}"
+                                    Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).DismissSuggestionCommand}">
+                              <TextBlock Text="{l:T design.dismiss}" />
+                            </Button>
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </Border>
+          <Border Classes="frame" ui:Ui.Tone="{Binding FrameTone}" Name="DesignCanvas" Margin="4">
+            <!-- The picture with scroll bars when zoomed in, the overview in the corner (AS-17). The scroll bars lie
+                 over the picture, so showing them never changes its size (100 % stays one camera pixel per screen pixel). -->
+            <Grid>
+            <ui:ZoomBox Name="Zoom" PanTool="{Binding #PanToolButton.IsChecked}">
+            <Panel>
+              <Image Source="{Binding Image}" Stretch="Uniform" Name="DesignImage" />
+              <ui:ResultOverlay Graphics="{Binding Graphics}" ImageWidth="{Binding ImageWidth}" ImageHeight="{Binding ImageHeight}" />
+              <ui:AreaDrag Name="AreaDrag" ImageWidth="{Binding ImageWidth}" ImageHeight="{Binding ImageHeight}" />
+              <TextBlock Text="{l:T design.press_try}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                         IsVisible="{Binding Image, Converter={x:Static ObjectConverters.IsNull}}" IsHitTestVisible="False" />
+            </Panel>
+            </ui:ZoomBox>
+            <Border HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,8,0,0" Padding="8,2" CornerRadius="4"
+                    Background="{DynamicResource Vs.Brush.SurfaceRaised}" IsHitTestVisible="False" Name="FullPictureNote"
+                    IsVisible="{Binding FullPictureText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding FullPictureText}" />
+            </Border>
+            <ui:ZoomOverview Name="Overview" Source="{Binding OverviewImage}" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                             Margin="0,0,22,22" Width="160" Height="120" IsVisible="False" ToolTip.Tip="{l:T ws.overview}" />
+            <ScrollBar Orientation="Vertical" Name="ZoomScrollY" AllowAutoHide="False" IsVisible="False"
+                       HorizontalAlignment="Right" Margin="0,0,0,14" />
+            <ScrollBar Orientation="Horizontal" Name="ZoomScrollX" AllowAutoHide="False" IsVisible="False"
+                       VerticalAlignment="Bottom" Margin="0,0,14,0" />
+            </Grid>
+          </Border>
+        </DockPanel>
+      </Border>
+      <TextBlock Grid.Column="2" Grid.Row="0" Text="{l:T design.pick_job}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsVisible="{Binding !HasJob}" />
+
+      <GridSplitter Grid.Column="3" Grid.RowSpan="3" ResizeDirection="Columns" IsVisible="{Binding ShowPropertiesPanel}" />
+
+      <!-- Right: every area of the picture with what it found (AS-15, folds to its header), the property table of the
+           selected tool (or camera), then the tool's result. -->
+      <Grid Grid.Column="4" Grid.RowSpan="3" RowDefinitions="*,4,Auto" IsVisible="{Binding ShowPropertiesPanel}" Name="PropertiesPanel">
+        <Border Classes="card" Padding="0">
+          <DockPanel>
+            <v:AreasPanelView DockPanel.Dock="Top" DataContext="{Binding Areas}" Name="AreasPanel" />
+            <Border DockPanel.Dock="Top" Classes="headrow">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{l:T ws.properties}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                  <Button Classes="vs tool" Classes.primary="{Binding !ShowAllProperties}" Command="{Binding ShowEssentialCommand}"
+                          Name="EssentialButton" ToolTip.Tip="{l:T ws.essential.tip}"><TextBlock Text="{l:T ws.essential}" /></Button>
+                  <Button Classes="vs tool" Classes.primary="{Binding ShowAllProperties}" Command="{Binding ShowAllCommand}"
+                          Name="AllButton" ToolTip.Tip="{l:T ws.all.tip}"><TextBlock Text="{l:T ws.all}" /></Button>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <TextBox DockPanel.Dock="Top" Text="{Binding PropertySearch}" Watermark="{l:T ws.find_setting}" Name="PropertySearch" Margin="6,4" />
+            <TextBlock DockPanel.Dock="Top" Text="{l:T ws.no_setting}" Classes="hint" Name="NoSetting" IsVisible="False" />
+            <ScrollViewer Name="PropertiesScroll">
+              <StackPanel>
+                <!-- The camera. -->
+                <StackPanel DataContext="{Binding Camera}" x:DataType="vm:CameraDraft"
+                            IsVisible="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Camera, Converter={x:Static ObjectConverters.IsNotNull}}">
+                  <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.camera}" /></Border>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.camera_name}" ToolTip.Tip="{l:T design.camera_name}" /><TextBox Grid.Column="1" Text="{Binding Name}" /></Grid>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.pictures_folder}" ToolTip.Tip="{l:T design.pictures_folder}" /><TextBox Grid.Column="1" Text="{Binding TestFolder}" Name="PicturesFolder" /></Grid>
+                  <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.serial}" ToolTip.Tip="{l:T design.serial}" /><TextBox Grid.Column="1" Text="{Binding Serial}" Watermark="{l:T design.serial_any}" /></Grid>
+                  <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.lens_mm}" ToolTip.Tip="{l:T design.lens_mm}" />
+                    <NumericUpDown Grid.Column="1" Value="{Binding LensFocalMm}" Minimum="0" Maximum="500" Increment="1" FormatString="0.#" Watermark="{l:T design.lens_mm_unknown}" Name="LensFocal" /></Grid>
+                </StackPanel>
+
+                <Panel IsVisible="{Binding !HasTool}"><TextBlock Text="{l:T design.pick_tool}" Classes="hint" /></Panel>
+                <StackPanel DataContext="{Binding SelectedTool}" x:DataType="vm:ToolDraft"
+                            IsVisible="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).HasTool}">
+                  <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.general}" /></Border>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.tool_name}" ToolTip.Tip="{l:T design.tool_name}" /><TextBox Grid.Column="1" Text="{Binding Name}" Name="ToolName" /></Grid>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T ws.col.tool}" ToolTip.Tip="{l:T ws.col.tool}" /><TextBlock Grid.Column="1" Text="{Binding KindText}" VerticalAlignment="Center" /></Grid>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="" /><CheckBox Grid.Column="1" IsChecked="{Binding Enabled}" Content="{l:T design.enabled}" /></Grid>
+
+                  <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.area}" /></Border>
+                  <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.area}" ToolTip.Tip="{l:T design.area}" /><TextBlock Grid.Column="1" Text="{Binding RoiText}" VerticalAlignment="Center" /></Grid>
+                  <TextBlock Text="{l:T design.area_hint}" Classes="hint" />
+
+                  <!-- Read code (tool spec 5, 6). -->
+                  <StackPanel IsVisible="{Binding IsCode}">
+                    <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.code}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.code_type}" ToolTip.Tip="{l:T design.code_type}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).CodeFormats}" SelectedItem="{Binding Format}" Name="CodeType" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.code_count}" ToolTip.Tip="{l:T design.code_count}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding ExpectedCount}" Minimum="0" Maximum="200" Increment="1" FormatString="0" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.expected}" ToolTip.Tip="{l:T design.expected}" />
+                      <TextBox Grid.Column="1" Text="{Binding Expected}" Watermark="{l:T design.expected_hint}" Name="CodeExpected" /></Grid>
+                    <StackPanel IsVisible="{Binding IsLinear}">
+                      <Grid Classes="prow adv" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.length}" ToolTip.Tip="{l:T design.length}" />
+                        <NumericUpDown Grid.Column="1" Value="{Binding MinLength}" Minimum="0" Maximum="100" FormatString="0" />
+                        <NumericUpDown Grid.Column="3" Value="{Binding MaxLength}" Minimum="0" Maximum="100" FormatString="0" /></Grid>
+                      <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.check_digit}" ToolTip.Tip="{l:T design.check_digit}" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).CheckDigits}" SelectedItem="{Binding CheckDigit}" /></Grid>
+                    </StackPanel>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="GS1" />
+                      <CheckBox Grid.Column="1" IsChecked="{Binding Gs1Check}" Content="{l:T design.gs1}" /></Grid>
+                    <Panel IsVisible="{Binding Gs1Check}"><Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.gs1_ais}" ToolTip.Tip="{l:T design.gs1_ais}" />
+                      <TextBox Grid.Column="1" Text="{Binding Gs1Required}" Watermark="{l:T design.gs1_ais}" /></Grid></Panel>
+                    <Panel IsVisible="{Binding Gs1Check}"><Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock />
+                      <Button Grid.Column="1" Command="{Binding UseGs1PharmaCommand}" Content="{l:T design.gs1_pharma}" ToolTip.Tip="{l:T design.gs1_pharma_hint}" /></Grid></Panel>
+                    <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.grade}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.min_grade}" ToolTip.Tip="{l:T design.min_grade}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Grades}" SelectedItem="{Binding MinGrade}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.grade_every}" ToolTip.Tip="{l:T design.grade_every}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding GradeEvery}" Minimum="1" Maximum="1000" FormatString="0" /></Grid>
+                  </StackPanel>
+
+                  <!-- Read text and Check text (tool spec 7). -->
+                  <StackPanel IsVisible="{Binding IsText}">
+                    <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.print}" /></Border>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.print}" ToolTip.Tip="{l:T design.print}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PrintTypes}" SelectedItem="{Binding Print}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.polarity}" ToolTip.Tip="{l:T design.polarity}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Polarities}" SelectedItem="{Binding Polarity}" Name="Polarity" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.letter_height}" ToolTip.Tip="{l:T design.letter_height}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding CharHeightPx}" Minimum="0" Maximum="400" FormatString="0" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.min_quality}" ToolTip.Tip="{l:T design.min_quality}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinQuality}" Minimum="0" Maximum="100" FormatString="0" /></Grid>
+                    <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.lines}" /></Border>
+                    <Panel IsVisible="{Binding IsCheck}"><TextBlock Text="{l:T design.lines_check_hint}" Classes="hint" /></Panel>
+                    <Panel IsVisible="{Binding IsRead}"><TextBlock Text="{l:T design.lines_read_hint}" Classes="hint" /></Panel>
+                    <ItemsControl ItemsSource="{Binding Lines}" Name="TextLines" Margin="6,0">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="vm:LineDraft">
+                          <Border BorderBrush="{DynamicResource Vs.Brush.Border}" BorderThickness="0,0,0,1" Padding="0,4">
+                            <StackPanel Spacing="3">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="4">
+                                <TextBox Text="{Binding Template}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
+                                <Button Grid.Column="1" Classes="vs tool" Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).RemoveLineCommand}" CommandParameter="{Binding}">
+                                  <PathIcon Data="{Binding Source={x:Static vm:Icons.Delete}, Converter={x:Static ui:IconConverter.Instance}}" />
+                                </Button>
+                              </Grid>
+                              <Grid ColumnDefinitions="*,4,*">
+                                <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Sources}" SelectedItem="{Binding Source}" HorizontalAlignment="Stretch" />
+                                <TextBox Grid.Column="2" Text="{Binding SourceName}" Watermark="{l:T design.source_name}" IsVisible="{Binding NeedsSourceName}" />
+                              </Grid>
+                              <!-- Text from the PLC's text block: where its string lies (PLC-INTERFACE.md 3.7). -->
+                              <Grid ColumnDefinitions="Auto,*,6,Auto,*" IsVisible="{Binding IsPlcText}">
+                                <TextBlock Text="{l:T design.plc_register}" VerticalAlignment="Center" Margin="0,0,4,0" Classes="hint" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding PlcRegister}" Minimum="501" Maximum="627" FormatString="0" />
+                                <TextBlock Grid.Column="3" Text="{l:T design.plc_length}" VerticalAlignment="Center" Margin="0,0,4,0" Classes="hint" />
+                                <NumericUpDown Grid.Column="4" Value="{Binding PlcLength}" Minimum="1" Maximum="254" FormatString="0" />
+                              </Grid>
+                            </StackPanel>
+                          </Border>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Classes="vs" Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).AddLineCommand}" Margin="6,4">
+                      <TextBlock Text="{l:T design.add_line}" />
+                    </Button>
+                  </StackPanel>
+
+                  <!-- Blob, count / spot (tool spec 4, requirements 17.12 BLB-OUT-03..06). -->
+                  <StackPanel IsVisible="{Binding IsBlob}" Name="BlobPanel">
+                    <Border Classes="pcat"><TextBlock Text="{l:T design.blob.threshold}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.threshold}" ToolTip.Tip="{l:T design.blob.threshold}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobThresholds}" SelectedItem="{Binding Threshold}" Name="BlobThreshold" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.polarity}" ToolTip.Tip="{l:T design.blob.polarity}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobPolarities}" SelectedItem="{Binding BlobPolarity}" /></Grid>
+                    <Panel IsVisible="{Binding HasLevel}"><Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.level}" ToolTip.Tip="{l:T design.blob.level}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding Level}" Minimum="0" Maximum="255" Increment="1" FormatString="0" /></Grid></Panel>
+                    <Panel IsVisible="{Binding IsBand}"><Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.level_high}" ToolTip.Tip="{l:T design.blob.level_high}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding LevelHigh}" Minimum="0" Maximum="255" Increment="1" FormatString="0" /></Grid></Panel>
+                    <Panel IsVisible="{Binding IsLocal}"><Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.local_window}" ToolTip.Tip="{l:T design.blob.local_window}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding LocalWindow}" Minimum="3" Maximum="501" Increment="2" FormatString="0" /></Grid></Panel>
+                    <Panel IsVisible="{Binding IsLocal}"><Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.local_offset}" ToolTip.Tip="{l:T design.blob.local_offset}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding LocalOffset}" Minimum="-255" Maximum="255" Increment="1" FormatString="0" /></Grid></Panel>
+                    <Panel IsVisible="{Binding IsAutoThreshold}"><Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.min_contrast}" ToolTip.Tip="{l:T design.blob.min_contrast}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinContrast}" Minimum="0" Maximum="255" Increment="1" FormatString="0" /></Grid></Panel>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.connectivity}" ToolTip.Tip="{l:T design.blob.connectivity}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).Connectivities}" SelectedItem="{Binding Connectivity}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.morphology}" ToolTip.Tip="{l:T design.blob.morphology}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobMorphologies}" SelectedItem="{Binding Morphology}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="" /><CheckBox Grid.Column="1" IsChecked="{Binding FillHoles}" Content="{l:T design.blob.fill_holes}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="" /><CheckBox Grid.Column="1" IsChecked="{Binding ExcludeEdge}" Content="{l:T design.blob.exclude_edge}" /></Grid>
+                    <Border Classes="pcat"><TextBlock Text="{l:T design.blob.min_area}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.min_area}" ToolTip.Tip="{l:T design.blob.min_area}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinArea}" Minimum="1" Maximum="100000000" Increment="1" FormatString="0" Name="BlobMinArea" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.max_area}" ToolTip.Tip="{l:T design.blob.max_area}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MaxArea}" Minimum="0" Maximum="100000000" Increment="1" FormatString="0" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.blob.circularity}" ToolTip.Tip="{l:T design.blob.circularity}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinCircularity}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.00" />
+                      <NumericUpDown Grid.Column="3" Value="{Binding MaxCircularity}" Minimum="0" Maximum="1" Increment="0.05" FormatString="0.00" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.blob.elongation}" ToolTip.Tip="{l:T design.blob.elongation}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinElongation}" Minimum="0" Maximum="1000" Increment="0.5" FormatString="0.0" />
+                      <NumericUpDown Grid.Column="3" Value="{Binding MaxElongation}" Minimum="0" Maximum="1000" Increment="0.5" FormatString="0.0" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.sort}" ToolTip.Tip="{l:T design.blob.sort}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobSorts}" SelectedItem="{Binding SortBy}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="" /><CheckBox Grid.Column="1" IsChecked="{Binding SortDescending}" Content="{l:T design.blob.sort_descending}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.keep_first}" ToolTip.Tip="{l:T design.blob.keep_first}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding KeepFirst}" Minimum="0" Maximum="10000" Increment="1" FormatString="0" /></Grid>
+                    <Border Classes="pcat"><TextBlock Text="{l:T design.blob.presence}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.presence}" ToolTip.Tip="{l:T design.blob.presence}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobPresences}" SelectedItem="{Binding Presence}" Name="BlobPresence" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.blob.count}" ToolTip.Tip="{l:T design.blob.count}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinCount}" Minimum="0" Maximum="100000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" />
+                      <NumericUpDown Grid.Column="3" Value="{Binding MaxCount}" Minimum="0" Maximum="100000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.blob.spot_area}" ToolTip.Tip="{l:T design.blob.spot_area}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding BlobAreaMin}" Minimum="0" Maximum="100000000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" />
+                      <NumericUpDown Grid.Column="3" Value="{Binding BlobAreaMax}" Minimum="0" Maximum="100000000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*,4,*"><TextBlock Text="{l:T design.blob.total_area}" ToolTip.Tip="{l:T design.blob.total_area}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding TotalAreaMin}" Minimum="0" Maximum="100000000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" />
+                      <NumericUpDown Grid.Column="3" Value="{Binding TotalAreaMax}" Minimum="0" Maximum="100000000" Increment="1" FormatString="0" Watermark="{l:T design.blob.no_limit}" /></Grid>
+                    <Border Classes="pcat"><TextBlock Text="{l:T design.blob.check_outline}" /></Border>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="" /><CheckBox Grid.Column="1" IsChecked="{Binding CheckOutline}" Content="{l:T design.blob.check_outline}" Name="BlobCheckOutline" /></Grid>
+                    <TextBlock Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).TaughtOutlineText}" Classes="hint" />
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.unit}" ToolTip.Tip="{l:T design.blob.unit}" />
+                      <ComboBox Grid.Column="1" ItemsSource="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).OutlineUnits}" SelectedItem="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobUnit}" Name="BlobUnit" /></Grid>
+                    <TextBlock Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).BlobUnitHint}" Classes="hint" />
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.max_deviation}" ToolTip.Tip="{l:T design.blob.max_deviation}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MaxDeviation}" Minimum="0" Maximum="10000" Increment="0.1" FormatString="0.0##" Watermark="{l:T design.blob.no_limit}" Name="BlobMaxDeviation" /></Grid>
+                    <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.max_dent}" ToolTip.Tip="{l:T design.blob.max_dent}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MaxDentDepth}" Minimum="0" Maximum="10000" Increment="0.1" FormatString="0.0##" Watermark="{l:T design.blob.no_limit}" Name="BlobMaxDent" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.min_convexity}" ToolTip.Tip="{l:T design.blob.min_convexity}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinConvexity}" Minimum="0" Maximum="1" Increment="0.01" FormatString="0.00" Watermark="{l:T design.blob.no_limit}" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.min_defect}" ToolTip.Tip="{l:T design.blob.min_defect}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding MinDefectDepth}" Minimum="0" Maximum="1000" Increment="0.5" FormatString="0.0" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.smoothing}" ToolTip.Tip="{l:T design.blob.smoothing}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding OutlineSmoothing}" Minimum="0" Maximum="5" Increment="0.5" FormatString="0.0" /></Grid>
+                    <Grid Classes="prow adv" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.blob.edge_level}" ToolTip.Tip="{l:T design.blob.edge_level}" />
+                      <NumericUpDown Grid.Column="1" Value="{Binding EdgeLevel}" Minimum="0" Maximum="255" Increment="1" FormatString="0" Watermark="{l:T design.blob.edge_level_auto}" /></Grid>
+                    <ToggleButton Classes="vs" Margin="6,4,6,0" HorizontalAlignment="Stretch" IsChecked="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).PickingSpot}"
+                                  Name="TeachSpot"
+                                  ToolTip.Tip="{l:T design.blob.teach_spot_tip}"><TextBlock Text="{l:T design.blob.teach_spot}" /></ToggleButton>
+                    <Button Classes="vs" Margin="6,4" Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).AutoToleranceCommand}" Name="AutoTolerance"
+                            ToolTip.Tip="{l:T design.blob.auto_tolerance_tip}"><TextBlock Text="{l:T design.blob.auto_tolerance}" /></Button>
+                    <Border Classes="card" Margin="6,2" Padding="6" IsVisible="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).HasToleranceSuggestion}" Name="ToleranceSuggestion">
+                      <StackPanel Spacing="6">
+                        <TextBlock Text="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).ToleranceSuggestion.Text}" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <Button Classes="vs primary" Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).AcceptToleranceCommand}" Name="AcceptTolerance"><TextBlock Text="{l:T design.blob.accept}" /></Button>
+                          <Button Classes="vs" Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).DismissToleranceCommand}" Name="DismissTolerance"><TextBlock Text="{l:T design.blob.not_this}" /></Button>
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                    <TextBlock Text="{l:T design.blob.outline_hint}" Classes="hint" TextWrapping="Wrap" />
+                  </StackPanel>
+                </StackPanel>
+
+                <Border Classes="pcat"><TextBlock Text="{l:T ws.cat.try}" /></Border>
+                <Grid Classes="prow" ColumnDefinitions="132,*"><TextBlock Text="{l:T design.try_batch}" ToolTip.Tip="{l:T design.try_batch}" />
+                  <TextBox Grid.Column="1" Text="{Binding TryBatch}" Watermark="BATCH=A123; MRP=45.00" Name="TryBatch" /></Grid>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <!-- The selected tool's result on the picture tried, its lines, and its margin over the image set. -->
+        <Border Grid.Row="2" Classes="card" Padding="0" Name="ToolResultPanel" MaxHeight="280">
+          <DockPanel>
+            <Border DockPanel.Dock="Top" Classes="headrow">
+              <TextBlock Text="{l:T ws.tool_result}" />
+            </Border>
+            <ScrollViewer>
+              <StackPanel Margin="8,4" Spacing="3">
+                <TextBlock Text="{l:T ws.no_result}" Classes="hint" Margin="0" IsVisible="{Binding !HasSelectedResult}" />
+                <StackPanel IsVisible="{Binding HasSelectedResult}" Spacing="2">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock FontWeight="Bold" Text="{Binding SelectedResult, Converter={x:Static vm:DesignerConverters.ToolMark}}" />
+                    <TextBlock FontWeight="SemiBold" Text="{Binding SelectedResult, Converter={x:Static vm:DesignerConverters.ToolText}}" />
+                    <TextBlock Classes="muted" Text="{Binding SelectedResult.TimeMs, StringFormat='{}{0:0.0} ms'}" />
+                  </StackPanel>
+                  <TextBlock Text="{Binding SelectedResult.Reason}" TextWrapping="Wrap" Name="ToolReason" />
+                </StackPanel>
+                <!-- Pixel check (AS-14): advice only, the result above is the tool's. -->
+                <StackPanel IsVisible="{Binding HasPixelCheck}" Spacing="2" Name="PixelCheck">
+                  <TextBlock Text="{Binding PixelNeedText}" Classes="muted" TextWrapping="Wrap" />
+                  <Border Classes="toned" ui:Ui.Tone="Warn" Padding="6,3" IsVisible="{Binding HasPixelAdvice}">
+                    <TextBlock Text="{Binding PixelAdviceText}" TextWrapping="Wrap" Name="PixelAdvice" />
+                  </Border>
+                  <Button Classes="vs" Command="{Binding AcceptPixelsCommand}" IsVisible="{Binding CanAcceptPixels}" IsEnabled="{Binding !Busy}"
+                          Name="AcceptPixels" ToolTip.Tip="{l:T px.accept.tip}"><TextBlock Text="{l:T px.accept}" /></Button>
+                  <TextBlock Text="{Binding PixelAcceptedText}" Classes="hint" TextWrapping="Wrap"
+                             IsVisible="{Binding PixelAcceptedText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding SelectedLines}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="rt:TextLineRead">
+                      <TextBlock TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas, Menlo, monospace">
+                        <Run Text="{Binding Pass, Converter={x:Static vm:DesignerConverters.PassMark}}" />
+                        <Run Text="{Binding Text}" />
+                        <Run Text="{Binding Quality, StringFormat='({0:0})'}" />
+                      </TextBlock>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel IsVisible="{Binding HasMargin}" Spacing="2" Margin="0,6,0,0">
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding MarginTitle}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="{Binding MarginVerdict}" Classes="glyph" ui:Ui.Tone="{Binding MarginTone}" />
+                  </Grid>
+                  <ui:MarginChart Scores="{Binding SelectedMargin}" Height="92" Name="MarginChart" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+      </Grid>
+
+      <GridSplitter Grid.Column="2" Grid.Row="1" ResizeDirection="Rows" IsVisible="{Binding ShowDocks}" />
+
+      <!-- Bottom: results of every tool, lines read, the image set, tool times, messages. -->
+      <Border Grid.Column="2" Grid.Row="2" Classes="card" Padding="0" Name="BottomDocks" IsVisible="{Binding ShowDocks}">
+        <TabControl Classes="compact" SelectedIndex="{Binding BottomTab}">
+          <TabItem Header="{l:T ws.tab.results}">
+            <DockPanel>
+              <Border DockPanel.Dock="Top" Classes="headrow">
+                <Grid ColumnDefinitions="22,160,70,*,70">
+                  <TextBlock Grid.Column="1" Text="{l:T ws.col.tool}" />
+                  <TextBlock Grid.Column="2" Text="{l:T ws.col.result}" />
+                  <TextBlock Grid.Column="3" Text="{l:T ws.col.detail}" />
+                  <TextBlock Grid.Column="4" Text="ms" HorizontalAlignment="Right" />
+                </Grid>
+              </Border>
+              <ScrollViewer>
+                <ItemsControl ItemsSource="{Binding Results}" Name="ToolResults">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="rt:ToolTried">
+                      <Border Classes="row">
+                        <Grid ColumnDefinitions="22,160,70,*,70">
+                          <TextBlock Text="{Binding Converter={x:Static vm:DesignerConverters.ToolMark}}" FontWeight="Bold" />
+                          <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Grid.Column="2" Text="{Binding Converter={x:Static vm:DesignerConverters.ToolText}}" FontWeight="SemiBold" />
+                          <TextBlock Grid.Column="3" Text="{Binding Reason}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Reason}" />
+                          <TextBlock Grid.Column="4" Text="{Binding TimeMs, StringFormat='{}{0:0.0}'}" HorizontalAlignment="Right" />
+                        </Grid>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{l:T ws.tab.lines}">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding LinesRead}" Margin="6,4">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="rt:TextLineRead">
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="22,160,*,60">
+                        <TextBlock Text="{Binding Pass, Converter={x:Static vm:DesignerConverters.PassMark}}" FontWeight="Bold" />
+                        <TextBlock Grid.Column="1" Text="{Binding Tool}" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="2" Text="{Binding Text}" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Grid.Column="3" Text="{Binding Quality, StringFormat='{}{0:0}'}" HorizontalAlignment="Right" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="{l:T ws.tab.set}" Name="ImageSetTab">
+            <DockPanel>
+              <TextBlock DockPanel.Dock="Top" Text="{Binding ImageSetSummary}" FontWeight="SemiBold" Margin="8,4" IsVisible="{Binding HasImageSet}" />
+              <TextBlock DockPanel.Dock="Top" Text="{l:T design.set.empty}" Classes="hint" IsVisible="{Binding !HasImageSet}" />
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding ImageSet}" Name="ImageSet" Margin="6,0,6,6" IsEnabled="{Binding !Busy}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:PictureResult">
+                      <Button Padding="0" Background="Transparent" BorderThickness="0" ToolTip.Tip="{Binding Reason}"
+                              Command="{Binding $parent[UserControl].((vm:DesignerViewModel)DataContext).OpenSetPictureCommand}" CommandParameter="{Binding}">
+                        <Border Classes="frame" ui:Ui.Tone="{Binding Tone}" BorderThickness="2" Width="112" Height="104">
+                          <DockPanel>
+                            <Border DockPanel.Dock="Bottom" Classes="toned" ui:Ui.Tone="{Binding Tone}" Padding="4,1">
+                              <Grid ColumnDefinitions="Auto,*,Auto">
+                                <PathIcon Width="10" Height="10" Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                                <TextBlock Grid.Column="1" Text="{Binding Name}" FontSize="{DynamicResource Vs.Font.Small}" Margin="4,0" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="2" Text="{Binding TimeText}" FontSize="{DynamicResource Vs.Font.Small}" />
+                              </Grid>
+                            </Border>
+                            <Image Source="{Binding Thumb}" Stretch="UniformToFill" />
+                          </DockPanel>
+                        </Border>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </ScrollViewer>
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{l:T ws.tab.cycle}">
+            <DockPanel Margin="8,4">
+              <TextBlock DockPanel.Dock="Top" Text="{Binding ToolTimesText}" FontWeight="SemiBold" />
+              <ui:ToolTimeChart Tools="{Binding ToolTimes}" Name="ToolTimeChart" Margin="0,4,0,0" />
+            </DockPanel>
+          </TabItem>
+          <TabItem Header="{l:T ws.tab.messages}">
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Messages}" Name="Messages" Margin="6,2">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:WorkspaceMessage">
+                    <Border Classes="row">
+                      <Grid ColumnDefinitions="64,20,*">
+                        <TextBlock Text="{Binding Time}" Classes="muted" />
+                        <PathIcon Grid.Column="1" Width="12" Height="12" Classes="glyph" ui:Ui.Tone="{Binding Tone}"
+                                  Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                        <TextBlock Grid.Column="2" Text="{Binding Text}" TextWrapping="Wrap" />
+                      </Grid>
+                    </Border>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+      </Border>
+    </Grid>
+
+    <!-- Status bar. -->
+    <Border Grid.Row="4" Classes="bar" BorderThickness="0,1,0,0" Padding="8,3" Name="StatusBar">
+      <StackPanel Orientation="Horizontal" Spacing="16">
+        <TextBlock Text="{Binding JobTitle}" FontWeight="SemiBold" />
+        <TextBlock Text="{Binding StatusText}" Classes="muted" Name="WorkspaceStatus" />
+        <TextBlock Text="{Binding PictureText}" Classes="muted" />
+        <TextBlock Text="{Binding PointerText}" Name="PointerText" FontFamily="Cascadia Mono, Consolas, Menlo, monospace" />
+        <TextBlock Text="{Binding ZoomText}" Classes="muted" />
+      </StackPanel>
+    </Border>
+  </Grid>
+</UserControl>

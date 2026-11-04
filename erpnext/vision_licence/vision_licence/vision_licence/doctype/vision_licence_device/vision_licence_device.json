@@ -1,0 +1,47 @@
+{
+ "doctype": "DocType",
+ "name": "Vision Licence Device",
+ "module": "Vision Licence",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "kind",
+  "serial_no",
+  "item_code"
+ ],
+ "fields": [
+  {
+   "fieldname": "kind",
+   "label": "Kind",
+   "fieldtype": "Select",
+   "options": "camera\nplc\nprinter\nipc\nother",
+   "default": "camera",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "serial_no",
+   "label": "Serial No",
+   "fieldtype": "Link",
+   "options": "Serial No",
+   "in_list_view": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "label": "Item",
+   "fieldtype": "Link",
+   "options": "Item",
+   "fetch_from": "serial_no.item_code",
+   "read_only": 1,
+   "in_list_view": 1
+  }
+ ],
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "links": [],
+ "actions": [],
+ "istable": 1
+}

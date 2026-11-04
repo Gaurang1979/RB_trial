@@ -1,0 +1,118 @@
+@page "/tuning"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ProductStore Store
+@inject Station Station
+@inject CaseLog Log
+
+<PageTitle>Tuning</PageTitle>
+
+<h1>Tuning agent</h1>
+<p class="muted">What the agent has learned per product while the line ran. Only Auto settings are learned; a Locked product is never changed.</p>
+
+<section class="panel">
+    <label>
+        Product
+        <select @bind="code" @bind:after="Load">
+            <option value="">choose...</option>
+            @foreach (var p in products)
+            {
+                <option value="@p.ProductCode">@p.ProductCode: @p.Name</option>
+            }
+        </select>
+    </label>
+</section>
+
+@if (product is not null && tuner is not null)
+{
+    <section class="panel">
+        <h2>@product.ProductCode: learned from @tuner.Frames cases (@product.Mode)</h2>
+        <table>
+            <thead><tr><th>Setting</th><th>Now in product</th><th>Best learned</th><th>Score</th><th>Cases with best</th><th>Auto</th></tr></thead>
+            <tbody>
+                @foreach (var b in tuner.Best())
+                {
+                    bool auto = product.Reader.AutoKnobs.Contains(b.Knob);
+                    <tr>
+                        <td>@b.Knob</td>
+                        <td>@Current(b.Knob)</td>
+                        <td>@(b.Frames > 0 ? Show(b.Knob, b.Value) : "-")</td>
+                        <td>@(b.Frames > 0 ? b.MeanReward.ToString("F3") : "-")</td>
+                        <td>@b.Frames</td>
+                        <td>@(auto ? "Auto" : "Manual")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+        <p class="muted">Score: share of codes read minus a small time penalty, averaged (1.000 = every code, instantly).</p>
+        @if (product.Mode == LearningMode.Locked)
+        {
+            <p class="warn">Locked: learned values are shown for information only. A QA user can unlock the product to apply them.</p>
+        }
+        else if (canApply)
+        {
+            <button disabled="@(tuner.Frames < 50)" @onclick="Apply">Save learned values as a new product version</button>
+            @if (tuner.Frames < 50)
+            {
+                <span class="muted">needs at least 50 cases</span>
+            }
+        }
+        @if (message is not null)
+        {
+            <p class="good">@message</p>
+        }
+    </section>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    private IReadOnlyList<ProductMaster> products = Array.Empty<ProductMaster>();
+    private string code = "";
+    private ProductMaster? product;
+    private TuningAgent? tuner;
+    private bool canApply;
+    private string user = "";
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = Store.List();
+        if (Auth is not null)
+        {
+            var u = (await Auth).User;
+            canApply = u.IsInRole(Roles.Engineer);
+            user = u.Identity?.Name ?? "";
+        }
+        code = Station.Snapshot().Product ?? "";
+        Load();
+    }
+
+    private void Load()
+    {
+        message = null;
+        product = string.IsNullOrEmpty(code) ? null : Store.Get(code);
+        tuner = product is null ? null : Station.Tuner(code);
+    }
+
+    private string Current(string knob) => product is null ? "" : knob switch
+    {
+        "Gamma" => product.Reader.Gamma.ToString("0.##"),
+        "LocatorDensity" => product.Reader.LocatorDensity.ToString("0.##"),
+        "AiThreshold" => product.Reader.AiThreshold.ToString("0.##"),
+        "MaxUpscale" => product.Reader.MaxUpscale.ToString(),
+        "Enhancer" => product.Reader.Enhancer.ToString(),
+        _ => "",
+    };
+
+    private static string Show(string knob, float v) => knob == "Enhancer" ? ((EnhancerMode)(int)v).ToString() : v.ToString("0.##");
+
+    private void Apply()
+    {
+        if (product is null || tuner is null) return;
+        var saved = Store.Save(tuner.Propose(product), user);
+        Log.Audit(user, "tuning-apply", $"{saved.ProductCode} v{saved.Version} from {tuner.Frames} cases");
+        products = Store.List();
+        Load();
+        message = $"Saved as version {saved.Version}. Used from the next start of this product.";
+    }
+}

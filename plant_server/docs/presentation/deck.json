@@ -1,0 +1,76 @@
+{
+ "v": 4,
+ "createdOnFiles": {
+  "v": 1,
+  "at": "2026-09-21T16:05:01Z"
+ },
+ "title": "Sundaram Smart Production Intelligence \u2013 Customer Presentation",
+ "order": [
+  "cover",
+  "states",
+  "questions",
+  "positioning",
+  "hierarchy",
+  "line3d",
+  "signalmap",
+  "equip3d",
+  "infra3d",
+  "exec",
+  "linedash",
+  "equipdash",
+  "truth",
+  "cause",
+  "loss",
+  "mobile",
+  "amc",
+  "architecture",
+  "security",
+  "roles",
+  "value",
+  "status",
+  "pilot",
+  "commercial",
+  "next"
+ ],
+ "sections": {
+  "s1": {
+   "description": "Introduction: the promise",
+   "start": "cover"
+  },
+  "s2": {
+   "description": "The problem: machine ON is not machine producing",
+   "start": "states"
+  },
+  "s3": {
+   "description": "The approach: model, map and see the line",
+   "start": "positioning"
+  },
+  "s4": {
+   "description": "The product: equipment, dashboards, digital truth, losses, mobile, AMC",
+   "start": "equip3d"
+  },
+  "s5": {
+   "description": "How it works: architecture, security, roles",
+   "start": "architecture"
+  },
+  "s6": {
+   "description": "Proof, pilot and commercial model",
+   "start": "value"
+  },
+  "s7": {
+   "description": "Next steps",
+   "start": "next"
+  }
+ },
+ "faces": {
+  "oswald": {
+   "family": "Oswald",
+   "href": "https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&display=swap"
+  },
+  "ibm-plex-sans": {
+   "family": "IBM Plex Sans",
+   "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+  }
+ },
+ "designSystems": []
+}

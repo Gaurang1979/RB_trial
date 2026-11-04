@@ -1,0 +1,30 @@
+@page "/login"
+@layout Layout.MainLayout
+@inject UserStore Users
+
+<PageTitle>Sign in</PageTitle>
+
+<div class="login">
+    <h1>Sign in</h1>
+    @if (Failed)
+    {
+        <p class="bad">Wrong user name or password.</p>
+    }
+    @if (!Users.Any())
+    {
+        <p class="warn">No users yet. On the line PC run:<br /><code>Dashboard add-user &lt;name&gt; "&lt;full name&gt;" Operator,Engineer,QA</code></p>
+    }
+    <form method="post" action="/account/login">
+        <AntiforgeryToken />
+        <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+        <label>User <input name="user" autocomplete="username" required autofocus /></label>
+        <label>Password <input name="password" type="password" autocomplete="current-password" required /></label>
+        <button type="submit">Sign in</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? ReturnUrl { get; set; }
+    [SupplyParameterFromQuery(Name = "failed")] public int? FailedFlag { get; set; }
+    private bool Failed => FailedFlag == 1;
+}

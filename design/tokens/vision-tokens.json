@@ -1,0 +1,67 @@
+{
+  "_about": "The one source of the Vision System look (ARCHITECTURE.md 2.3, UI-UX-SPEC.md 7). tools/tokens/gen_tokens.py generates dotnet/Studio/Theme/Tokens.g.axaml from it (CSS for the browser dashboard later). Colours have one value per theme: dark (default), light and highContrast. Status colours always go with their shape: ok ✓, ng ✗, warn !, duplicate ⧉, stopped ‖, info i. Sizes are one compact density for every role, for touch, mouse and keyboard together (owner, 2026-10-31; UI-UX-SPEC.md principle 3). Chart colours are the series colours of charts (principle 15), never a status. Instrument colours (hud, hudDim) are for keyboard focus, hover and scan lines only, never a status (requirements 17.15 NXT-01). Typefaces are three roles (NXT-02): display (titles, buttons, the OK/NG word), body (all text in every language; scripts it lacks fall back to the listed system fonts) and mono (every number, tabular); the three families are embedded in Vision Studio (SIL Open Font License 1.1).",
+  "themes": ["dark", "light", "highContrast"],
+  "color": {
+    "bg":            { "dark": "#0E131A", "light": "#F3F5F8", "highContrast": "#000000" },
+    "surface":       { "dark": "#161D27", "light": "#FFFFFF", "highContrast": "#000000" },
+    "surfaceRaised": { "dark": "#1F2834", "light": "#E8ECF1", "highContrast": "#1A1A1A" },
+    "border":        { "dark": "#2E3A49", "light": "#C9D1DB", "highContrast": "#FFFFFF" },
+    "text":          { "dark": "#E8EEF5", "light": "#111827", "highContrast": "#FFFFFF" },
+    "textMuted":     { "dark": "#A3B1C2", "light": "#4B5563", "highContrast": "#E6E6E6" },
+    "accent":        { "dark": "#2563EB", "light": "#1D4ED8", "highContrast": "#FFFF00" },
+    "onAccent":      { "dark": "#FFFFFF", "light": "#FFFFFF", "highContrast": "#000000" },
+    "hud":           { "dark": "#38BDF8", "light": "#0369A1", "highContrast": "#00FFFF" },
+    "hudDim":        { "dark": "#2E38BDF8", "light": "#2E0369A1", "highContrast": "#6600FFFF" },
+    "imageBg":       { "dark": "#06090D", "light": "#1F2937", "highContrast": "#000000" },
+    "scrim":         { "dark": "#CC06090D", "light": "#B3111827", "highContrast": "#E6000000" },
+    "status": {
+      "ok":        { "dark": "#22C55E", "light": "#15803D", "highContrast": "#00FF5A" },
+      "ng":        { "dark": "#DC2626", "light": "#991B1B", "highContrast": "#FF3B3B" },
+      "warn":      { "dark": "#FACC15", "light": "#A16207", "highContrast": "#FFFF00" },
+      "duplicate": { "dark": "#FB923C", "light": "#C2410C", "highContrast": "#FF9900" },
+      "stopped":   { "dark": "#8C98A8", "light": "#6B7280", "highContrast": "#C0C0C0" },
+      "info":      { "dark": "#60A5FA", "light": "#1D4ED8", "highContrast": "#00CCFF" }
+    },
+    "onStatus": {
+      "ok":        { "dark": "#04140A", "light": "#FFFFFF", "highContrast": "#000000" },
+      "ng":        { "dark": "#FFFFFF", "light": "#FFFFFF", "highContrast": "#000000" },
+      "warn":      { "dark": "#1A1400", "light": "#FFFFFF", "highContrast": "#000000" },
+      "duplicate": { "dark": "#1A0B00", "light": "#FFFFFF", "highContrast": "#000000" },
+      "stopped":   { "dark": "#0E131A", "light": "#FFFFFF", "highContrast": "#000000" },
+      "info":      { "dark": "#0E131A", "light": "#FFFFFF", "highContrast": "#000000" }
+    },
+    "chart": {
+      "s1":   { "dark": "#3987E5", "light": "#2A78D6", "highContrast": "#00CCFF" },
+      "s2":   { "dark": "#D95926", "light": "#EB6834", "highContrast": "#FF9900" },
+      "s3":   { "dark": "#199E70", "light": "#1BAF7A", "highContrast": "#00FF5A" },
+      "grid": { "dark": "#263140", "light": "#E3E8EE", "highContrast": "#5A5A5A" },
+      "axis": { "dark": "#7D8B9C", "light": "#6B7280", "highContrast": "#E6E6E6" }
+    }
+  },
+  "size": {
+    "touch": 32,
+    "topBar": 40,
+    "actionBar": 40,
+    "actionButtonWidth": 88,
+    "pinKey": 56,
+    "resultGlyph": 48,
+    "ngThumb": 64,
+    "imageFrame": 3,
+    "graphicStroke": 2
+  },
+  "space": { "xs": 2, "s": 4, "m": 6, "l": 8, "xl": 12 },
+  "radius": { "s": 3, "m": 5, "l": 6 },
+  "font": {
+    "small": 11,
+    "body": 13,
+    "label": 13,
+    "title": 15,
+    "counter": 20,
+    "result": 40
+  },
+  "typeface": {
+    "display": { "family": "Rajdhani", "fallback": ["Noto Sans", "Segoe UI"], "generic": "sans-serif" },
+    "body": { "family": "Noto Sans", "fallback": ["Nirmala UI", "Segoe UI", "Microsoft YaHei UI"], "generic": "sans-serif" },
+    "mono": { "family": "JetBrains Mono", "fallback": ["Cascadia Mono", "Consolas"], "generic": "monospace" }
+  }
+}

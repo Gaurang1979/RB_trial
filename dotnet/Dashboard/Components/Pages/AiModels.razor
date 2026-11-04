@@ -1,0 +1,122 @@
+@page "/models"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ModelRegistry Registry
+@inject UserStore Users
+@inject CaseLog Log
+
+<PageTitle>AI models</PageTitle>
+
+<h1>AI models</h1>
+
+<section class="panel">
+    @{ var (loc, enh) = Registry.Current(); }
+    <p>Code locator: @(loc is null ? "none (classical locator only)" : $"codenet.onnx, {loc.Value.ToLocalTime():dd MMM yyyy HH:mm}")</p>
+    <p>Code enhancer: @(enh is null ? "none" : $"enhancer.onnx, {enh.Value.ToLocalTime():dd MMM yyyy HH:mm}")</p>
+    <p class="muted">The retraining agent (ml/retrain.py) learns from the line's hard cases at night and leaves candidates here. A candidate can be promoted only if it found at least as many codes as the current model on both test sets, and only with a QA signature. It is used from the next station start.</p>
+</section>
+
+<section class="panel">
+    <h2>Candidates</h2>
+    @if (reports.Count == 0)
+    {
+        <p class="muted">No retraining runs yet.</p>
+    }
+    <table>
+        <thead><tr><th>Run</th><th>Hard cases</th><th>Learnable</th><th>Reference images: old / new</th><th>Hard cases: old / new</th><th>Result</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var r in reports)
+            {
+                <tr>
+                    <td>@r.Stamp</td><td>@r.HardCases</td><td>@r.Learnable</td>
+                    <td>@r.GoldenOld / @r.GoldenNew of @r.GoldenLabelled</td>
+                    <td>@r.HardOld / @r.HardNew of @r.HardLabelled</td>
+                    <td class="@(r.Passed ? "good" : "bad")">@r.Decision</td>
+                    <td>
+                        @if (r.Passed && isQa && r.CandidateFile is not null)
+                        {
+                            <button class="link" @onclick="() => selected = r">Promote...</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@if (selected is not null)
+{
+    <section class="panel sign">
+        <h2>Promote @selected.CandidateFile</h2>
+        <label>Your password <input type="password" @bind="password" autocomplete="current-password" /></label>
+        <label>Reason <input @bind="reason" size="40" /></label>
+        <button @onclick="Promote">Sign and promote</button>
+        <button class="link" @onclick="() => selected = null">Cancel</button>
+    </section>
+}
+@if (message is not null)
+{
+    <p class="@(ok ? "good" : "bad")">@message</p>
+}
+
+<section class="panel">
+    <h2>Promotions</h2>
+    <table>
+        <thead><tr><th>Time</th><th>Model</th><th>Approved by</th></tr></thead>
+        <tbody>
+            @foreach (var h in Registry.History())
+            {
+                <tr><td>@h.Time.ToString("dd MMM yyyy HH:mm")</td><td>@System.IO.Path.GetFileName(h.Promoted)</td><td>@h.ApprovedBy</td></tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    private IReadOnlyList<CandidateReport> reports = Array.Empty<CandidateReport>();
+    private CandidateReport? selected;
+    private bool isQa, ok;
+    private string user = "", password = "", reason = "";
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        reports = Registry.Reports();
+        if (Auth is not null)
+        {
+            var u = (await Auth).User;
+            isQa = u.IsInRole(Roles.QA);
+            user = u.Identity?.Name ?? "";
+        }
+    }
+
+    private void Promote()
+    {
+        if (selected?.CandidateFile is null) return;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(reason)) throw new InvalidOperationException("give a reason for the signature");
+            if (Users.Verify(user, password) is null)
+            {
+                Log.Audit(user, "signature-failed", "model " + selected.CandidateFile);
+                throw new InvalidOperationException("password does not match: not signed");
+            }
+            string approver = $"{user} {DateTime.Now:yyyy-MM-dd HH:mm}: {reason}";
+            Registry.Promote(selected.CandidateFile, approver);
+            Log.Audit(user, "model-promote", $"{selected.CandidateFile}, {approver}");
+            message = $"Promoted {selected.CandidateFile}. Restart the station to use it.";
+            ok = true;
+            selected = null;
+        }
+        catch (Exception e)
+        {
+            message = e.Message;
+            ok = false;
+        }
+        finally
+        {
+            password = "";
+        }
+    }
+}

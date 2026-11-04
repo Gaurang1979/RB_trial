@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>VisionSystem.Runtime</RootNamespace>
+    <AssemblyName>vs-runtime</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>The vision runtime service (vs-runtime): runs the line (station, cameras, jobs, PLC, plant link, resource guard) and serves the runtime contract on the local endpoint (named pipe, Unix socket on macOS) with the access rules of ARCHITECTURE.md section 2.2. Windows service, or a plain program with --console.</Description>
+    <!-- the Hikrobot adapter is x64-only; it is loaded only when a camera is opened -->
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.85.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The station, PLC service, licence and image cache are used from VisionStudio as they are
+         until draft #70 (which edits Station.cs) merges; then they move here (Pending in the note). -->
+    <ProjectReference Include="../../third_party/remote-service/dotnet/RemoteService.Agent/RemoteService.Agent.csproj" />
+    <ProjectReference Include="../VisionStudio/VisionStudio.csproj" />
+    <ProjectReference Include="../RuntimeContract/RuntimeContract.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- the browser dashboard's pages (Hybrid 4), served from the program itself, never from a folder -->
+    <EmbeddedResource Include="Web/*.html;Web/*.js;Web/*.css" LogicalName="VisionSystem.Runtime.Web.%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="vs-runtime.json" CopyToOutputDirectory="PreserveNewest" />
+    <!-- the Blob tool's engine (Teach and Auto tolerance in the job designer, and the line): not in the
+         retired VisionStudio project's list, so the runtime brings it itself (requirements 17.12 BLB-OUT-06) -->
+    <None Include="../../engine/build/libvs_blob.dylib" Condition="Exists('../../engine/build/libvs_blob.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libvs_blob.dylib" />
+    <None Include="../../engine/build/Release/vs_blob.dll" Condition="Exists('../../engine/build/Release/vs_blob.dll')" CopyToOutputDirectory="PreserveNewest" Link="vs_blob.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Runtime.Host.Tests" />
+  </ItemGroup>
+  <!-- the remote service agent comes from a git submodule; a checkout or worktree made without it gets this message, not a missing project -->
+  <Target Name="CheckRemoteServiceSubmodule" BeforeTargets="CollectPackageReferences;ResolveProjectReferences">
+    <Error Condition="!Exists('$(MSBuildThisFileDirectory)../../third_party/remote-service/dotnet/RemoteService.Agent/RemoteService.Agent.csproj')"
+           Text="third_party/remote-service is empty: run 'git submodule update --init' in the repository (or clone with --recurse-submodules)." />
+  </Target>
+</Project>

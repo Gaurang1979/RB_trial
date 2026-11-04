@@ -1,0 +1,22 @@
+@page "/login"
+
+<PageTitle>@T["login.title"]</PageTitle>
+<div class="card narrow">
+    <h1>@T["login.title"]</h1>
+    @if (Failed == 1) { <p class="bad">@T["login.failed"]</p> }
+    @if (Failed == 2) { <p class="bad">@T["login.no_role"]</p> }
+    @if (Failed == 3) { <p class="bad">@T["login.otp_locked"]</p> }
+    <form method="post" action="/account/login" data-enhance="false">
+        <AntiforgeryToken />
+        <label>@T["login.user"] <input name="user" autocomplete="username" required autofocus /></label>
+        <label>@T["login.password"] <input name="password" type="password" autocomplete="current-password" required /></label>
+        @* Service and OEM roles need today's code (Req 17.10 MRG-09 item 4, REQ-21 item 4 warning) *@
+        <label>@T["login.otp"] <input name="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" /></label>
+        <p class="muted small">@T["login.otp_warning"]</p>
+        <button class="big primary" type="submit">@T["login.sign_in"]</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "failed")] public int? Failed { get; set; }
+}

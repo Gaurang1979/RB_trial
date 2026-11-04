@@ -1,0 +1,47 @@
+{
+  "Name": "Toilet cleaner 500ml",
+  "Description": "First release layout (Oct 2026): no schema version, no job number",
+  "Version": 3,
+  "UpdatedAt": "2026-10-29T10:12:00+05:30",
+  "UpdatedBy": "engineer",
+  "Cameras": [
+    {
+      "Name": "Camera 1",
+      "Driver": "",
+      "Serial": "",
+      "ExposureUs": 2000,
+      "GainDb": 0
+    }
+  ],
+  "Tools": [
+    {
+      "kind": "code",
+      "Format": "Ean13",
+      "ExpectedCount": 1,
+      "Expected": "{GTIN}",
+      "TimeBudgetMs": 100,
+      "Name": "EAN",
+      "Camera": 0,
+      "Roi": { "X": 100, "Y": 80, "Width": 600, "Height": 300 },
+      "Enabled": true
+    },
+    {
+      "kind": "text",
+      "Mode": "Check",
+      "Lines": [
+        { "Entry": "Template", "Template": "MRP {MRP}" },
+        { "Entry": "FullText", "Template": "" }
+      ],
+      "Print": "Auto",
+      "Polarity": "Auto",
+      "CharHeightPx": 32,
+      "MinQuality": 60,
+      "MaxSkewDeg": 15,
+      "TimeBudgetMs": 100,
+      "Name": "Batch print",
+      "Camera": 0,
+      "Roi": { "X": 400, "Y": 600, "Width": 900, "Height": 400 },
+      "Enabled": true
+    }
+  ]
+}

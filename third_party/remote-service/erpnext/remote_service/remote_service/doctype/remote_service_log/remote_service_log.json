@@ -1,0 +1,216 @@
+{
+ "doctype": "DocType",
+ "name": "Remote Service Log",
+ "module": "Remote Service",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "session_id",
+  "machine",
+  "machine_name",
+  "site",
+  "licence",
+  "customer",
+  "column_break_1",
+  "engineer",
+  "engineer_name",
+  "employee",
+  "role",
+  "timesheet",
+  "section_time",
+  "started",
+  "ended",
+  "duration_hours",
+  "end_reason",
+  "reason",
+  "timesheet_note",
+  "ledger_head",
+  "section_actions",
+  "actions"
+ ],
+ "fields": [
+  {
+   "fieldname": "session_id",
+   "label": "Session",
+   "fieldtype": "Data",
+   "unique": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "machine",
+   "label": "Machine",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "machine_name",
+   "label": "Machine Name",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "site",
+   "label": "Site",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "licence",
+   "label": "Licence Key",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "customer",
+   "label": "Customer",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "label": "",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "engineer",
+   "label": "Engineer (relay account)",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "engineer_name",
+   "label": "Engineer Name",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employee",
+   "label": "Employee",
+   "fieldtype": "Link",
+   "options": "Employee",
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "role",
+   "label": "Role",
+   "fieldtype": "Select",
+   "options": "service\noem",
+   "read_only": 1
+  },
+  {
+   "fieldname": "timesheet",
+   "label": "Timesheet",
+   "fieldtype": "Link",
+   "options": "Timesheet",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_time",
+   "label": "Time",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "started",
+   "label": "Started",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "ended",
+   "label": "Ended",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "duration_hours",
+   "label": "Hours",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "read_only": 1,
+   "precision": "2"
+  },
+  {
+   "fieldname": "end_reason",
+   "label": "Ended Because",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "label": "Reason Given",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "timesheet_note",
+   "label": "Timesheet Note",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ledger_head",
+   "label": "Machine Log Head at End",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "description": "The machine's log chain head when the session ended. A later rewrite of the machine's log no longer matches it."
+  },
+  {
+   "fieldname": "section_actions",
+   "label": "What Was Done",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "actions",
+   "label": "Actions",
+   "fieldtype": "Table",
+   "options": "Remote Service Log Action",
+   "read_only": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "autoname": "field:session_id",
+ "title_field": "machine",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Remote Service Integration",
+   "read": 1,
+   "create": 1
+  },
+  {
+   "role": "Projects Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "HR Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+# Example Mosquitto ACL for a real line (docs/architecture/EDGE.md, "Gateway token"). Use with, in mosquitto.conf:
+#   allow_anonymous false
+#   password_file /mosquitto/config/passwd      (mosquitto_passwd -c passwd spi-backend; one user per gateway)
+#   acl_file /mosquitto/config/acl
+#   listener 8883 + certfile/keyfile            (TLS: the gateway token travels in every message)
+# Only the plant server reads production events: MQTT 5 gives a message's user properties (the gateway's
+# token) to every subscriber. Each gateway writes only its own topic: <prefix>/<plant>/<line>/<gateway>/events.
+
+user spi-backend
+topic read spi/v1/#
+
+# Every gateway logs in with its gateway id as its MQTT user name and may write only its own topic.
+pattern write spi/v1/+/+/%u/events

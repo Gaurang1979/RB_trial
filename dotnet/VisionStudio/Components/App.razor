@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="@Text.Language">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+        // Light / Dark / Auto: "auto" follows the PC (no data-theme); the choice is kept in this browser only.
+        (function () {
+            var K = "vs-theme", root = document.documentElement;
+            function apply(v) { if (v === "dark" || v === "light") root.setAttribute("data-theme", v); else root.removeAttribute("data-theme"); }
+            function get() { try { var v = localStorage.getItem(K); return v === "dark" || v === "light" ? v : "auto"; } catch (e) { return "auto"; } }
+            window.vsTheme = {
+                get: get,
+                set: function (v) { apply(v); try { if (v === "auto") localStorage.removeItem(K); else localStorage.setItem(K, v); } catch (e) { } }
+            };
+            apply(get());
+        })();
+    </script>
+    <link rel="stylesheet" href="app.css" />
+    <HeadOutlet @rendermode="InteractiveServer" />
+</head>
+<body>
+    <Routes @rendermode="InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
+
+@code {
+    [Inject] private VisionStudio.Services.Texts Text { get; set; } = default!;
+}

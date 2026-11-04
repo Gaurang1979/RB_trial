@@ -1,0 +1,536 @@
+@page "/sundaram"
+@attribute [Authorize(Roles = Roles.QA)]
+@rendermode InteractiveServer
+@inject SundaramTelemetryService Telemetry
+@inject IJSRuntime JS
+
+<PageTitle>Sundaram Telemetry & Releases</PageTitle>
+
+<div class="sundaram-portal">
+    <div class="portal-header">
+        <div>
+            <h1>Sundaram Enterprise Vision Administration</h1>
+            <p class="muted">Centralized error aggregation, cross-plant incident clustering, Claude diagnostic exports, and staged version releases.</p>
+        </div>
+        <div class="header-kpis">
+            <div class="kpi-mini">
+                <span class="label">Connected Facilities</span>
+                <span class="val good">@facilities.Count(f => f.IsOnline) / @facilities.Count Online</span>
+            </div>
+            <div class="kpi-mini">
+                <span class="label">Grouped Incident Clusters</span>
+                <span class="val @(clusters.Any(c => c.Severity == ClusterSeverity.Critical) ? "bad" : "good")">@clusters.Count Active</span>
+            </div>
+            <div class="kpi-mini">
+                <span class="label">Total Incidents (Enterprise)</span>
+                <span class="val">@clusters.Sum(c => c.TotalOccurrences)</span>
+            </div>
+            <div class="kpi-mini">
+                <span class="label">Active Rollout Version</span>
+                <span class="val text-accent">@(releases.FirstOrDefault(r => r.IsActive)?.Version ?? "v2.4.0")</span>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(toastMessage))
+    {
+        <div class="toast-banner @(toastIsError ? "toast-bad" : "toast-good")">
+            <span>@toastMessage</span>
+            <button class="link" @onclick="() => toastMessage = null">✕</button>
+        </div>
+    }
+
+    <!-- Tabs Navigation -->
+    <div class="tab-bar">
+        <button class="tab-btn @(currentTab == "clusters" ? "active" : "")" @onclick='() => currentTab = "clusters"'>
+            Grouped Error Clusters (@clusters.Count)
+        </button>
+        <button class="tab-btn @(currentTab == "facilities" ? "active" : "")" @onclick='() => currentTab = "facilities"'>
+            Facilities & Line Matrix (@facilities.Count)
+        </button>
+        <button class="tab-btn @(currentTab == "releases" ? "active" : "")" @onclick='() => currentTab = "releases"'>
+            Staged Version Releases
+        </button>
+        <button class="tab-btn @(currentTab == "live" ? "active" : "")" @onclick='() => currentTab = "live"'>
+            Live Incident Stream (@recentIncidents.Count)
+        </button>
+    </div>
+
+    <!-- TAB 1: GROUPED ERROR CLUSTERS -->
+    @if (currentTab == "clusters")
+    {
+        <section class="panel">
+            <div class="panel-header-row">
+                <div>
+                    <h2>Cross-Facility Grouped Error Clusters</h2>
+                    <p class="muted">Identical errors occurring across Sundaram Chennai, Hosur, and Pune lines are grouped by deterministic fingerprint.</p>
+                </div>
+                <div class="controls">
+                    <input type="text" placeholder="Search clusters by code or title..." @bind="searchFilter" @bind:event="oninput" style="width: 280px;" />
+                    <select @bind="severityFilter">
+                        <option value="">All Severities</option>
+                        <option value="Critical">Critical</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Warning">Warning</option>
+                    </select>
+                </div>
+            </div>
+
+            <table class="cluster-table">
+                <thead>
+                    <tr>
+                        <th style="width: 90px;">Severity</th>
+                        <th style="width: 140px;">Fingerprint</th>
+                        <th>Error Title & Root Cause</th>
+                        <th style="width: 100px; text-align: center;">Occurrences</th>
+                        <th>Affected Locations</th>
+                        <th style="width: 110px;">Status</th>
+                        <th style="width: 220px; text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in FilteredClusters)
+                    {
+                        <tr class="@(c.Severity == ClusterSeverity.Critical ? "badrow" : "")">
+                            <td>
+                                <span class="badge badge-@c.Severity.ToString().ToLowerInvariant()">@c.Severity</span>
+                            </td>
+                            <td><code>@c.ClusterId</code></td>
+                            <td>
+                                <div class="font-bold">@c.Title</div>
+                                <div class="muted small">First: @c.FirstSeenUtc.ToString("MM-dd HH:mm") | Last: @c.LastSeenUtc.ToString("MM-dd HH:mm")</div>
+                            </td>
+                            <td style="text-align: center;">
+                                <span class="badge-count">@c.TotalOccurrences</span>
+                            </td>
+                            <td>
+                                <div class="pill-cloud">
+                                    @foreach (var loc in c.AffectedLines)
+                                    {
+                                        <span class="pill-loc">@loc</span>
+                                    }
+                                </div>
+                            </td>
+                            <td>
+                                <select class="compact-select" value="@c.Status" @onchange="(e) => UpdateStatus(c.ClusterId, e.Value?.ToString())">
+                                    <option value="New">New</option>
+                                    <option value="Investigating">Investigating</option>
+                                    <option value="FixScheduled">Fix Scheduled</option>
+                                    <option value="Resolved">Resolved</option>
+                                </select>
+                            </td>
+                            <td style="text-align: right;">
+                                <button class="btn-sm btn-accent" @onclick="() => CopyClusterPrompt(c)">📋 Copy Claude Prompt</button>
+                                <button class="btn-sm btn-outline" @onclick="() => ViewClusterPrompt(c)">View</button>
+                            </td>
+                        </tr>
+                    }
+                    @if (!FilteredClusters.Any())
+                    {
+                        <tr>
+                            <td colspan="7" class="text-center muted pad-lg">No incident clusters match the filter.</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    <!-- TAB 2: FACILITIES & LINE MATRIX -->
+    @if (currentTab == "facilities")
+    {
+        <div class="facility-grid">
+            @foreach (var fac in facilities)
+            {
+                <div class="facility-card panel">
+                    <div class="fac-header">
+                        <div>
+                            <div class="fac-title">@fac.FacilityName</div>
+                            <div class="muted small">@fac.Location</div>
+                        </div>
+                        <span class="status-indicator @(fac.IsOnline ? "online" : "offline")">
+                            @(fac.IsOnline ? "Online" : "Offline")
+                        </span>
+                    </div>
+
+                    <div class="fac-stats-row">
+                        <div><strong>@fac.Lines.Count</strong> Active Lines</div>
+                        <div>Critical Faults (24h): <strong class="@(fac.CriticalErrors24h > 0 ? "bad" : "good")">@fac.CriticalErrors24h</strong></div>
+                    </div>
+
+                    <table class="line-table">
+                        <thead>
+                            <tr>
+                                <th>Line</th>
+                                <th>Installed</th>
+                                <th>Target</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var l in fac.Lines)
+                            {
+                                <tr>
+                                    <td><strong>@l.Line</strong></td>
+                                    <td><code>@l.InstalledVersion</code></td>
+                                    <td><code>@l.TargetVersion</code></td>
+                                    <td>
+                                        <span class="badge badge-deploy-@l.Status.ToString().ToLowerInvariant()">
+                                            @l.Status
+                                        </span>
+                                        @if (l.ErrorCountSinceDeploy > 0)
+                                        {
+                                            <span class="error-count-tag">@l.ErrorCountSinceDeploy errors</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (l.Status == DeploymentStatus.RollbackRequired)
+                                        {
+                                            <button class="btn-sm btn-danger" @onclick="() => TriggerRollback(fac.FacilityName, l.Line)">Rollback</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-sm btn-outline" @onclick="() => AssignTarget(fac.FacilityName, l.Line, releases.FirstOrDefault(r => r.IsActive)?.Version ?? l.TargetVersion)">Sync</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    }
+
+    <!-- TAB 3: STAGED VERSION RELEASES -->
+    @if (currentTab == "releases")
+    {
+        <section class="panel">
+            <h2>Enterprise Staged Version Release Lifecycle</h2>
+            <p class="muted">Software releases are rolled out progressively across Sundaram facilities to eliminate risk of production stops.</p>
+
+            <div class="stage-pipeline">
+                <div class="pipeline-step completed">
+                    <div class="step-num">1</div>
+                    <div class="step-label">Canary</div>
+                    <div class="step-desc">1 Line (Hosur L4)</div>
+                </div>
+                <div class="pipeline-arrow">➔</div>
+                <div class="pipeline-step completed">
+                    <div class="step-num">2</div>
+                    <div class="step-label">Pilot</div>
+                    <div class="step-desc">1 Facility (Hosur)</div>
+                </div>
+                <div class="pipeline-arrow">➔</div>
+                <div class="pipeline-step current">
+                    <div class="step-num">3</div>
+                    <div class="step-label">Staged (50%)</div>
+                    <div class="step-desc">Chennai & Hosur</div>
+                </div>
+                <div class="pipeline-arrow">➔</div>
+                <div class="pipeline-step">
+                    <div class="step-num">4</div>
+                    <div class="step-label">Production (GA)</div>
+                    <div class="step-desc">All Sundaram Plants</div>
+                </div>
+            </div>
+
+            <table class="cluster-table mt-16">
+                <thead>
+                    <tr>
+                        <th>Version</th>
+                        <th>Current Stage</th>
+                        <th>Git Commit</th>
+                        <th>Release Date</th>
+                        <th>Lines Updated</th>
+                        <th>Release Notes & Enhancements</th>
+                        <th>Stage Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var rel in releases)
+                    {
+                        <tr>
+                            <td><strong><code>@rel.Version</code></strong></td>
+                            <td><span class="badge badge-accent">@rel.Stage</span></td>
+                            <td><code>@rel.GitCommit</code></td>
+                            <td>@rel.ReleaseDateUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td>@rel.TargetLinesUpdated / @rel.TargetLinesTotal</td>
+                            <td class="small">@rel.ReleaseNotes</td>
+                            <td>
+                                @if (rel.Stage < ReleaseStage.GeneralAvailability)
+                                {
+                                    <button class="btn-sm btn-accent" @onclick="() => PromoteStage(rel.Version, rel.Stage + 1)">Promote Stage ➔</button>
+                                }
+                                else
+                                {
+                                    <span class="good small">✓ Global GA</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    <!-- TAB 4: LIVE INCIDENT STREAM -->
+    @if (currentTab == "live")
+    {
+        <section class="panel">
+            <h2>Real-time Incident Ingestion Stream</h2>
+            <p class="muted">Chronological telemetry feed from all operational vision stations.</p>
+
+            <table class="cluster-table">
+                <thead>
+                    <tr>
+                        <th>Incident ID</th>
+                        <th>Time (UTC)</th>
+                        <th>Facility / Line</th>
+                        <th>Fault Code</th>
+                        <th>Active Tool</th>
+                        <th>Error Message</th>
+                        <th style="text-align: right;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var inc in recentIncidents)
+                    {
+                        <tr>
+                            <td><code>@inc.IncidentId</code></td>
+                            <td>@inc.TimestampUtc.ToString("HH:mm:ss")</td>
+                            <td>@inc.Facility / @inc.Line</td>
+                            <td><span class="badge badge-warning">@inc.FaultCode</span></td>
+                            <td>@inc.PipelineContext.SafeToolLabel</td>
+                            <td class="small font-mono">@inc.ErrorMessage</td>
+                            <td style="text-align: right;">
+                                <button class="btn-sm btn-accent" @onclick="() => CopyIncidentPrompt(inc)">📋 Copy Claude Prompt</button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    <!-- MODAL DRAWER: CLAUDE DIAGNOSTIC PROMPT VIEWER -->
+    @if (showPromptModal && activeModalPrompt is not null)
+    {
+        <div class="modal-backdrop" @onclick="() => showPromptModal = false">
+            <div class="modal-box" @onclick:stopPropagation="true">
+                <div class="modal-header">
+                    <div>
+                        <h3>@modalTitle</h3>
+                        <div class="muted small">Ready to submit directly to Claude for immediate diagnosis & code fix</div>
+                    </div>
+                    <button class="link" @onclick="() => showPromptModal = false">✕</button>
+                </div>
+                <div class="modal-body">
+                    <pre class="prompt-preview">@activeModalPrompt</pre>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-accent" @onclick="CopyActivePrompt">📋 Copy to Clipboard</button>
+                    <button class="btn-outline" @onclick="() => showPromptModal = false">Close</button>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .sundaram-portal { max-width: 1400px; margin: 0 auto; }
+    .portal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 16px; }
+    .header-kpis { display: flex; gap: 12px; flex-wrap: wrap; }
+    .kpi-mini { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; min-width: 140px; }
+    .kpi-mini .label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; font-weight: 600; }
+    .kpi-mini .val { font-size: 16px; font-weight: 700; }
+    .text-accent { color: var(--accent); }
+
+    .toast-banner { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; border-radius: 6px; margin-bottom: 16px; }
+    .toast-good { background: var(--ok-bg); color: var(--ok); border: 1px solid #86efac; }
+    .toast-bad { background: var(--bad-bg); color: var(--bad); border: 1px solid #fca5a5; }
+
+    .tab-bar { display: flex; gap: 8px; border-bottom: 2px solid var(--line); margin-bottom: 16px; }
+    .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; color: var(--muted); font-size: 14px; font-weight: 600; padding: 8px 16px; cursor: pointer; border-radius: 0; }
+    .tab-btn:hover { color: var(--ink); background: none; }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); background: none; }
+
+    .panel-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+    .cluster-table th, .cluster-table td { padding: 10px 12px; }
+    .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-critical { background: var(--bad-bg); color: var(--bad); }
+    .badge-high { background: #fee2e2; color: #dc2626; }
+    .badge-medium { background: var(--warn-bg); color: var(--warn); }
+    .badge-warning { background: #fef9c3; color: #854d0e; }
+    .badge-accent { background: #dbeafe; color: var(--accent); }
+    .badge-deploy-synced { background: var(--ok-bg); color: var(--ok); }
+    .badge-deploy-rollbackrequired { background: var(--bad-bg); color: var(--bad); }
+    .badge-deploy-updating { background: #e0e7ff; color: #4338ca; }
+    .badge-deploy-pendingapproval { background: var(--warn-bg); color: var(--warn); }
+
+    .badge-count { background: #e5e7eb; color: #374151; font-weight: 700; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+    .pill-cloud { display: flex; flex-wrap: wrap; gap: 4px; }
+    .pill-loc { background: #f3f4f6; color: #4b5563; padding: 2px 6px; border-radius: 4px; font-size: 11px; white-space: nowrap; border: 1px solid #e5e7eb; }
+
+    .btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 4px; margin-left: 4px; }
+    .btn-accent { background: var(--accent); color: #fff; border: 1px solid var(--accent); cursor: pointer; }
+    .btn-outline { background: #fff; color: var(--ink); border: 1px solid var(--line); cursor: pointer; }
+    .btn-danger { background: var(--bad); color: #fff; border: 1px solid var(--bad); cursor: pointer; }
+    .compact-select { padding: 3px 6px; font-size: 12px; border-radius: 4px; }
+
+    .facility-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; }
+    .fac-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    .fac-title { font-size: 16px; font-weight: 700; }
+    .status-indicator { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+    .status-indicator.online { background: var(--ok-bg); color: var(--ok); }
+    .status-indicator.offline { background: var(--bad-bg); color: var(--bad); }
+    .fac-stats-row { display: flex; justify-content: space-between; background: #f9fafb; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; }
+    .line-table th, .line-table td { padding: 6px 8px; font-size: 13px; }
+    .error-count-tag { display: block; font-size: 10px; color: var(--bad); font-weight: 600; }
+
+    .stage-pipeline { display: flex; align-items: center; justify-content: space-between; background: #f9fafb; border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 16px 0; }
+    .pipeline-step { text-align: center; flex: 1; }
+    .step-num { width: 32px; height: 32px; border-radius: 16px; background: #e5e7eb; color: #4b5563; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 6px; }
+    .pipeline-step.completed .step-num { background: var(--ok); color: #fff; }
+    .pipeline-step.current .step-num { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px #bfdbfe; }
+    .step-label { font-weight: 700; font-size: 13px; }
+    .step-desc { font-size: 11px; color: var(--muted); }
+    .pipeline-arrow { color: var(--muted); font-size: 18px; padding: 0 8px; }
+
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .modal-box { background: #fff; border-radius: 8px; width: 90%; max-width: 850px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); }
+    .modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+    .modal-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; gap: 8px; }
+    .prompt-preview { background: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 6px; font-family: monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-all; max-height: 450px; overflow-y: auto; }
+</style>
+
+@code {
+    private string currentTab = "clusters";
+    private string searchFilter = "";
+    private string severityFilter = "";
+    private string? toastMessage;
+    private bool toastIsError;
+
+    private bool showPromptModal = false;
+    private string modalTitle = "";
+    private string? activeModalPrompt;
+
+    private IReadOnlyList<ErrorCluster> clusters = Array.Empty<ErrorCluster>();
+    private IReadOnlyList<FacilityStatus> facilities = Array.Empty<FacilityStatus>();
+    private IReadOnlyList<ReleasePackage> releases = Array.Empty<ReleasePackage>();
+    private IReadOnlyList<ClaudeDiagnosticPackage> recentIncidents = Array.Empty<ClaudeDiagnosticPackage>();
+
+    protected override void OnInitialized()
+    {
+        RefreshData();
+    }
+
+    private void RefreshData()
+    {
+        clusters = Telemetry.GetClusters();
+        facilities = Telemetry.GetFacilities();
+        releases = Telemetry.GetReleases();
+        recentIncidents = Telemetry.GetRecentIncidents(50);
+    }
+
+    private IEnumerable<ErrorCluster> FilteredClusters
+    {
+        get
+        {
+            var list = clusters.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(searchFilter))
+            {
+                list = list.Where(c => c.Title.Contains(searchFilter, StringComparison.OrdinalIgnoreCase) ||
+                                       c.ClusterId.Contains(searchFilter, StringComparison.OrdinalIgnoreCase));
+            }
+            if (!string.IsNullOrWhiteSpace(severityFilter) && Enum.TryParse<ClusterSeverity>(severityFilter, true, out var sev))
+            {
+                list = list.Where(c => c.Severity == sev);
+            }
+            return list;
+        }
+    }
+
+    private void UpdateStatus(string clusterId, string? statusStr)
+    {
+        if (Enum.TryParse<ClusterStatus>(statusStr, out var status))
+        {
+            Telemetry.UpdateClusterStatus(clusterId, status);
+            RefreshData();
+            ShowToast($"Cluster {clusterId} updated to {status}.");
+        }
+    }
+
+    private async Task CopyClusterPrompt(ErrorCluster cluster)
+    {
+        string prompt = cluster.ToAggregatedClaudePrompt();
+        await CopyToClipboard(prompt);
+        ShowToast($"Copied Claude Prompt for Cluster {cluster.ClusterId}! Paste into Claude to get an immediate fix.");
+    }
+
+    private void ViewClusterPrompt(ErrorCluster cluster)
+    {
+        modalTitle = $"Cluster Diagnostic Prompt: {cluster.ClusterId}";
+        activeModalPrompt = cluster.ToAggregatedClaudePrompt();
+        showPromptModal = true;
+    }
+
+    private async Task CopyIncidentPrompt(ClaudeDiagnosticPackage inc)
+    {
+        string prompt = inc.ToClaudeMarkdownPrompt();
+        await CopyToClipboard(prompt);
+        ShowToast($"Copied Claude Prompt for Incident {inc.IncidentId}! Paste into Claude for root cause analysis.");
+    }
+
+    private async Task CopyActivePrompt()
+    {
+        if (!string.IsNullOrEmpty(activeModalPrompt))
+        {
+            await CopyToClipboard(activeModalPrompt);
+            showPromptModal = false;
+            ShowToast("Copied diagnostic prompt to clipboard! Submit directly to Claude.");
+        }
+    }
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+        }
+        catch
+        {
+            // Fallback: toast message guides the user
+        }
+    }
+
+    private void PromoteStage(string version, ReleaseStage newStage)
+    {
+        Telemetry.PromoteReleaseStage(version, newStage);
+        RefreshData();
+        ShowToast($"Promoted {version} to stage {newStage}.");
+    }
+
+    private void AssignTarget(string facility, string line, string targetVersion)
+    {
+        Telemetry.AssignTargetVersion(facility, line, targetVersion);
+        RefreshData();
+        ShowToast($"Target version for {facility} / {line} set to {targetVersion}.");
+    }
+
+    private void TriggerRollback(string facility, string line)
+    {
+        Telemetry.TriggerRollback(facility, line);
+        RefreshData();
+        ShowToast($"Triggered rollback on {facility} / {line} to stable v2.3.9.");
+    }
+
+    private void ShowToast(string message, bool isError = false)
+    {
+        toastMessage = message;
+        toastIsError = isError;
+    }
+}

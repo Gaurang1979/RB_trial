@@ -1,0 +1,785 @@
+<meta charset="utf-8">
+<title>Vision Studio Next UI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Noto+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a line-PC console in a 16:9 frame (top bar, action bar, live image + verdict column, charts),
+   with the proposal and supervisor settings as sibling tabs. Dark-first, the project's own tokens
+   (design/tokens/vision-tokens.json), plus one instrument tint for HUD lines that is never a status. */
+:root {
+  color-scheme: dark;
+  --bg: #0E131A; --surface: #161D27; --raised: #1F2834; --border: #2E3A49;
+  --text: #E8EEF5; --muted: #A3B1C2; --accent: #2563EB; --on-accent: #FFFFFF;
+  --hud: #38BDF8; --hud-dim: rgba(56,189,248,.18); --image-bg: #06090D;
+  --ok: #22C55E; --on-ok: #04140A; --ng: #DC2626; --on-ng: #FFFFFF;
+  --warn: #FACC15; --on-warn: #1A1400; --stopped: #8C98A8; --info: #60A5FA;
+  --grid: #263140; --axis: #7D8B9C; --s1: #3987E5; --s2: #D95926;
+  --f-display: "Rajdhani", "Noto Sans", system-ui, sans-serif;
+  --f-body: "Noto Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 5px;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--text); font: 13px/1.45 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px 32px;
+}
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--hud); outline-offset: 2px; }
+.wrap { max-width: 1400px; margin: 0 auto; display: grid; gap: 14px; }
+
+/* page header */
+.page-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.page-head h1 { font: 700 26px/1 var(--f-display); letter-spacing: .04em; margin: 0; text-transform: uppercase; }
+.page-head h1 span { color: var(--hud); }
+.page-head p { margin: 0; color: var(--muted); max-width: 62ch; flex: 1 1 320px; }
+.toggles { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-btn { height: 32px; padding: 0 12px; border-radius: var(--r); border: 1px solid var(--border); background: var(--surface); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.chip-btn[aria-pressed="true"] { border-color: var(--hud); color: var(--hud); }
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tab { background: none; border: 0; border-bottom: 2px solid transparent; padding: 10px 14px; cursor: pointer; color: var(--muted); font: 600 15px var(--f-display); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.tab[aria-selected="true"] { color: var(--text); border-bottom-color: var(--hud); }
+.panel[hidden] { display: none !important; }
+
+/* ===== HUD primitives ===== */
+.hud-btn {
+  position: relative; height: 40px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px;
+  background: var(--raised); border: 1px solid var(--border); border-radius: 3px; cursor: pointer;
+  font: 600 14px var(--f-display); letter-spacing: .05em; text-transform: uppercase;
+  transition: background .12s, border-color .12s, box-shadow .12s, transform .08s;
+}
+.hud-btn kbd { font: 10px var(--f-mono); color: var(--muted); border: 1px solid var(--border); border-radius: 2px; padding: 1px 4px; text-transform: none; letter-spacing: 0; }
+.hud-btn::before, .hud-btn::after { content: ""; position: absolute; width: 7px; height: 7px; border: 2px solid var(--hud); opacity: 0; transition: opacity .12s, inset .12s; pointer-events: none; }
+.hud-btn::before { top: -4px; left: -4px; border-right: 0; border-bottom: 0; }
+.hud-btn::after { bottom: -4px; right: -4px; border-left: 0; border-top: 0; }
+.hud-btn:hover:not(:disabled) { border-color: var(--hud); background: #1c2a3a; box-shadow: 0 0 0 1px var(--hud-dim), 0 0 18px var(--hud-dim); }
+.hud-btn:hover:not(:disabled)::before, .hud-btn:hover:not(:disabled)::after { opacity: 1; }
+.hud-btn:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+.hud-btn:disabled { opacity: .45; cursor: not-allowed; }
+.hud-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.hud-btn.go { background: #0f3d22; border-color: var(--ok); }
+.hud-btn.halt { background: #3a1316; border-color: var(--ng); }
+.hud-btn svg { width: 16px; height: 16px; flex: none; }
+
+/* ===== Operator console ===== */
+.console { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: grid; grid-template-rows: auto auto auto 1fr; position: relative; }
+.console.alarm::after { content: ""; position: absolute; inset: 0; border: 3px solid var(--ng); pointer-events: none; animation: flash .5s steps(1) infinite; }
+@keyframes flash { 50% { border-color: transparent; } }
+.topbar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); background: var(--bg); flex-wrap: wrap; }
+.prod { display: flex; align-items: center; gap: 8px; font: 700 17px var(--f-display); letter-spacing: .04em; min-width: 0; }
+.prod i { width: 26px; height: 26px; border-radius: 3px; background: linear-gradient(135deg, #b98a4f, #6b4a24); display: grid; place-items: center; font: 700 12px var(--f-display); font-style: normal; }
+.pill { margin: 0 auto; display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 14px; border-radius: 14px; font: 700 14px var(--f-display); letter-spacing: .08em; text-transform: uppercase; }
+.pill .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.pill.run { background: rgba(34,197,94,.14); color: var(--ok); border: 1px solid var(--ok); }
+.pill.run .dot { animation: pulse 1.6s ease-out infinite; }
+.pill.stop { background: rgba(140,152,168,.14); color: var(--stopped); border: 1px solid var(--stopped); }
+.pill.alarm { background: var(--ng); color: var(--on-ng); }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(34,197,94,.7); } 100% { box-shadow: 0 0 0 9px rgba(34,197,94,0); } }
+.who { display: flex; gap: 6px; }
+.icon-btn { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 3px; border: 1px solid var(--border); background: var(--raised); cursor: pointer; transition: border-color .12s, box-shadow .12s; }
+.icon-btn:hover { border-color: var(--hud); box-shadow: 0 0 12px var(--hud-dim); }
+.icon-btn svg { width: 16px; height: 16px; }
+.actions { display: flex; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--border); flex-wrap: wrap; align-items: center; }
+.actions .sep { width: 1px; height: 28px; background: var(--border); margin: 0 2px; }
+.actions .end { margin-left: auto; }
+.banner { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--warn); color: var(--on-warn); font-weight: 600; }
+.banner[hidden] { display: none; }
+.banner .bang { font: 700 20px var(--f-display); }
+.banner .hud-btn { height: 32px; background: var(--on-warn); color: var(--warn); border-color: var(--on-warn); margin-left: auto; }
+.banner.alarm { background: var(--ng); color: var(--on-ng); }
+.banner.alarm .hud-btn { background: var(--on-ng); color: var(--ng); border-color: var(--on-ng); }
+
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 8px; padding: 8px; min-height: 0; }
+.view { position: relative; background: var(--image-bg); border: 3px solid var(--border); border-radius: 3px; min-height: 340px; transition: border-color .15s; overflow: hidden; }
+.view.ok { border-color: var(--ok); }
+.view.ng { border-color: var(--ng); }
+.view canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.view .cam { position: absolute; top: 8px; left: 10px; font: 600 12px var(--f-mono); color: var(--hud); letter-spacing: .04em; text-shadow: 0 0 6px rgba(0,0,0,.8); }
+.view .tele { position: absolute; bottom: 8px; left: 10px; right: 10px; display: flex; justify-content: space-between; font: 11px var(--f-mono); color: var(--muted); }
+.side { display: grid; gap: 8px; align-content: start; }
+.verdict { height: 120px; border-radius: 4px; display: grid; place-items: center; font: 700 52px/1 var(--f-display); letter-spacing: .06em; background: var(--raised); color: var(--stopped); position: relative; overflow: hidden; transition: background .1s; }
+.verdict.ok { background: var(--ok); color: var(--on-ok); }
+.verdict.ng { background: var(--ng); color: var(--on-ng); }
+.verdict.hit { animation: hit .32s ease-out; }
+@keyframes hit { 0% { transform: scale(.96); filter: brightness(1.6); } 100% { transform: none; filter: none; } }
+.verdict small { position: absolute; bottom: 8px; font: 600 12px var(--f-mono); letter-spacing: 0; opacity: .85; }
+.card { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; }
+.card h3 { margin: 0 0 8px; font: 600 12px var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+.counts { display: grid; grid-template-columns: 1fr 1fr auto; gap: 4px 12px; align-items: center; }
+.counts .k { color: var(--muted); }
+.counts .v { font: 600 20px var(--f-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.ring { grid-row: 1 / span 2; grid-column: 3; width: 64px; height: 64px; }
+.ring text { font: 600 13px var(--f-mono); fill: var(--text); }
+.checks { display: grid; gap: 4px; }
+.check { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 3px; transition: background .12s; cursor: default; }
+.check:hover { background: var(--raised); }
+.check b { width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-size: 12px; flex: none; }
+.check.ok b { background: var(--ok); color: var(--on-ok); }
+.check.ng b { background: var(--ng); color: var(--on-ng); }
+.check span:last-child { margin-left: auto; font: 11px var(--f-mono); color: var(--muted); }
+.plc { display: flex; flex-wrap: wrap; gap: 6px; }
+.plc span { font: 11px var(--f-mono); padding: 2px 6px; border: 1px solid var(--ok); color: var(--ok); border-radius: 3px; }
+.bottom { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; padding: 0 8px 8px; }
+.spark { width: 100%; height: 90px; display: block; }
+.strip { display: flex; gap: 6px; overflow-x: auto; min-height: 72px; }
+.thumb { flex: none; width: 64px; height: 64px; border: 2px solid var(--ng); border-radius: 3px; background: var(--image-bg); position: relative; cursor: pointer; transition: transform .12s, box-shadow .12s; }
+.thumb:hover { transform: translateY(-2px); box-shadow: 0 0 14px rgba(220,38,38,.5); }
+.thumb canvas { width: 100%; height: 100%; display: block; }
+.thumb em { position: absolute; bottom: 0; left: 0; right: 0; font: 600 9px var(--f-mono); font-style: normal; background: rgba(0,0,0,.7); text-align: center; }
+.strip .empty { color: var(--muted); align-self: center; }
+
+/* help overlay */
+.overlay { position: absolute; inset: 0; background: rgba(6,9,13,.82); display: grid; place-items: center; padding: 16px; z-index: 5; }
+.overlay[hidden] { display: none; }
+.help { background: var(--surface); border: 1px solid var(--hud); border-radius: 6px; padding: 18px; max-width: 520px; width: 100%; box-shadow: 0 0 40px var(--hud-dim); display: grid; gap: 12px; }
+.help h2 { margin: 0; font: 700 22px var(--f-display); letter-spacing: .03em; }
+.steps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; counter-reset: s; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: center; padding: 8px; border-radius: 4px; background: var(--raised); cursor: pointer; border: 1px solid transparent; }
+.steps li::before { content: counter(s); width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--hud); color: var(--hud); display: grid; place-items: center; font: 700 16px var(--f-display); }
+.steps li.done { border-color: var(--ok); }
+.steps li.done::before { content: "✓"; border-color: var(--ok); color: var(--ok); }
+.help .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ===== Supervisor ===== */
+.sup { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 14px; }
+.sup nav { display: grid; gap: 4px; align-content: start; }
+.navi { text-align: left; padding: 10px 12px; border-radius: 4px; border: 1px solid transparent; background: none; cursor: pointer; display: flex; gap: 10px; align-items: center; transition: background .12s, border-color .12s; }
+.navi:hover { background: var(--surface); border-color: var(--border); }
+.navi[aria-current="true"] { background: var(--surface); border-color: var(--hud); }
+.navi svg { width: 18px; height: 18px; color: var(--hud); flex: none; }
+.navi small { display: block; color: var(--muted); font-size: 11px; }
+.settings { display: grid; gap: 12px; }
+.set { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; display: grid; gap: 12px; transition: border-color .15s; }
+.set:hover { border-color: #3d4d61; }
+.set header { display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+.set h3 { margin: 0; font: 700 18px var(--f-display); letter-spacing: .02em; }
+.set p { margin: 2px 0 0; color: var(--muted); max-width: 62ch; }
+.set .now { margin-left: auto; font: 600 12px var(--f-mono); color: var(--hud); border: 1px solid var(--hud-dim); padding: 3px 8px; border-radius: 3px; white-space: nowrap; }
+.strict { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.stop-opt { height: 56px; border: 1px solid var(--border); background: var(--raised); border-radius: 4px; cursor: pointer; display: grid; place-items: center; gap: 0; padding: 4px; font: 600 14px var(--f-display); letter-spacing: .04em; text-transform: uppercase; transition: border-color .12s, box-shadow .12s, background .12s; }
+.stop-opt small { font: 400 11px var(--f-body); color: var(--muted); text-transform: none; letter-spacing: 0; }
+.stop-opt:hover { border-color: var(--hud); box-shadow: 0 0 14px var(--hud-dim); }
+.stop-opt[aria-checked="true"] { background: #13304d; border-color: var(--hud); }
+.preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.meter { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 10px; display: grid; gap: 6px; }
+.meter b { font: 600 22px var(--f-mono); font-variant-numeric: tabular-nums; }
+.meter .bar { height: 6px; border-radius: 3px; background: var(--grid); overflow: hidden; }
+.meter .bar i { display: block; height: 100%; transition: width .3s; }
+.meter.good b { color: var(--ok); } .meter.good .bar i { background: var(--ok); }
+.meter.bad b { color: var(--ng); } .meter.bad .bar i { background: var(--ng); }
+.meter span { color: var(--muted); font-size: 12px; }
+.advice { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-radius: 4px; background: rgba(250,204,21,.1); border: 1px solid rgba(250,204,21,.4); color: var(--warn); }
+.advice.fine { background: rgba(34,197,94,.08); border-color: rgba(34,197,94,.35); color: var(--ok); }
+.choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.choice { text-align: left; padding: 12px; border-radius: 4px; border: 1px solid var(--border); background: var(--raised); cursor: pointer; display: grid; gap: 6px; transition: border-color .12s, box-shadow .12s; }
+.choice:hover { border-color: var(--hud); box-shadow: 0 0 14px var(--hud-dim); }
+.choice[aria-checked="true"] { border-color: var(--hud); background: #13304d; }
+.choice svg { width: 40px; height: 28px; color: var(--hud); }
+.choice strong { font: 700 15px var(--f-display); letter-spacing: .03em; }
+.choice small { color: var(--muted); }
+.stepper { display: inline-flex; align-items: center; gap: 0; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.stepper button { width: 40px; height: 40px; border: 0; background: var(--raised); cursor: pointer; font: 700 18px var(--f-display); }
+.stepper button:hover { background: #24364a; color: var(--hud); }
+.stepper output { min-width: 110px; text-align: center; font: 600 18px var(--f-mono); }
+.switch { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.switch input { appearance: none; width: 44px; height: 24px; border-radius: 12px; background: var(--grid); position: relative; cursor: pointer; transition: background .15s; margin: 0; flex: none; }
+.switch input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--text); transition: left .15s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { left: 23px; }
+.savebar { position: sticky; bottom: 0; display: flex; gap: 10px; align-items: center; padding: 10px 12px; background: var(--raised); border: 1px solid var(--hud); border-radius: 6px; box-shadow: 0 0 24px var(--hud-dim); flex-wrap: wrap; }
+.savebar[hidden] { display: none; }
+.savebar span { flex: 1 1 240px; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ok); color: var(--on-ok); padding: 10px 16px; border-radius: 4px; font-weight: 600; z-index: 20; }
+.toast[hidden] { display: none; }
+
+/* ===== Proposal ===== */
+.prop { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.prop section { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; min-width: 0; }
+.prop h2 { margin: 0 0 4px; font: 700 19px var(--f-display); letter-spacing: .03em; text-wrap: balance; }
+.prop .who-for { font: 600 11px var(--f-mono); color: var(--hud); letter-spacing: .06em; text-transform: uppercase; }
+.prop ul { margin: 10px 0 0; padding-left: 18px; display: grid; gap: 6px; }
+.prop li { max-width: 65ch; }
+.phases { grid-column: 1 / -1; }
+.phase-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 8px; }
+.phase-list li { background: var(--bg); border: 1px solid var(--border); border-left: 3px solid var(--hud); border-radius: 4px; padding: 10px; }
+.phase-list b { display: block; font: 700 15px var(--f-display); letter-spacing: .03em; }
+
+/* ===== Sounds ===== */
+.sounds { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.snd { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; display: grid; gap: 8px; }
+.snd h3 { margin: 0; font: 700 16px var(--f-display); letter-spacing: .03em; }
+.snd p { margin: 0; color: var(--muted); }
+.snd .meta { font: 11px var(--f-mono); color: var(--hud); }
+
+@media (max-width: 980px) {
+  .stage, .bottom, .sup { grid-template-columns: minmax(0, 1fr); }
+  .strict { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+.reduce *, .reduce *::before, .reduce *::after { animation: none !important; transition: none !important; }
+</style>
+
+<div class="wrap" id="app">
+  <header class="page-head">
+    <h1>Vision Studio <span>Next</span></h1>
+    <p>A working sketch of the new look for the line PC. Turn sound on, then press Start on the operator screen. Everything here is example data.</p>
+    <div class="toggles">
+      <button class="chip-btn" id="soundBtn" aria-pressed="false" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 9a4 4 0 0 1 0 6" /></svg>
+        <span>Sound off</span>
+      </button>
+      <button class="chip-btn" id="motionBtn" aria-pressed="false" type="button">Reduce motion</button>
+    </div>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true" data-tab="operator" id="t-operator">Operator · Run</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="supervisor" id="t-supervisor">Supervisor · Settings</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="sounds" id="t-sounds">Sounds</button>
+    <button class="tab" role="tab" aria-selected="false" data-tab="proposal" id="t-proposal">The proposal</button>
+  </div>
+
+  <!-- ================= OPERATOR ================= -->
+  <section class="panel" id="operator" role="tabpanel">
+    <div class="console" id="console">
+      <div class="topbar">
+        <div class="prod"><i>W</i>Whisky 750 ml</div>
+        <div class="pill stop" id="pill"><span class="dot"></span><span id="pillText">‖ Stopped</span></div>
+        <div class="who">
+          <button class="icon-btn" title="Read this screen aloud" id="speakBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8a5 5 0 0 1 0 8M19.5 5.5a9 9 0 0 1 0 13"/></svg></button>
+          <button class="icon-btn" title="Language" type="button" style="font:700 15px var(--f-body)">अ</button>
+          <button class="hud-btn" type="button" style="height:32px" title="Sign in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>Operator</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="hud-btn go" id="startBtn" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>Start <kbd>F5</kbd></button>
+        <button class="hud-btn halt" id="stopBtn" type="button" disabled><svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"/><rect x="14" y="5" width="4" height="14"/></svg>Stop <kbd>⇧F5</kbd></button>
+        <span class="sep"></span>
+        <button class="hud-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/></svg>Change product <kbd>F2</kbd></button>
+        <button class="hud-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>Start batch <kbd>F3</kbd></button>
+        <span class="sep"></span>
+        <button class="hud-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h1M3 12h1M3 18h1"/></svg>Parts <kbd>F4</kbd></button>
+        <button class="hud-btn end" id="alarmDemo" type="button" title="Show what an alarm looks and sounds like">Try an alarm</button>
+        <button class="hud-btn" id="helpBtn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7M12 17h.01"/></svg>Help <kbd>F1</kbd></button>
+      </div>
+      <div class="banner" id="banner" hidden>
+        <span class="bang">!</span><span id="bannerText">Image is getting darker. Clean the lens or check the light.</span>
+        <button class="hud-btn" id="whatBtn" type="button">What do I do?</button>
+      </div>
+      <div style="display:grid;grid-template-rows:auto auto">
+        <div class="stage">
+          <div class="view" id="view">
+            <canvas id="cam"></canvas>
+            <div class="cam">CAM 1 · LABEL AND BATCH · 1920×1200</div>
+            <div class="tele"><span id="teleL">exposure 1.8 ms · gain 2.0</span><span id="teleR">waiting for trigger</span></div>
+          </div>
+          <div class="side">
+            <div class="verdict" id="verdict">‖ READY<small id="vms">—</small></div>
+            <div class="card">
+              <h3>This shift</h3>
+              <div class="counts">
+                <span class="k">Good</span><span class="v" id="cGood">0</span>
+                <svg class="ring" viewBox="0 0 64 64"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--grid)" stroke-width="6"/><circle id="ringArc" cx="32" cy="32" r="27" fill="none" stroke="var(--ok)" stroke-width="6" stroke-linecap="round" stroke-dasharray="0 170" transform="rotate(-90 32 32)" style="transition:stroke-dasharray .35s"/><text x="32" y="36" text-anchor="middle" id="ringTxt">—</text></svg>
+                <span class="k">Bad</span><span class="v" id="cBad" style="color:var(--ng)">0</span>
+              </div>
+            </div>
+            <div class="card">
+              <h3>This part <span id="partNo" style="font-family:var(--f-mono);letter-spacing:0">—</span></h3>
+              <div class="checks" id="checks"><div class="check" style="color:var(--muted)">Press Start to inspect.</div></div>
+            </div>
+            <div class="card">
+              <h3>PLC</h3>
+              <div class="plc"><span>✓ Link</span><span>✓ Heartbeat</span><span id="runEn" style="border-color:var(--stopped);color:var(--stopped)">‖ RunEnable</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="bottom">
+          <div class="card">
+            <h3>Parts per minute <span style="letter-spacing:0;font-family:var(--f-mono)">line speed 225/min</span></h3>
+            <svg class="spark" id="spark" viewBox="0 0 400 90" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="card">
+            <h3>Last bad parts <span style="letter-spacing:0;font-family:var(--f-mono)">tap to look</span></h3>
+            <div class="strip" id="strip"><span class="empty">No bad parts yet.</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="overlay" id="overlay" hidden>
+        <div class="help" role="dialog" aria-labelledby="helpTitle">
+          <h2 id="helpTitle">Image is getting darker</h2>
+          <p style="margin:0;color:var(--muted)">The line keeps running. Do these steps, then tap each one when it is done.</p>
+          <ol class="steps" id="steps">
+            <li>Wipe the camera glass with the soft cloth.</li>
+            <li>Check the light is on and not covered.</li>
+            <li>If it is still dark, call maintenance.</li>
+          </ol>
+          <div class="row">
+            <button class="hud-btn primary" id="closeHelp" type="button">Done</button>
+            <button class="hud-btn" id="readSteps" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8a5 5 0 0 1 0 8"/></svg>Read aloud</button>
+            <button class="hud-btn" type="button">Call supervisor</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SUPERVISOR ================= -->
+  <section class="panel" id="supervisor" role="tabpanel" hidden>
+    <div class="sup">
+      <nav aria-label="Settings">
+        <button class="navi" aria-current="true" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg><span>How strict<small>For this product</small></span></button>
+        <button class="navi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span>Line speed<small>Parts per minute</small></span></button>
+        <button class="navi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4l16 16M20 4L4 20"/></svg><span>Bad parts<small>What the line does</small></span></button>
+        <button class="navi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 4V5L8 9H4z"/></svg><span>Sound and voice<small>Beeps and spoken alarms</small></span></button>
+        <button class="navi" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span>People<small>Who can do what</small></span></button>
+      </nav>
+      <div class="settings">
+        <article class="set">
+          <header>
+            <div><h3>How strict should the check be?</h3><p>Stricter catches smaller faults but may reject some good parts. We test your choice on the last 200 good and 18 bad parts saved for this product.</p></div>
+            <span class="now" id="strictNow">Now: Normal</span>
+          </header>
+          <div class="strict" role="radiogroup" aria-label="Strictness" id="strict"></div>
+          <div class="preview">
+            <div class="meter good"><span>Good parts that still pass</span><b id="mGood">198 / 200</b><div class="bar"><i id="bGood" style="width:99%"></i></div></div>
+            <div class="meter bad"><span>Bad parts caught</span><b id="mBad">18 / 18</b><div class="bar"><i id="bBad" style="width:100%"></i></div></div>
+          </div>
+          <div class="advice fine" id="advice">✓ Good choice. Every bad part is caught and almost no good part is rejected.</div>
+        </article>
+
+        <article class="set">
+          <header><div><h3>Line speed</h3><p>How many parts pass the camera in one minute. The check must finish before the next part arrives.</p></div><span class="now" id="speedNow">Time per part: 267 ms</span></header>
+          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+            <div class="stepper"><button type="button" id="spDown" aria-label="Slower">−</button><output id="speed">225 / min</output><button type="button" id="spUp" aria-label="Faster">+</button></div>
+            <span id="speedAdvice" style="color:var(--ok)">✓ The check takes 48 ms. There is enough time.</span>
+          </div>
+        </article>
+
+        <article class="set">
+          <header><div><h3>When a part is bad</h3><p>Pick what the line does. The PLC is told at once.</p></div></header>
+          <div class="choices" role="radiogroup" aria-label="Bad part action" id="ngAct">
+            <button class="choice" role="radio" aria-checked="true" type="button" data-v="Push it off the line">
+              <svg viewBox="0 0 40 28" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h36"/><rect x="14" y="8" width="10" height="10"/><path d="M28 13h8m-3-3 3 3-3 3"/></svg>
+              <strong>Push it off the line</strong><small>Reject arm removes the part. The line keeps running.</small></button>
+            <button class="choice" role="radio" aria-checked="false" type="button" data-v="Stop the line">
+              <svg viewBox="0 0 40 28" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h36"/><rect x="15" y="4" width="4" height="12"/><rect x="22" y="4" width="4" height="12"/></svg>
+              <strong>Stop the line</strong><small>Someone must look before it starts again.</small></button>
+            <button class="choice" role="radio" aria-checked="false" type="button" data-v="Stop after 3 in a row">
+              <svg viewBox="0 0 40 28" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="8" width="8" height="10"/><rect x="16" y="8" width="8" height="10"/><rect x="29" y="8" width="8" height="10"/></svg>
+              <strong>Stop after 3 in a row</strong><small>Reject one by one. Stop when something is clearly wrong.</small></button>
+          </div>
+        </article>
+
+        <article class="set">
+          <header><div><h3>Sound and voice</h3><p>Sounds help when nobody is looking at the screen.</p></div></header>
+          <label class="switch"><input type="checkbox" id="swNg" checked> <span>Beep on every bad part</span></label>
+          <label class="switch"><input type="checkbox" id="swOk"> <span>Soft tick on good parts (off by default; at 225 a minute it gets tiring)</span></label>
+          <label class="switch"><input type="checkbox" id="swSpeak" checked> <span>Speak alarms in the operator's language</span></label>
+        </article>
+
+        <div class="savebar" id="savebar" hidden>
+          <span id="saveText">2 changes for Whisky 750 ml. They apply from the next part.</span>
+          <button class="hud-btn" id="undoBtn" type="button">Undo all</button>
+          <button class="hud-btn primary" id="saveBtn" type="button">Save changes</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SOUNDS ================= -->
+  <section class="panel" id="sounds" role="tabpanel" hidden>
+    <div class="sounds" id="soundList"></div>
+  </section>
+
+  <!-- ================= PROPOSAL ================= -->
+  <section class="panel" id="proposal" role="tabpanel" hidden>
+    <div class="prop">
+      <section>
+        <div class="who-for">Everyone</div>
+        <h2>Look: an instrument, not an office app</h2>
+        <ul>
+          <li>Keep the dark console colours already in the design tokens; add one cyan "instrument" colour for HUD lines, focus and hover. It is never used for OK or NG.</li>
+          <li>Corner brackets light up on the control under the pointer, like a camera locking on. Panels get thin 1 px frames, no soft shadows.</li>
+          <li>Rajdhani for titles, buttons and the OK/NG word (made in India, has Devanagari). Noto Sans for text in all 15 languages. A mono face for every number so digits never jump.</li>
+          <li>Live image shows a scan sweep, the camera's real telemetry (exposure, gain, ms) and the tool boxes locking on in green or red.</li>
+        </ul>
+      </section>
+      <section>
+        <div class="who-for">Everyone</div>
+        <h2>Motion with a purpose</h2>
+        <ul>
+          <li>Each part gets one short moment: the result block pops and the frame turns green or red. Under 300 ms, nothing else moves.</li>
+          <li>The Running dot pulses slowly so the operator sees from across the line that it is alive.</li>
+          <li>Alarms flash at 2 Hz at most, as the spec asks. "Reduce motion" turns all of this off.</li>
+          <li>Hover is a bonus only. Every action also works by touch and keyboard, with no hover needed.</li>
+        </ul>
+      </section>
+      <section>
+        <div class="who-for">Everyone</div>
+        <h2>Sound design</h2>
+        <ul>
+          <li>Each sound means one thing, and the operator learns it in a day: a low double buzz is a bad part, a rising sweep is Start, a falling sweep is Stop, a two-tone chime is an alarm.</li>
+          <li>Good parts are silent by default. A beep 225 times a minute stops meaning anything.</li>
+          <li>Hover ticks are very quiet and only for mouse users. Volume and each sound can be set by the supervisor.</li>
+          <li>Alarms can be spoken in the operator's language. Sounds are made in the app, so no audio files to ship or translate.</li>
+        </ul>
+      </section>
+      <section>
+        <div class="who-for">Operator</div>
+        <h2>Run screen for someone who rarely uses a computer</h2>
+        <ul>
+          <li>One giant answer first: OK or NG with its shape, readable from several metres.</li>
+          <li>Every warning has one button, "What do I do?", which opens numbered steps with pictures, read aloud, and each step ticks off.</li>
+          <li>Only safe actions on screen: Start, Stop, Change product, Start batch, Parts, Help. Stop asks once.</li>
+          <li>Tap a bad part to see it large, with the fault circled and one sentence saying what is wrong.</li>
+        </ul>
+      </section>
+      <section>
+        <div class="who-for">Supervisor</div>
+        <h2>Settings in plain words</h2>
+        <ul>
+          <li>Questions instead of parameters: "How strict should the check be?", not "Threshold 0.62".</li>
+          <li>Every change is tested at once on the product's saved good and bad pictures, and the effect is shown before saving: "198 of 200 good parts still pass, 18 of 18 bad parts caught".</li>
+          <li>Choices show a small drawing of what will happen on the line.</li>
+          <li>Changes collect in one save bar with Undo all; nothing applies by accident. Numbers like ms and thresholds stay in the engineer workspace.</li>
+        </ul>
+      </section>
+      <section>
+        <div class="who-for">Engineer</div>
+        <h2>Workspace keeps its density</h2>
+        <ul>
+          <li>Same look and sounds, but the dense VisionPro-style layout stays: job tree, picture, properties, results.</li>
+          <li>Hover on a tool box shows its live value and margin. Hover on a chart mark shows the part.</li>
+          <li>Keyboard first: every action keeps its shortcut and tooltip.</li>
+        </ul>
+      </section>
+      <section class="phases">
+        <div class="who-for">How we build it</div>
+        <h2>Build in four steps, each its own pull request</h2>
+        <ol class="phase-list">
+          <li><b>1 · Look and feel base</b>Tokens for the instrument colour and fonts, the bracket hover and pressed states, the sound service with its sounds and settings, and Reduce motion. Applied to every existing button and panel.</li>
+          <li><b>2 · Operator Run screen</b>Result pop, live image scan and telemetry, pulsing status, NG strip, and "What do I do?" with steps, pictures and voice.</li>
+          <li><b>3 · Supervisor settings</b>Plain-word settings with the live test on saved pictures, picture choices, and the save bar with Undo all.</li>
+          <li><b>4 · Engineer polish and checks</b>Hover values in the workspace, and the 1366 × 768 layout tests and snapshots for every screen in all three themes.</li>
+        </ol>
+      </section>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast" hidden>Saved.</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let reduce = reduceMq.matches;
+
+  /* ---------- sound engine (WebAudio, synthesized) ---------- */
+  let ctx = null, soundOn = false;
+  function ac() { if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { ctx = null; } } return ctx; }
+  function tone(freq, dur, { type = "sine", gain = .08, at = 0, to = null } = {}) {
+    const c = ac(); if (!c || !soundOn) return;
+    const t = c.currentTime + at, o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + .006);
+    g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t + dur + .02);
+  }
+  const S = {
+    hover: () => tone(2400, .025, { gain: .012 }),
+    click: () => tone(1400, .05, { type: "triangle", gain: .05, to: 900 }),
+    ok:    () => { tone(1320, .05, { gain: .025 }); },
+    ng:    () => { tone(196, .12, { type: "square", gain: .05 }); tone(196, .12, { type: "square", gain: .05, at: .16 }); },
+    start: () => tone(220, .38, { type: "sawtooth", gain: .035, to: 1200 }),
+    stop:  () => tone(1000, .38, { type: "sawtooth", gain: .035, to: 180 }),
+    alarm: () => { for (let i = 0; i < 4; i++) { tone(660, .2, { type: "triangle", gain: .07, at: i * .5 }); tone(880, .2, { type: "triangle", gain: .07, at: i * .5 + .25 }); } },
+    save:  () => { tone(660, .1, { gain: .05 }); tone(880, .1, { gain: .05, at: .09 }); tone(1320, .18, { gain: .05, at: .18 }); },
+    tick:  () => tone(900, .02, { type: "square", gain: .02 }),
+  };
+  function speak(text) {
+    if (!soundOn || !$("swSpeak").checked) return;
+    try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text); u.rate = .92; speechSynthesis.speak(u); } catch (e) {}
+  }
+  $("soundBtn").addEventListener("click", () => {
+    soundOn = !soundOn; const c = ac(); if (c && c.state === "suspended") c.resume();
+    $("soundBtn").setAttribute("aria-pressed", soundOn); $("soundBtn").querySelector("span").textContent = soundOn ? "Sound on" : "Sound off";
+    if (soundOn) S.save();
+  });
+  $("motionBtn").addEventListener("click", () => {
+    reduce = !reduce; document.documentElement.classList.toggle("reduce", reduce);
+    $("motionBtn").setAttribute("aria-pressed", reduce);
+  });
+  // hover tick on mouse only, click blip everywhere
+  let lastHover = null;
+  document.addEventListener("pointerover", e => {
+    if (e.pointerType !== "mouse") return;
+    const b = e.target.closest("button:not(:disabled), .thumb, .steps li");
+    if (b && b !== lastHover) { lastHover = b; S.hover(); }
+    if (!b) lastHover = null;
+  });
+  document.addEventListener("click", e => { if (e.target.closest("button:not(#soundBtn), .steps li")) S.click(); }, true);
+
+  /* ---------- tabs ---------- */
+  function showTab(name) {
+    document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === name));
+    document.querySelectorAll(".panel").forEach(p => p.hidden = p.id !== name);
+    if (name === "operator") sizeCanvas();
+  }
+  document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => showTab(t.dataset.tab)));
+  const h = location.hash.slice(1); if (["operator", "supervisor", "sounds", "proposal"].includes(h)) showTab(h);
+
+  /* ---------- live camera canvas ---------- */
+  const cv = $("cam"), g2 = cv.getContext("2d");
+  let W = 0, H = 0, dpr = 1;
+  function sizeCanvas() { const r = cv.getBoundingClientRect(); if (!r.width) return; dpr = window.devicePixelRatio || 1; W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; g2.setTransform(dpr, 0, 0, dpr, 0, 0); draw(); }
+  window.addEventListener("resize", sizeCanvas);
+
+  function matrix(seed) { const m = []; let s = seed; for (let i = 0; i < 196; i++) { s = (s * 9301 + 49297) % 233280; m.push(s / 233280 > .5); } return m; }
+  const part = { x: 0, phase: "idle", t: 0, verdict: null, faultCode: false, faultText: false, mat: matrix(7), n: 0, sweep: 0 };
+
+  function drawPart(c, cx, cy, sc, p, boxes) {
+    c.save(); c.translate(cx, cy); c.scale(sc, sc);
+    c.fillStyle = "#c9a36b"; roundRect(c, -150, -95, 300, 190, 10); c.fill();
+    c.fillStyle = "#efe9dc"; c.fillRect(-120, -70, 240, 140);
+    // data matrix
+    const ms = 6, ox = -105, oy = -45;
+    c.fillStyle = "#111";
+    for (let i = 0; i < 14; i++) { c.fillRect(ox, oy + i * ms, ms, ms); c.fillRect(ox + i * ms, oy + 13 * ms, ms, ms); }
+    p.mat.forEach((on, k) => { const i = k % 14, j = (k / 14) | 0; if (on && i > 0 && j < 13 && !(p.faultCode && i > 6 && j < 6)) c.fillRect(ox + i * ms, oy + j * ms, ms, ms); });
+    if (p.faultCode) { c.fillStyle = "rgba(239,233,220,.85)"; c.fillRect(ox + 40, oy - 2, 46, 40); }
+    c.fillStyle = "#1a1a1a"; c.font = "600 17px JetBrains Mono, monospace";
+    c.fillText("LOT A23", 2, -18); c.fillText(p.faultText ? "EXP 1 /2" : "EXP 12/27", 2, 8); c.fillText("MRP 145.00", 2, 34);
+    if (boxes) {
+      c.lineWidth = 2.5;
+      box(c, ox - 5, oy - 5, 14 * ms + 10, 14 * ms + 10, !p.faultCode, "Code");
+      box(c, -4, -38, 120, 82, !p.faultText, "Text");
+    }
+    c.restore();
+  }
+  function box(c, x, y, w, h, ok, label) {
+    const col = ok ? "#22C55E" : "#DC2626";
+    c.strokeStyle = col; c.strokeRect(x, y, w, h);
+    c.fillStyle = col; c.font = "700 12px Rajdhani, sans-serif";
+    const tw = c.measureText(label).width + 22; c.fillRect(x, y - 18, tw, 16);
+    c.fillStyle = ok ? "#04140A" : "#fff"; c.fillText((ok ? "✓ " : "✗ ") + label, x + 4, y - 6);
+  }
+  function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+
+  function draw() {
+    if (!W) return;
+    const c = g2; c.clearRect(0, 0, W, H);
+    // faint grid
+    c.strokeStyle = "rgba(56,189,248,.06)"; c.lineWidth = 1;
+    for (let x = 0; x < W; x += 40) { c.beginPath(); c.moveTo(x + .5, 0); c.lineTo(x + .5, H); c.stroke(); }
+    for (let y = 0; y < H; y += 40) { c.beginPath(); c.moveTo(0, y + .5); c.lineTo(W, y + .5); c.stroke(); }
+    const sc = Math.min(W / 420, H / 280);
+    if (part.phase !== "idle") drawPart(c, part.x, H / 2, sc, part, part.phase === "result" || part.phase === "out");
+    // targeting brackets
+    const bw = 180 * sc, bh = 120 * sc, cx = W / 2, cy = H / 2, L = 18;
+    c.strokeStyle = part.phase === "scan" ? "#38BDF8" : "rgba(56,189,248,.5)"; c.lineWidth = 2;
+    [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sy]) => {
+      const x = cx + sx * bw, y = cy + sy * bh;
+      c.beginPath(); c.moveTo(x, y - sy * L); c.lineTo(x, y); c.lineTo(x - sx * L, y); c.stroke();
+    });
+    if (part.phase === "scan" && !reduce) {
+      const y = cy - bh + part.sweep * bh * 2;
+      const gr = c.createLinearGradient(0, y - 30, 0, y);
+      gr.addColorStop(0, "rgba(56,189,248,0)"); gr.addColorStop(1, "rgba(56,189,248,.28)");
+      c.fillStyle = gr; c.fillRect(cx - bw, y - 30, bw * 2, 30);
+      c.fillStyle = "#38BDF8"; c.fillRect(cx - bw, y, bw * 2, 2);
+    }
+  }
+
+  /* ---------- line simulation ---------- */
+  let running = false, timer = null, raf = null;
+  let good = 0, bad = 0, ppm = [];
+  const verdictEl = $("verdict"), viewEl = $("view");
+
+  function setPill(kind, text) { const p = $("pill"); p.className = "pill " + kind; $("pillText").textContent = text; }
+  function cycle() {
+    if (!running) return;
+    part.n++; part.mat = matrix(part.n * 31 + 7);
+    const r = Math.random(); part.faultCode = r < .035; part.faultText = !part.faultCode && r < .075;
+    part.verdict = (part.faultCode || part.faultText) ? "ng" : "ok";
+    $("teleR").textContent = "trigger " + (48200 + part.n);
+    const tIn = reduce ? 0 : 220, tScan = reduce ? 0 : 320;
+    part.phase = "in"; const start = performance.now();
+    const from = -W * .4, mid = W / 2;
+    cancelAnimationFrame(raf);
+    const step = now => {
+      const t = now - start;
+      if (t < tIn) { part.x = from + (mid - from) * easeOut(t / tIn); }
+      else if (t < tIn + tScan) { part.x = mid; part.phase = "scan"; part.sweep = (t - tIn) / tScan; }
+      else if (part.phase !== "result" && part.phase !== "out") { part.x = mid; part.phase = "result"; result(); }
+      else if (t > tIn + tScan + 520 && !reduce) { part.phase = "out"; part.x = mid + (t - tIn - tScan - 520) * W / 400; }
+      draw();
+      if (t < tIn + tScan + 760 && running) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+  }
+  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
+  function result() {
+    const ok = part.verdict === "ok", ms = 38 + Math.round(Math.random() * 14);
+    ok ? good++ : bad++;
+    verdictEl.className = "verdict " + part.verdict;
+    void verdictEl.offsetWidth; if (!reduce) verdictEl.classList.add("hit");
+    verdictEl.firstChild.nodeValue = ok ? "✓ OK" : "✗ NG";
+    $("vms").textContent = ms + " ms";
+    viewEl.className = "view " + part.verdict;
+    $("cGood").textContent = good.toLocaleString("en-IN"); $("cBad").textContent = bad;
+    const y = good / (good + bad); $("ringArc").setAttribute("stroke-dasharray", (y * 170).toFixed(1) + " 170");
+    $("ringTxt").textContent = (y * 100).toFixed(1) + "%";
+    $("partNo").textContent = "#" + (48200 + part.n);
+    $("checks").innerHTML = [
+      ["Read code", !part.faultCode, part.faultCode ? "not read" : "8901234567890"],
+      ["Batch print", !part.faultText, part.faultText ? "EXP not read" : "quality 92"],
+      ["Label present", true, "score 0.98"],
+    ].map(([n, k, v]) => `<div class="check ${k ? "ok" : "ng"}"><b>${k ? "✓" : "✗"}</b><span>${n}</span><span>${v}</span></div>`).join("");
+    if (ok) { if ($("swOk").checked) S.ok(); } else { if ($("swNg").checked) S.ng(); addThumb(); }
+  }
+  function addThumb() {
+    const strip = $("strip"); const empty = strip.querySelector(".empty"); if (empty) empty.remove();
+    const d = document.createElement("div"); d.className = "thumb"; d.tabIndex = 0;
+    d.title = part.faultCode ? "Code not read" : "Expiry date not read";
+    const c = document.createElement("canvas"); c.width = 128; c.height = 128; d.appendChild(c);
+    const em = document.createElement("em"); em.textContent = "#" + (48200 + part.n); d.appendChild(em);
+    const x = c.getContext("2d"); x.fillStyle = "#06090D"; x.fillRect(0, 0, 128, 128);
+    drawPart(x, 64, 64, .38, { ...part }, true);
+    strip.prepend(d); while (strip.children.length > 12) strip.lastChild.remove();
+  }
+  function spark() {
+    const s = $("spark"); const n = 40; ppm.push(running ? 214 + Math.round(Math.random() * 14) - (Math.random() < .08 ? 40 : 0) : 0); if (ppm.length > n) ppm.shift();
+    const x = i => (i / (n - 1)) * 400, y = v => 86 - (v / 260) * 80;
+    const pts = ppm.map((v, i) => `${x(i + n - ppm.length).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const lastX = x(n - 1), lastY = y(ppm[ppm.length - 1] || 0);
+    s.innerHTML = `<line x1="0" x2="400" y1="${y(225)}" y2="${y(225)}" stroke="var(--axis)" stroke-dasharray="4 4" stroke-width="1"/>
+      <text x="396" y="${y(225) - 4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="JetBrains Mono, monospace">225</text>
+      ${ppm.length > 1 ? `<polyline points="${x(n - ppm.length)},86 ${pts} ${lastX},86" fill="rgba(57,135,229,.18)" stroke="none"/>
+      <polyline points="${pts}" fill="none" stroke="var(--s1)" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      <circle cx="${lastX}" cy="${lastY}" r="3" fill="var(--s1)"/>` : ""}`;
+  }
+  setInterval(spark, 1000); spark();
+
+  function start() {
+    if (running) return; running = true; S.start();
+    $("startBtn").disabled = true; $("stopBtn").disabled = false;
+    setPill("run", "▶ Running"); $("runEn").textContent = "✓ RunEnable"; $("runEn").style = "";
+    verdictEl.className = "verdict"; verdictEl.firstChild.nodeValue = "…";
+    timer = setInterval(cycle, 1100); cycle();
+  }
+  function stop() {
+    if (!running) return; running = false; clearInterval(timer); S.stop();
+    $("startBtn").disabled = false; $("stopBtn").disabled = true;
+    setPill("stop", "‖ Stopped"); $("runEn").textContent = "‖ RunEnable"; $("runEn").style = "border-color:var(--stopped);color:var(--stopped)";
+    verdictEl.className = "verdict"; verdictEl.firstChild.nodeValue = "‖ STOPPED"; viewEl.className = "view";
+    part.phase = "idle"; draw();
+  }
+  $("startBtn").addEventListener("click", start);
+  $("stopBtn").addEventListener("click", stop);
+  document.addEventListener("keydown", e => {
+    if ($("operator").hidden) return;
+    if (e.key === "F5" && !e.shiftKey) { e.preventDefault(); start(); }
+    if (e.key === "F5" && e.shiftKey) { e.preventDefault(); stop(); }
+    if (e.key === "F1") { e.preventDefault(); openHelp(); }
+    if (e.key === "Escape") closeHelp();
+  });
+
+  // warning banner after a few seconds of running
+  let warned = false;
+  setInterval(() => { if (running && !warned && part.n > 6) { warned = true; $("banner").hidden = false; $("banner").className = "banner"; S.tick(); setPill("run", "! Check"); $("pill").style = "background:rgba(250,204,21,.14);color:var(--warn);border-color:var(--warn)"; } }, 500);
+  function openHelp() { $("overlay").hidden = false; speak("Image is getting darker. Step 1. Wipe the camera glass with the soft cloth. Step 2. Check the light is on and not covered. Step 3. If it is still dark, call maintenance."); }
+  function closeHelp() { $("overlay").hidden = true; try { speechSynthesis.cancel(); } catch (e) {} }
+  $("whatBtn").addEventListener("click", openHelp);
+  $("helpBtn").addEventListener("click", openHelp);
+  $("closeHelp").addEventListener("click", () => { closeHelp(); if ($("banner").classList.contains("alarm")) { clearAlarm(); } });
+  $("readSteps").addEventListener("click", () => speak([...document.querySelectorAll("#steps li")].map((l, i) => "Step " + (i + 1) + ". " + l.textContent).join(" ")));
+  $("steps").addEventListener("click", e => { const li = e.target.closest("li"); if (li) { li.classList.toggle("done"); if (li.classList.contains("done")) S.ok(); } });
+  $("speakBtn").addEventListener("click", () => speak(running ? `Running. ${good} good, ${bad} bad.` : "Stopped. Press Start to inspect."));
+
+  // alarm demo
+  function clearAlarm() { $("console").classList.remove("alarm"); $("banner").hidden = true; $("banner").className = "banner"; $("pill").style = ""; running ? setPill("run", "▶ Running") : setPill("stop", "‖ Stopped"); $("helpTitle").textContent = "Image is getting darker"; }
+  $("alarmDemo").addEventListener("click", () => {
+    $("console").classList.add("alarm"); $("banner").hidden = false; $("banner").className = "banner alarm";
+    $("bannerText").textContent = "PLC not connected. Check the network cable to the PLC.";
+    setPill("alarm", "! Alarm"); $("pill").style = ""; S.alarm();
+    $("helpTitle").textContent = "PLC not connected";
+    speak("Alarm. PLC not connected. Check the network cable to the PLC.");
+    setTimeout(() => { if ($("console").classList.contains("alarm")) { clearAlarm(); $("bannerText").textContent = "Image is getting darker. Clean the lens or check the light."; if (warned) { $("banner").hidden = false; } } }, 6000);
+  });
+
+  /* ---------- supervisor ---------- */
+  const levels = [
+    { k: "Relaxed", d: "Fewest rejects", good: 200, bad: 14 },
+    { k: "Easy", d: "", good: 200, bad: 17 },
+    { k: "Normal", d: "Recommended", good: 198, bad: 18 },
+    { k: "Strict", d: "", good: 191, bad: 18 },
+    { k: "Very strict", d: "Smallest faults", good: 176, bad: 18 },
+  ];
+  let strict = 2, savedStrict = 2, ngAct = "Push it off the line", savedAct = ngAct, speed = 225, savedSpeed = 225;
+  $("strict").innerHTML = levels.map((l, i) => `<button class="stop-opt" role="radio" aria-checked="${i === strict}" data-i="${i}" type="button">${l.k}<small>${l.d || "&nbsp;"}</small></button>`).join("");
+  $("strict").addEventListener("click", e => { const b = e.target.closest(".stop-opt"); if (!b) return; strict = +b.dataset.i; renderStrict(); dirty(); });
+  function renderStrict() {
+    document.querySelectorAll(".stop-opt").forEach(b => b.setAttribute("aria-checked", +b.dataset.i === strict));
+    const l = levels[strict];
+    $("mGood").textContent = l.good + " / 200"; $("bGood").style.width = l.good / 2 + "%";
+    $("mBad").textContent = l.bad + " / 18"; $("bBad").style.width = l.bad / 18 * 100 + "%";
+    const a = $("advice");
+    if (l.bad < 18) { a.className = "advice"; a.textContent = `! ${18 - l.bad} of the 18 bad parts would pass. Choose a stricter level.`; }
+    else if (l.good < 195) { a.className = "advice"; a.textContent = `! ${200 - l.good} good parts would be rejected. That is waste. Try one step less strict.`; }
+    else { a.className = "advice fine"; a.textContent = "✓ Good choice. Every bad part is caught and almost no good part is rejected."; }
+  }
+  $("ngAct").addEventListener("click", e => { const b = e.target.closest(".choice"); if (!b) return; ngAct = b.dataset.v; document.querySelectorAll(".choice").forEach(c => c.setAttribute("aria-checked", c === b)); dirty(); });
+  function renderSpeed() {
+    $("speed").textContent = speed + " / min"; const per = Math.round(60000 / speed);
+    $("speedNow").textContent = "Time per part: " + per + " ms";
+    const a = $("speedAdvice");
+    if (per < 60) { a.style.color = "var(--ng)"; a.textContent = `✗ Only ${per} ms per part, and the check takes 48 ms. Too fast; parts may be missed.`; }
+    else if (per < 90) { a.style.color = "var(--warn)"; a.textContent = `! ${per} ms per part. It works, with little time to spare.`; }
+    else { a.style.color = "var(--ok)"; a.textContent = "✓ The check takes 48 ms. There is enough time."; }
+  }
+  $("spUp").addEventListener("click", () => { speed = Math.min(1200, speed + 25); renderSpeed(); dirty(); });
+  $("spDown").addEventListener("click", () => { speed = Math.max(25, speed - 25); renderSpeed(); dirty(); });
+  function dirty() {
+    const n = (strict !== savedStrict) + (ngAct !== savedAct) + (speed !== savedSpeed);
+    $("savebar").hidden = n === 0;
+    $("saveText").textContent = `${n} change${n === 1 ? "" : "s"} for Whisky 750 ml. They apply from the next part.`;
+  }
+  $("saveBtn").addEventListener("click", () => {
+    savedStrict = strict; savedAct = ngAct; savedSpeed = speed; dirty(); S.save();
+    $("strictNow").textContent = "Now: " + levels[strict].k;
+    const t = $("toast"); t.textContent = "Saved. The line uses the new settings from the next part."; t.hidden = false; setTimeout(() => t.hidden = true, 2600);
+  });
+  $("undoBtn").addEventListener("click", () => {
+    strict = savedStrict; ngAct = savedAct; speed = savedSpeed; renderStrict(); renderSpeed();
+    document.querySelectorAll(".choice").forEach(c => c.setAttribute("aria-checked", c.dataset.v === ngAct)); dirty();
+  });
+
+  /* ---------- sound gallery ---------- */
+  const list = [
+    ["Bad part", "ng", "Low double buzz. Plays on every NG part. The one sound everyone must know.", "196 Hz square · 2 × 120 ms"],
+    ["Alarm", "alarm", "Two-tone chime at 2 per second until someone looks. Can be spoken too.", "660 / 880 Hz · 2 Hz"],
+    ["Start", "start", "Rising sweep. The line is now inspecting.", "220 → 1200 Hz · 380 ms"],
+    ["Stop", "stop", "Falling sweep. Inspection has stopped.", "1000 → 180 Hz · 380 ms"],
+    ["Saved", "save", "Three rising notes. A setting or job was saved.", "660 · 880 · 1320 Hz"],
+    ["Good part", "ok", "A very soft tick. Off by default.", "1320 Hz · 50 ms"],
+    ["Tap", "click", "Short blip under every button press, so a gloved tap is felt.", "1400 → 900 Hz · 50 ms"],
+    ["Hover", "hover", "Barely there. Mouse users only.", "2400 Hz · 25 ms"],
+  ];
+  $("soundList").innerHTML = list.map(([n, k, d, m]) => `<div class="snd"><h3>${n}</h3><p>${d}</p><span class="meta">${m}</span><button class="hud-btn" data-s="${k}" type="button"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>Play</button></div>`).join("");
+  $("soundList").addEventListener("click", e => {
+    const b = e.target.closest("[data-s]"); if (!b) return;
+    if (!soundOn) { $("soundBtn").click(); }
+    setTimeout(() => S[b.dataset.s](), 60);
+  });
+
+  requestAnimationFrame(sizeCanvas);
+  document.fonts && document.fonts.ready.then(sizeCanvas);
+})();
+</script>

@@ -1,0 +1,25 @@
+{
+  "alarm.camera_error.title": "Camera not working",
+  "alarm.camera_error.fix": "A camera of this station has stopped giving pictures. Check its cable and power, then start the station again.",
+  "alarm.child_camera_error.title": "Pack camera not working",
+  "alarm.child_camera_error.fix": "The camera that reads the codes on the packs has stopped. Check its cable and power, then start the station again.",
+  "alarm.parent_camera_error.title": "Case camera not working",
+  "alarm.parent_camera_error.fix": "The camera that reads the case code has stopped or sent no picture. Check its cable, power and trigger, then start the station again.",
+  "alarm.station_error.title": "Station stopped with an error",
+  "alarm.station_error.fix": "The inspection hit an error and the line was set to fault. Read the error on the station screen and start the station again. If it comes back, call the vision engineer.",
+  "alarm.pc_pressure.title": "Station PC short of memory or disk",
+  "alarm.pc_pressure.fix": "The station PC is low on memory or disk space and is freeing some by itself. Close other programs on the PC. If it stays, call the vision engineer.",
+  "alarm.ledger_tampered.title": "Results record changed: line stopped",
+  "alarm.ledger_tampered.fix": "The station's saved results no longer match their check, so production will not start (alarm 801). Do not run the line. Tell the supervisor and the vision engineer: the engineer puts back the results file from a backup, or starts a new record, then starts the station again.",
+  "alarm.licence_content_key.title": "Licence missing: station not started",
+  "alarm.licence_content_key.fix": "The station has no valid licence key on this PC, or a product or model file could not be opened, so it did not start and the line is in fault. Call the vision engineer to check the licence in Vision Studio and reinstall the product from the signed package.",
+  "_meta": {
+    "alarm.camera_error.title": { "max": 40, "context": "Alarm raised by Vision Studio when a camera with tools reports an error; alert title on the plant server, mobile app and dashboard" },
+    "alarm.child_camera_error.title": { "max": 40, "context": "Aggregation line: the camera reading child (pack) codes failed" },
+    "alarm.parent_camera_error.title": { "max": 40, "context": "Aggregation line: the camera reading the parent (case) code failed or sent no frame" },
+    "alarm.station_error.title": { "max": 40, "context": "The inspection program raised an error during production; the line state is Fault" },
+    "alarm.pc_pressure.title": { "max": 40, "context": "The station PC's memory or disk use reached the High or Critical level" },
+    "alarm.ledger_tampered.title": { "max": 40, "context": "The station's tamper-evident results ledger failed its check (alarm 801); production starts are refused until the engineer restores or restarts the ledger" },
+    "alarm.licence_content_key.title": { "max": 40, "context": "LineRunner refused to start: no licence content key on this PC, or an encrypted product or model could not be opened; the line state is Fault" }
+  }
+}

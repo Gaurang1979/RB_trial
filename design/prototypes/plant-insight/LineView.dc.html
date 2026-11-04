@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Line view</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E151C}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 32px; background: #121C25; border-bottom: 1px solid #22303D">
+    <a href="Main.dc.html" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none; font-size: 14px; min-height: 40px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg>Floor map</a>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 700">Line 4</h1>
+    <span style="font-size: 14px; color: #9FB0C0">Carton print · 30 ct · Job "Carton-30 v7" · Batch C1180</span>
+    <span style="display: inline-flex; align-items: center; gap: 6px; background: #12301B; color: #3FB950; border: 1px solid #2B6A3A; border-radius: 999px; padding: 6px 12px; font-weight: 600; font-size: 14px">✓ Running</span>
+    <div style="flex: 1 1 auto"></div>
+    <button style="background: transparent; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; min-height: 40px">Change product</button>
+    <button style="background: transparent; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; min-height: 40px">Shift report</button>
+  </header>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 24px 32px 40px; box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+    <section aria-label="Cameras" style="flex: 999 1 640px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px">
+        <sc-for list="{{cams}}" as="c" hint-placeholder-count="2">
+          <figure style="margin: 0; background: #16212C; border: 1px solid #22303D; border-radius: 12px; overflow: hidden">
+            <div style="position: relative; aspect-ratio: 4 / 3; background: #1B2733; border: 6px solid {{c.color}}; box-sizing: border-box; display: flex; align-items: center; justify-content: center">
+              <svg width="70%" viewBox="0 0 280 180" role="img" aria-label="{{c.alt}}">
+                <rect x="20" y="20" width="240" height="140" rx="6" fill="#2A3846" stroke="#4A5E72"></rect>
+                <rect x="40" y="40" width="110" height="18" rx="3" fill="#5A7088"></rect>
+                <rect x="40" y="70" width="80" height="12" rx="3" fill="#4A5E72"></rect>
+                <rect x="190" y="40" width="50" height="50" fill="none" stroke="#7CB7FF" stroke-width="2" stroke-dasharray="4 3"></rect>
+                <rect x="38" y="100" width="150" height="34" fill="none" stroke="{{c.color}}" stroke-width="3"></rect>
+              </svg>
+              <span style="position: absolute; top: 10px; left: 12px; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 28px; color: {{c.color}}">{{c.result}}</span>
+              <span style="position: absolute; bottom: 10px; right: 12px; font-size: 12px; color: #C4D0DB; background: #0E151Ccc; padding: 3px 8px; border-radius: 6px">live · {{c.ms}}</span>
+            </div>
+            <figcaption style="padding: 10px 14px; font-size: 14px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap"><span style="font-weight: 600">{{c.name}}</span><span style="color: #9FB0C0">{{c.tools}}</span></figcaption>
+          </figure>
+        </sc-for>
+      </div>
+
+      <div style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px">
+          <h2 style="margin: 0; font-size: 17px; font-weight: 600">Last NG parts</h2>
+          <a href="MobileReview.dc.html" style="font-size: 14px">Review all 37</a>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 12px">
+          <sc-for list="{{ngs}}" as="n" hint-placeholder-count="6">
+            <div style="background: #1B2733; border: 1px solid #3A2A2A; border-radius: 10px; overflow: hidden">
+              <div style="height: 70px; background: #2A3846; display: flex; align-items: center; justify-content: center; color: #FF7B72; font-weight: 700; font-size: 22px">✗</div>
+              <div style="padding: 8px 10px"><div style="font-size: 13px; font-weight: 600">{{n.reason}}</div><div style="font-size: 12px; color: #9FB0C0">{{n.when}}</div></div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <div style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">This shift</h2>
+        <svg width="100%" height="44" viewBox="0 0 800 44" preserveAspectRatio="none" role="img" aria-label="Line state over the shift: running most of the time, two short stops and one changeover">
+          <rect x="0" y="6" width="210" height="28" fill="#3FB950"></rect>
+          <rect x="210" y="6" width="22" height="28" fill="#FF7B72"></rect>
+          <rect x="232" y="6" width="248" height="28" fill="#3FB950"></rect>
+          <rect x="480" y="6" width="40" height="28" fill="#79C0FF"></rect>
+          <rect x="520" y="6" width="120" height="28" fill="#3FB950"></rect>
+          <rect x="640" y="6" width="14" height="28" fill="#FF7B72"></rect>
+          <rect x="654" y="6" width="146" height="28" fill="#3FB950"></rect>
+        </svg>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #9FB0C0; font-family: 'IBM Plex Mono', monospace"><span>14:00</span><span>16:00</span><span>18:00</span><span>20:00</span><span>22:00</span></div>
+      </div>
+    </section>
+
+    <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section aria-label="Counters" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px">
+        <div><div style="font-size: 13px; color: #9FB0C0">Good</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600; color: #3FB950">38,412</div></div>
+        <div><div style="font-size: 13px; color: #9FB0C0">NG</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600; color: #FF7B72">388</div></div>
+        <div><div style="font-size: 13px; color: #9FB0C0">Yield</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600">99.00%</div></div>
+        <div><div style="font-size: 13px; color: #9FB0C0">OEE now</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 600">79%</div></div>
+      </section>
+      <section aria-label="Cycle time" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <h2 style="margin: 0 0 8px; font-size: 17px; font-weight: 600">Cycle time</h2>
+        <div style="font-size: 13px; color: #9FB0C0">Median 41 ms · slowest 1% 63 ms · budget 80 ms</div>
+        <div style="height: 14px; background: #22303D; border-radius: 7px; margin-top: 10px; position: relative; overflow: hidden">
+          <div style="position: absolute; left: 0; top: 0; height: 14px; width: 51%; background: #58A6FF"></div>
+          <div style="position: absolute; left: 51%; top: 0; height: 14px; width: 28%; background: #2F5A86"></div>
+        </div>
+      </section>
+      <section aria-label="NG reasons" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">Why parts were NG</h2>
+        <sc-for list="{{pareto}}" as="p" hint-placeholder-count="4">
+          <div style="margin: 8px 0">
+            <div style="display: flex; justify-content: space-between; font-size: 14px"><span>{{p.reason}}</span><span style="font-family: 'IBM Plex Mono', monospace">{{p.n}}</span></div>
+            <div style="height: 8px; background: #22303D; border-radius: 4px; margin-top: 4px"><div style="height: 8px; width: {{p.pct}}; background: #FF7B72; border-radius: 4px"></div></div>
+          </div>
+        </sc-for>
+      </section>
+      <section aria-label="Station health" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+        <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">Station health</h2>
+        <sc-for list="{{health}}" as="h" hint-placeholder-count="4">
+          <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0; border-top: 1px solid #22303D"><span>{{h.k}}</span><span style="color: {{h.color}}">{{h.v}}</span></div>
+        </sc-for>
+      </section>
+    </aside>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      cams: [
+        { name: 'Camera 1 · top', tools: 'Read code · Check text · Find label', result: '✓ OK', color: '#3FB950', ms: '38 ms', alt: 'Carton top: label found, code read, date checked' },
+        { name: 'Camera 2 · side', tools: 'Check print · Measure offset', result: '✓ OK', color: '#3FB950', ms: '22 ms', alt: 'Carton side: print checked, offset measured' }
+      ],
+      ngs: [
+        { reason: 'Label offset too large', when: '17:41:08 · Camera 2' },
+        { reason: 'Date not readable', when: '17:38:55 · Camera 1' },
+        { reason: 'Label offset too large', when: '17:36:12 · Camera 2' },
+        { reason: 'Code not found', when: '17:31:40 · Camera 1' },
+        { reason: 'Wrong batch number', when: '17:22:03 · Camera 1' },
+        { reason: 'Label offset too large', when: '17:19:47 · Camera 2' }
+      ],
+      pareto: [
+        { reason: 'Label offset too large', n: '162', pct: '100%' },
+        { reason: 'Date not readable', n: '104', pct: '64%' },
+        { reason: 'Code not found', n: '71', pct: '44%' },
+        { reason: 'Wrong batch number', n: '51', pct: '31%' }
+      ],
+      health: [
+        { k: 'Camera 1 focus', v: '✓ 0.94', color: '#3FB950' },
+        { k: 'Camera 2 light', v: '✓ steady', color: '#3FB950' },
+        { k: 'PLC heartbeat', v: '✓ 5 ms', color: '#3FB950' },
+        { k: 'PC disk', v: '! 81% full', color: '#E3B341' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

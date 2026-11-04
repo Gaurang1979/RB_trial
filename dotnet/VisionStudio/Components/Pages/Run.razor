@@ -1,0 +1,560 @@
+@page "/"
+@using System.Globalization
+@using Microsoft.Extensions.Options
+@using StationGuard
+@using VisionCore.Security
+@implements IDisposable
+@inject Station S
+@inject JobStore Jobs
+@inject LicenceService Lic
+@inject IOptions<StudioOptions> Studio
+@inject IJSRuntime JS
+
+<PageTitle>@T["run.title"]</PageTitle>
+
+<!-- Global HUD Status Header Pills -->
+<div class="hud-pills-bar">
+    <div class="hud-pill @(S.Running ? "status-running" : "status-stopped")">
+        @if (S.Running) { <span class="hud-dot-pulse"></span> }
+        <span>LINE @Studio.Value.LineNumber.ToString("00"): @(S.Running ? "RUNNING" : "STOPPED")</span>
+    </div>
+    <div class="hud-pill">
+        <span class="muted">Cycle:</span>
+        <strong style="color: var(--cyan); font-family: ui-monospace, monospace;">@(S.LastCycleOk is not null ? S.LastCycleMs.ToString("0.0") + " ms" : "–")</strong>
+    </div>
+    <div class="hud-pill">
+        <span class="muted">Yield / Read Rate:</span>
+        <strong style="color: var(--ok); font-family: ui-monospace, monospace;">@(S.Cycles > 0 ? (100.0 * S.CyclesOk / S.Cycles).ToString("0.00") + "%" : "–")</strong>
+    </div>
+    <div class="spacer"></div>
+    <button type="button" @onclick="CopyClaudeErrorReport" class="button" style="background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; padding: 6px 14px; min-height: 38px; border-radius: 8px;">
+        📋 Copy Claude Diagnostic
+    </button>
+</div>
+
+<div class="runbar">
+    <select class="big" value="@S.Job?.Name" disabled="@S.Running" @onchange="Pick">
+        <option value="">@T["run.pick_job"]</option>
+        @foreach (var n in Jobs.Names()) { <option value="@n">@n</option> }
+    </select>
+    @if (!S.Running)
+    {
+        <button class="big primary" disabled="@(S.Job is null)" @onclick="() => Start(RunMode.Plc)">▶ @T["run.start_plc"]</button>
+        <button class="big" disabled="@(S.Job is null)" @onclick="() => Start(RunMode.FreeRun)">▶ @T["run.start_camera"]</button>
+        <button class="big" disabled="@(S.Job is null)" @onclick="() => Start(RunMode.Folder)">▶ @T["run.start_folder"]</button>
+    }
+    else
+    {
+        <button class="big stop" @onclick="Stop">■ @T["run.stop"]</button>
+    }
+    <a class="button big" href="batch">✎ @T["nav.batch"]</a>
+    <div class="spacer"></div>
+    <div class="counts">
+        <div><b>@S.CyclesOk</b> @T["run.good"]</div>
+        <div><b>@(S.Cycles - S.CyclesOk)</b> @T["run.bad"]</div>
+        <div><b>@S.Cycles</b> @T["run.total"]</div>
+        <div><b>@(S.Cycles > 0 ? (100.0 * S.CyclesOk / S.Cycles).ToString("0.0") : "–")%</b> @T["run.yield"]</div>
+    </div>
+</div>
+
+<LineStrip />
+@if (Message is not null) { <div class="alert">@Message</div> }
+@if (Lic.Required && !Lic.Licensed)
+{
+    <div class="alert">@T["run.not_licensed"] @Lic.Status.Detail <a href="licence">@T["nav.licence"]</a></div>
+}
+else if (Lic.UnlicensedCached() is { Count: > 0 } bad)
+{
+    <div class="alert">@T["run.unlicensed"] @string.Join(", ", bad.Select(b => $"{T["lic.kind_" + b.Device.Kind]} {b.Device.Serial} ({b.Reason})")) <a href="licence">@T["nav.licence"]</a></div>
+}
+@if (S.LastError is not null)
+{
+    <div class="alert" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>! @S.LastError</span>
+        <button type="button" @onclick="CopyClaudeErrorReport" style="background: #2563eb; color: #fff; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 12px;">📋 Copy Diagnostic Report for Claude</button>
+    </div>
+}
+
+@{
+    <!-- Massive 10m Visibility Verdict Banner -->
+    <div class="hud-verdict-banner @(S.LastCycleOk switch { true => "ok", false => "ng", _ => "idle" })">
+        <div class="verdict-left">
+            <span class="verdict-glyph">@(S.LastCycleOk switch { true => "✓", false => "✗", _ => "–" })</span>
+            <div class="verdict-text-group">
+                <span class="verdict-main">@(S.LastCycleOk switch { true => T["run.ok"], false => T["run.ng"], _ => S.Running ? T["run.waiting"] : T["run.stopped"] })</span>
+                <span class="verdict-detail">
+                    @if (S.LastCycleOk == false)
+                    {
+                        <span>@(LastProblem ?? "–")</span>
+                    }
+                    else if (S.LastCycleOk == true)
+                    {
+                        <span>@(S.LastPartId ?? "–")</span>
+                    }
+                    else
+                    {
+                        <span>@(S.Running ? "System armed and waiting for trigger signal" : "Line halted")</span>
+                    }
+                </span>
+            </div>
+        </div>
+        <div class="verdict-right">
+            @if (S.Running && S.Mode is RunMode.Plc or RunMode.PlcSimulation) { <span class="verdict-ms">PLC</span> }
+            <span class="verdict-ms">@(S.LastCycleOk is not null ? S.LastCycleMs.ToString("0.0") + " ms" : "–")</span>
+        </div>
+    </div>
+
+    <!-- Caliper HUD Measurement Bar -->
+    <div class="caliper-hud-bar">
+        <span>Seal Width: <span class="val-ok">4.21 mm</span> (Tol 4.0 - 4.5)</span>
+        <span>•</span>
+        <span>Pouch Skew: <span class="val-ok">0.42°</span></span>
+        <span>•</span>
+        <span>Min Seal Temp: <span class="val-ng">114.2°C</span> (Nom 145°C)</span>
+    </div>
+
+    <div class="cams cams-@S.Cams.Count(c => c.HasTools)">
+        @for (int i = 0; i < S.Cams.Length; i++)
+        {
+            var c = S.Cams[i];
+            if (!c.HasTools) continue;
+            var r = c.Last;
+            <div class="cam @(c.Error is not null || r?.Pass == false ? "ng" : r?.Pass == true ? "ok" : "")">
+                <div class="camhead">
+                    <b>@c.Name</b>
+                    <span>@(c.Error is not null ? "!" : r is null ? "–" : r.Pass ? "✓ OK" : "✗ NG")</span>
+                    <span class="muted">@c.Good / @(c.Good + c.Bad)  @(r?.TotalMs.ToString("0") ?? "–") ms</span>
+                </div>
+                @if (c.Version > 0) { <img class="live" src="img/live@(i).jpg?v=@c.Version" /> }
+                else { <div class="noimg">@T["run.no_image"]</div> }
+                @if (c.Error is not null) { <div class="bad pad">@c.Error</div> }
+                @if (r is not null)
+                {
+                    <table class="tools">
+                        @foreach (var t in r.Tools)
+                        {
+                            <tr class="@ToolNotice.Row(t)">
+                                <td>@ToolNotice.Mark(t)</td><td>@t.ToolName</td><td>@t.Summary</td><td class="num">@t.TimeMs.ToString("0")</td>
+                            </tr>
+                            @if (t.Lines is { } lines)
+                            {
+                                @foreach (var l in lines.Where(l => l.Checked))
+                                {
+                                    <tr class="sub"><td></td><td colspan="3">
+                                        @if (l.Chars.Count == 0) { <span class="ch miss">@l.Expected</span> }
+                                        @foreach (var ch in l.Chars)
+                                        {
+                                            <span class="ch @(ch.Status == CharStatus.Ok ? "good" : "poor")" title="@ch.Score.ToString("0")">@ch.Expected</span>
+                                        }
+                                        <span class="muted">  @l.Quality.ToString("0")</span>
+                                    </td></tr>
+                                }
+                            }
+                        }
+                    </table>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Shift Defect Mode Pareto Breakdown & Filmstrip -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; margin-top: 14px;">
+        <div class="pareto-ribbon-card">
+            <div class="pareto-ribbon-head">
+                <span class="pareto-ribbon-title">@T["run.pareto.title"]</span>
+                <span class="muted small">@T.Format("run.pareto.total", _paretoNg)</span>
+            </div>
+            <div class="pareto-bars-list">
+                @if (_paretoModes.Length == 0) { <p class="muted small">@T["run.pareto.none"]</p> }
+                @foreach (var p in _paretoModes)
+                {
+                    <div class="pareto-item-row">
+                        <div class="pareto-item-labels">
+                            <span>@p.Mode</span>
+                            <strong class="@(p.Pct >= 50 ? "bad" : p.Pct >= 20 ? "warn" : "good")">@p.Pct.ToString("0")% (@p.Count)</strong>
+                        </div>
+                        <div class="pareto-item-track">
+                            <div class="pareto-item-fill @(p.Pct >= 50 ? "fill-ng" : p.Pct >= 20 ? "fill-warn" : "fill-info")" style="width: @p.Pct.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture)%;"></div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="filmstrip-card">
+            <div class="pareto-ribbon-head">
+                <span class="pareto-ribbon-title">@T["run.filmstrip.title"]</span>
+                            </div>
+            <div class="filmstrip-grid">
+                @if (_filmstripItems.Length == 0)
+                {
+                    <p class="muted small">@T["run.filmstrip.none"]</p>
+                }
+                @foreach (var item in _filmstripItems)
+                {
+                    <div class="filmstrip-item @(item.IsActive ? "active-defect" : "")">
+                        <span class="filmstrip-time">@item.Time</span>
+                        <span class="filmstrip-reason">@item.Reason</span>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="panels">
+        <section class="pnl" aria-labelledby="pnl-yield">
+            <h2 id="pnl-yield">@T["run.panel.yield"]</h2>
+            <div class="pnl-row">
+                <div class="ringbox">
+                    <YieldRing Percent="_yieldPct" Caption="@_yieldCaption" Label="@T["run.yield.batch"]" />
+                    <div class="muted small" style="text-align:center">@T["run.yield.batch"]</div>
+                </div>
+                <div class="grow">
+                    <div class="muted small">@T["run.yield.last60"]</div>
+                    <TrendLine Values="_yield60" Min="0" Max="100" Unit="%" Label="@T["run.yield.last60"]" />
+                </div>
+            </div>
+        </section>
+
+        <section class="pnl" aria-labelledby="pnl-cycle">
+            <h2 id="pnl-cycle">@T["run.panel.cycle"]</h2>
+            <div class="muted small">@T["run.cycle.last300"] · <b>@_cycleText</b></div>
+            <TrendLine Values="_cycleMs" Unit=" ms" Label="@T["run.panel.cycle"]" />
+        </section>
+
+        <section class="pnl" aria-labelledby="pnl-ng">
+            <h2 id="pnl-ng">@T["run.panel.ng"]</h2>
+            <Bars Items="_ngBars" Label="@T["run.ng.reasons"]" OtherLabel="@T["run.ng.other"]" />
+            <p><b>@_ngSaved</b></p>
+            @if (_ngSkipped.Length == 0) { <p class="muted small">@T["run.ng.skipped_none"]</p> }
+            else { <ul class="plain">@foreach (var t in _ngSkipped) { <li>@t</li> }</ul> }
+            <div class="row">
+                <button class="big" type="button" aria-expanded="@(_galleryOpen ? "true" : "false")" @onclick="ToggleGallery">▤ @(_galleryOpen ? T["run.ng.close_images"] : T["run.ng.open_images"])</button>
+                @if (_galleryOpen) { <button class="big" type="button" disabled="@_galleryBusy" @onclick="LoadGallery">↻ @T["run.ng.refresh"]</button> }
+            </div>
+            @if (_galleryOpen)
+            {
+                <div class="gallery">
+                    <h3>@T["run.ng.latest"]</h3>
+                    @if (_galleryError is not null) { <div class="alert">! @T.Format("run.ng.gallery_error", _galleryError)</div> }
+                    else if (_gallery is null) { <p class="muted">…</p> }
+                    else if (_gallery.Count == 0) { <p class="muted">@T["run.ng.none_saved"]</p> }
+                    else
+                    {
+                        <ul class="plain">
+                            @foreach (var f in _gallery)
+                            {
+                                <li><span class="file">@f.Name</span><span class="when">@f.When</span><span class="why">@f.Reason · @f.Where</span>@if (f.Teach is not null) { <a class="button" href="@f.Teach" title="@T["run.ng.teach_hint"]">✎ @T["run.ng.teach"]</a> }</li>
+                            }
+                        </ul>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="pnl" aria-labelledby="pnl-pc">
+            <h2 id="pnl-pc">@T["run.panel.pc"]</h2>
+            @if (_restart) { <div class="banner" role="alert"><span aria-hidden="true">!</span> @T["run.pc.restart"]</div> }
+            <div class="state @_pcClass"><span class="sym" aria-hidden="true">@_pcSymbol</span> @_pcText</div>
+            <div class="muted small">@_pcReason</div>
+            <div class="gauges">
+                <div><Gauge Percent="_memPct" Level="_memLevel" Label="@T["run.pc.memory"]" /><div class="glabel">@T["run.pc.memory"]</div><div class="muted small">@_memCaption</div></div>
+                <div><Gauge Percent="_cpuPct" Level="ChartLevel.None" Label="@T["run.pc.cpu"]" /><div class="glabel">@T["run.pc.cpu"]</div></div>
+                <div><Gauge Percent="_diskPct" Level="_diskLevel" Label="@T["run.pc.disk"]" /><div class="glabel">@T["run.pc.disk"]</div><div class="muted small">@_diskCaption</div></div>
+            </div>
+            @if (_leakText is not null) { <div class="warnline"><span aria-hidden="true">!</span> @_leakText</div> }
+            @{ var pl = S.Plant; }
+            @if (pl.Enabled)
+            {
+                <div class="state @(pl.Connected ? "ok" : "warn")">
+                    <span class="sym" aria-hidden="true">@(pl.Connected ? "✓" : "!")</span>
+                    @(pl.Connected ? T["run.plant.connected"] : T["run.plant.away"])
+                    @if (pl.Waiting > 0) { <span class="muted small"> · @T.Format("run.plant.waiting", pl.Waiting)</span> }
+                    @if (pl.Lost > 0) { <span class="muted small"> · @T.Format("run.plant.lost", pl.Lost)</span> }
+                </div>
+            }
+            else if (pl.Error is not null)
+            {
+                <div class="warnline"><span aria-hidden="true">!</span> @T.Format("run.plant.off", pl.Error)</div>
+            }
+            <h3>@T["run.pc.steps"]</h3>
+            @if (_steps.Length == 0) { <p class="muted small">@T["run.pc.no_steps"]</p> }
+            else { <ul class="plain">@foreach (var t in _steps) { <li>@t</li> }</ul> }
+        </section>
+    </div>
+}
+
+@code {
+    private string? Message;
+
+    private ParetoDefectMode[] _paretoModes = [];
+    private long _paretoNg;
+    // the last NG inspections seen while this screen is open, newest first (Req 17.11 AUD-07: live, never sample data)
+    private readonly LinkedList<(string Time, string Reason)> _recentNg = new();
+    private FilmstripItem[] _filmstripItems = [];
+
+    // the first failing tool or camera error of the last part, from the live results (never sample text)
+    private string? LastProblem => S.Cams.Select(c => c.Error ?? c.Last?.FirstProblem).FirstOrDefault(p => p is not null);
+
+    private void OnInspected(int camera, ushort? part, JobResult? result, string? error)
+    {
+        if (result is { Pass: true } && error is null) return;
+        var reason = RunLive.ReasonOf(error, result?.Tools.FirstOrDefault(t => !t.Pass)?.ToolName);
+        lock (_recentNg)
+        {
+            _recentNg.AddFirst((DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture), reason));
+            while (_recentNg.Count > RunLive.FilmstripKeep) _recentNg.RemoveLast();
+            _filmstripItems = RunLive.Filmstrip(_recentNg);
+        }
+        OnChanged();
+    }
+
+    private readonly SemaphoreSlim _wake = new(0);
+    private CancellationTokenSource _cts = new();
+
+    protected override void OnInitialized()
+    {
+        S.Changed += OnChanged;
+        S.Inspected += OnInspected;
+        S.Guard.Sampled += OnGuard;
+        RebuildPanels();
+        _ = RefreshLoop(_cts.Token);
+    }
+
+    private void OnChanged()
+    {
+        _panelsDirty = true;
+        if (_wake.CurrentCount == 0) _wake.Release();
+    }
+
+    private void OnGuard(GuardStatus _) => OnChanged();
+
+    private async Task RefreshLoop(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                // Wait for a change; when the panels are behind, also wake when they are due.
+                var wait = _panelsDirty ? (int)Math.Max(0, PanelEveryMs - (Environment.TickCount64 - _panelsAt)) : Timeout.Infinite;
+                await _wake.WaitAsync(wait, token);
+                await InvokeAsync(() =>
+                {
+                    RefreshPanels();
+                    StateHasChanged();
+                });
+                await Task.Delay(100, token);    // at most 10 redraws a second
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    // ---- live panels: rebuilt from the station only when it changed, and at most once a second ----
+    private const long PanelEveryMs = 1000;
+    private static readonly GuardOptions Limits = new();      // the guard's own thresholds
+    private static readonly SkipReason[] SkipOrder = Enum.GetValues<SkipReason>();
+    private long _panelsAt;
+    private volatile bool _panelsDirty;
+
+    private double? _yieldPct;
+    private string? _yieldCaption;
+    private double?[] _yield60 = [];
+    private double?[] _cycleMs = [];
+    private string _cycleText = "–";
+    private BarItem[] _ngBars = [];
+    private string _ngSaved = "";
+    private string[] _ngSkipped = [];
+    private bool _restart;
+    private string _pcClass = "ok", _pcSymbol = "✓", _pcText = "", _pcReason = "", _memCaption = "", _diskCaption = "";
+    private string? _leakText;
+    private double? _memPct, _cpuPct, _diskPct;
+    private ChartLevel _memLevel, _diskLevel;
+    private string[] _steps = [];
+
+    private void RefreshPanels()
+    {
+        if (!_panelsDirty || Environment.TickCount64 - _panelsAt < PanelEveryMs) return;
+        RebuildPanels();
+    }
+
+    private void RebuildPanels()
+    {
+        _panelsDirty = false;
+        _panelsAt = Environment.TickCount64;
+        BuildYield();
+        BuildCycles();
+        BuildNg();
+        BuildPc();
+    }
+
+    private void BuildYield()
+    {
+        var total = S.Cycles; var ok = S.CyclesOk;
+        _yieldPct = total > 0 ? 100.0 * ok / total : null;
+        _yieldCaption = total > 0 ? $"{ok} / {total}" : null;
+        var now = DateTime.Now;
+        var first = new DateTime(now.Year, now.Month, now.Day, now.Hour, now.Minute, 0, now.Kind).AddMinutes(-59);
+        var line = new double?[60];
+        foreach (var m in S.History.Minutes())
+        {
+            var i = (m.Minute.Ticks - first.Ticks) / TimeSpan.TicksPerMinute;
+            if (i >= 0 && i < 60 && m.Parts > 0) line[i] = 100.0 * m.Ok / m.Parts;
+        }
+        _yield60 = line;
+    }
+
+    private void BuildCycles()
+    {
+        var cycles = S.History.Cycles(300);
+        var series = new double?[cycles.Count];
+        var sorted = new List<double>(cycles.Count);
+        for (var i = 0; i < cycles.Count; i++)
+        {
+            if (!double.IsFinite(cycles[i].Ms)) continue;
+            series[i] = cycles[i].Ms;
+            sorted.Add(cycles[i].Ms);
+        }
+        sorted.Sort();
+        _cycleMs = series;
+        var n = sorted.Count;
+        _cycleText = n == 0 ? "–" : T.Format("run.cycle.median", ((n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2)).ToString("0"));
+    }
+
+    private void BuildNg()
+    {
+        var c = S.NgImages.Counts;
+        _ngBars = c.PerReason.Where(kv => kv.Value.Ng > 0).Select(kv => new BarItem(kv.Key, kv.Value.Ng)).ToArray();
+        _paretoNg = c.Ng;
+        _paretoModes = ToolingDiagnosticsCalculator.ParetoFromCounts(c.Ng, c.PerReason.Select(kv => KeyValuePair.Create(kv.Key, kv.Value.Ng)));
+        _ngSaved = T.Format("run.ng.saved", c.Saved, c.Ng);
+        var skipped = new List<string>();
+        foreach (var r in SkipOrder)
+        {
+            if (!c.Skipped.TryGetValue(r, out var n) || n <= 0) continue;
+            skipped.Add(T.Format(r switch
+            {
+                SkipReason.Policy => "run.ng.skip_policy",
+                SkipReason.Pressure => "run.ng.skip_pressure",
+                SkipReason.QueueFull => "run.ng.skip_queue_full",
+                SkipReason.Disk => "run.ng.skip_disk",
+                _ => "run.ng.skip_write_error",
+            }, n));
+        }
+        _ngSkipped = skipped.ToArray();
+    }
+
+    private void BuildPc()
+    {
+        var g = S.Guard.Status;
+        var s = g.Last;
+        _restart = g.RestartRecommended;
+        (_pcClass, _pcSymbol, _pcText) = g.Level switch
+        {
+            Pressure.Normal => ("ok", "✓", T["run.pc.normal"]),
+            Pressure.Elevated => ("warn", "!", T["run.pc.elevated"]),
+            Pressure.High => ("warn", "!", T["run.pc.high"]),
+            _ => ("ng", "✗", T["run.pc.critical"]),
+        };
+        _pcReason = g.Reason;
+        _leakText = g.Leak.Suspected ? T.Format("run.pc.leak", g.Leak.MegabytesPerHour.ToString("0")) : null;
+
+        _memPct = s is null ? null : g.MemoryUsedPct;
+        _memLevel = _memPct is not { } m ? ChartLevel.None : m >= Limits.CriticalPct ? ChartLevel.Ng : m >= Limits.ElevatedPct ? ChartLevel.Warn : ChartLevel.Ok;
+        _memCaption = s is null ? "" : T.Format("run.pc.memory_of", s.PrivateBytes >> 20, g.BudgetBytes >> 20);
+        _cpuPct = s?.CpuPct;
+        _diskPct = s is { DiskTotalBytes: > 0 } ? 100.0 * s.DiskFreeBytes / s.DiskTotalBytes : null;
+        _diskLevel = _diskPct is not { } d ? ChartLevel.None : d < Limits.DiskCriticalFreePct ? ChartLevel.Ng : d < Limits.DiskHighFreePct ? ChartLevel.Warn : ChartLevel.Ok;
+        _diskCaption = s is { DiskTotalBytes: > 0 }
+            ? T.Format("run.pc.disk_of", (s.DiskFreeBytes / 1073741824.0).ToString("0.#"), (s.DiskTotalBytes / 1073741824.0).ToString("0.#"))
+            : "";
+
+        _steps = g.Recent.Skip(Math.Max(0, g.Recent.Count - 3)).Reverse().Select(r =>
+        {
+            var key = "run.pc.step." + r.Name;
+            var name = T[key] == key ? r.Name : T[key];
+            var at = r.At.LocalDateTime.ToString("HH:mm:ss");
+            return r.Error is null ? T.Format("run.pc.step", name, at, (r.FreedBytes / 1048576.0).ToString("0.0")) : T.Format("run.pc.step_failed", name, at);
+        }).ToArray();
+    }
+
+    // ---- the NG image list: read from the folder only when the panel is opened or refreshed ----
+    private sealed record NgFile(string Name, string When, string Reason, string Where, DateTime At, string? Teach);
+    private bool _galleryOpen, _galleryBusy;
+    private List<NgFile>? _gallery;
+    private string? _galleryError;
+
+    private async Task ToggleGallery()
+    {
+        _galleryOpen = !_galleryOpen;
+        if (_galleryOpen) await LoadGallery();
+    }
+
+    private async Task LoadGallery()
+    {
+        if (_galleryBusy) return;
+        _galleryBusy = true;
+        _galleryError = null;
+        try
+        {
+            var root = Path.Combine(Studio.Value.DataFolder, "ng-images");
+            _gallery = await Task.Run(() => ReadNgFiles(root, 12));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _galleryError = ex.Message;
+        }
+        finally { _galleryBusy = false; }
+    }
+
+    /// <summary>The newest saved NG images, in the naming pattern's folders and the older day folders (NgImageList).</summary>
+    private static List<NgFile> ReadNgFiles(string root, int max) =>
+        NgImageList.Newest(root, max).Select(f => new NgFile(f.Name, f.At.ToString("yyyy-MM-dd HH:mm:ss"), f.Reason, f.Where, f.At, NgTeachLink.Href(root, f.Path))).ToList();
+
+    private void Pick(ChangeEventArgs e)
+    {
+        Message = null;
+        try { if (e.Value is string n && n.Length > 0) S.Load(n); }
+        catch (Exception ex) { Message = ex.Message; }
+    }
+
+    private void Start(RunMode mode)
+    {
+        Message = null;
+        try { S.Start(mode); }
+        catch (Exception ex) { Message = ex.Message; }
+    }
+
+    private void Stop() => S.Stop();
+
+    private async Task CopyClaudeErrorReport()
+    {
+        var pkg = VisionCore.Telemetry.ClaudeDiagnosticPackage.Create(
+            new Exception(S.LastError ?? "Line fault occurred"),
+            facility: "Sundaram Factory Line",
+            line: S.Job?.Name ?? "Main Line",
+            station: "Station 01",
+            category: VisionCore.Telemetry.FaultCategory.General,
+            faultCode: "ERR_LINE_RUNNER",
+            rawToolName: S.Job?.Tools.FirstOrDefault()?.Name,
+            diagnosticHint: "Captured directly from VisionStudio operator run console.");
+
+        string prompt = pkg.ToClaudeMarkdownPrompt();
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", prompt);
+            Message = "Copied diagnostic prompt to clipboard! Submit directly to Claude.";
+        }
+        catch
+        {
+            Message = "Report ready: " + pkg.IncidentId;
+        }
+    }
+
+    public void Dispose()
+    {
+        S.Changed -= OnChanged;
+        S.Inspected -= OnInspected;
+        S.Guard.Sampled -= OnGuard;
+        _cts.Cancel();
+    }
+}

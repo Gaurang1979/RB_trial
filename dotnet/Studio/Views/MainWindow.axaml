@@ -1,0 +1,102 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:VisionSystem.Studio.ViewModels"
+        xmlns:v="using:VisionSystem.Studio.Views"
+        xmlns:ui="using:VisionSystem.Studio.Controls"
+        xmlns:l="using:VisionSystem.Studio.Localization"
+        x:Class="VisionSystem.Studio.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Title="{l:T app.title}"
+        Width="1366" Height="768" MinWidth="1024" MinHeight="700">
+  <!-- Keyboard shortcuts of the Run screen (UI-UX-SPEC.md principle 4); none while a panel is open. -->
+  <Window.KeyBindings>
+    <KeyBinding Gesture="F5" Command="{Binding ShortcutCommand}" CommandParameter="start" />
+    <KeyBinding Gesture="Shift+F5" Command="{Binding ShortcutCommand}" CommandParameter="stop" />
+    <KeyBinding Gesture="F2" Command="{Binding ShortcutCommand}" CommandParameter="change" />
+    <KeyBinding Gesture="F3" Command="{Binding ShortcutCommand}" CommandParameter="batch" />
+    <KeyBinding Gesture="F4" Command="{Binding ShortcutCommand}" CommandParameter="parts" />
+    <KeyBinding Gesture="F1" Command="{Binding ShortcutCommand}" CommandParameter="help" />
+    <KeyBinding Gesture="F6" Command="{Binding ShortcutCommand}" CommandParameter="tryall" />
+    <KeyBinding Gesture="F7" Command="{Binding ShortcutCommand}" CommandParameter="teach" />
+    <KeyBinding Gesture="Ctrl+S" Command="{Binding ShortcutCommand}" CommandParameter="save" />
+    <KeyBinding Gesture="PageUp" Command="{Binding ShortcutCommand}" CommandParameter="prev" />
+    <KeyBinding Gesture="PageDown" Command="{Binding ShortcutCommand}" CommandParameter="next" />
+    <KeyBinding Gesture="Ctrl+Shift+A" Command="{Binding ShortcutCommand}" CommandParameter="areas" />
+  </Window.KeyBindings>
+  <Grid RowDefinitions="Auto,*">
+
+    <!-- Top bar (UI-UX-SPEC.md 2): product, status pill, language, user. -->
+    <Border Grid.Row="0" Classes="bar" BorderThickness="0,0,0,1" Height="{DynamicResource Vs.Size.TopBar}"
+            Padding="{DynamicResource Vs.Pad.S}">
+      <Grid ColumnDefinitions="*,Auto,*">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Border Classes="toned" ui:Ui.Tone="Neutral" Width="28" Height="28" CornerRadius="{DynamicResource Vs.Radius.S}">
+            <TextBlock Text="{Binding ProductInitial}" FontWeight="Bold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="{Binding ProductText}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <Border Grid.Column="1" Name="StatusPill" Classes="toned" ui:Ui.Tone="{Binding PillTone}"
+                CornerRadius="14" Padding="12,3" MinHeight="28" VerticalAlignment="Center">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding PillIcon, Converter={x:Static ui:IconConverter.Instance}}" Width="16" Height="16" />
+            <TextBlock Text="{Binding PillText}" FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+          <!-- Remote service (REQ-11, REQ-08): that a session is open, never who or what -->
+          <Border Classes="toned" ui:Ui.Tone="Warn" Name="RemoteBadge" IsVisible="{Binding RemoteActive}"
+                  Padding="{DynamicResource Vs.Pad.S}" CornerRadius="{DynamicResource Vs.Radius.S}" VerticalAlignment="Center">
+            <TextBlock Text="{l:T top.remote_service}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </Border>
+          <!-- Engineers and admins only (the runtime refuses everyone else too). -->
+          <Button Classes="vs" Command="{Binding OpenDesignerCommand}" Name="DesignerButton" IsVisible="{Binding MayDesign}">
+            <TextBlock Text="{l:T top.designer}" VerticalAlignment="Center" />
+          </Button>
+          <Button Classes="vs" Command="{Binding DisplayCommand}" Name="LanguageButton">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Language}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding LanguageGlyph}" FontWeight="Bold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="vs" Command="{Binding UserTapCommand}" Name="UserButton">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.User}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding UserText}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <v:RunView Grid.Row="1" DataContext="{Binding Run}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).ShowRun}" />
+    <ContentControl Grid.Row="1" Content="{Binding Designer}" IsVisible="{Binding !ShowRun}">
+      <ContentControl.DataTemplates>
+        <DataTemplate DataType="vm:DesignerViewModel"><v:DesignerView /></DataTemplate>
+      </ContentControl.DataTemplates>
+    </ContentControl>
+
+    <!-- One panel at a time over the screen: sign-in, change product, questions, help, display, NG image, what to do. -->
+    <Border Grid.Row="1" Classes="scrim" IsVisible="{Binding HasOverlay}">
+      <ContentControl Content="{Binding Overlay}">
+        <ContentControl.DataTemplates>
+          <DataTemplate DataType="vm:SignInViewModel"><v:SignInView /></DataTemplate>
+          <DataTemplate DataType="vm:ProductPickerViewModel"><v:ProductPickerView /></DataTemplate>
+          <DataTemplate DataType="vm:ConfirmViewModel"><v:ConfirmView /></DataTemplate>
+          <DataTemplate DataType="vm:MessageViewModel"><v:MessageView /></DataTemplate>
+          <DataTemplate DataType="vm:DisplayOptionsViewModel"><v:DisplayOptionsView /></DataTemplate>
+          <DataTemplate DataType="vm:NgViewerViewModel"><v:NgViewerView /></DataTemplate>
+          <DataTemplate DataType="vm:SortViewModel"><v:SortView /></DataTemplate>
+          <DataTemplate DataType="vm:AlarmHelpViewModel"><v:AlarmHelpView /></DataTemplate>
+          <DataTemplate DataType="vm:BatchViewModel"><v:BatchView /></DataTemplate>
+          <DataTemplate DataType="vm:AcceptChangeoverViewModel"><v:AcceptChangeoverView /></DataTemplate>
+          <DataTemplate DataType="vm:RemoteRequestViewModel"><v:RemoteRequestView /></DataTemplate>
+          <DataTemplate DataType="vm:PartsViewModel"><v:PartsView /></DataTemplate>
+        </ContentControl.DataTemplates>
+      </ContentControl>
+    </Border>
+  </Grid>
+</Window>

@@ -1,0 +1,86 @@
+{
+ "doctype": "DocType",
+ "name": "Vision Licence Check",
+ "module": "Vision Licence",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "licence",
+  "licence_key",
+  "status",
+  "installation",
+  "version",
+  "ip_address",
+  "unlicensed_parts"
+ ],
+ "fields": [
+  {
+   "fieldname": "licence",
+   "label": "Licence",
+   "fieldtype": "Link",
+   "options": "Vision Licence",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "licence_key",
+   "label": "Licence Key Sent",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "status",
+   "label": "Result",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "installation",
+   "label": "Installation",
+   "fieldtype": "Data",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "version",
+   "label": "Software Version",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "ip_address",
+   "label": "IP Address",
+   "fieldtype": "Data"
+  },
+  {
+   "fieldname": "unlicensed_parts",
+   "label": "Unlicensed Parts",
+   "fieldtype": "Small Text",
+   "in_list_view": 1
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "links": [],
+ "actions": [],
+ "autoname": "hash",
+ "in_create": 1
+}

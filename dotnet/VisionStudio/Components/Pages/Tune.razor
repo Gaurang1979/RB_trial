@@ -1,0 +1,229 @@
+@page "/tune"
+@attribute [Authorize(Roles = "Engineer")]
+@implements IDisposable
+@inject Station S
+@inject JobStore Jobs
+@inject ModelPaths Models
+
+<PageTitle>@T["tune.title"]</PageTitle>
+<h1>@T["tune.title"]</h1>
+
+@if (S.Job is null)
+{
+    <p>@T["batch.no_job"] <a href="">@T["nav.run"]</a></p>
+}
+else
+{
+    <div class="card form">
+        <p class="muted">@S.Job.Name · @T["tune.hint"]</p>
+        @if (S.Job.Cameras.Count > 1)
+        {
+            <label><span>@T["tune.camera"]</span>
+                <select value="@Camera" disabled="@(_run is not null)" @onchange="e => PickCamera(int.TryParse(e.Value?.ToString(), out var c) ? c : 0)">
+                    @for (int i = 0; i < S.Job.Cameras.Count; i++) { <option value="@i">@S.Job.Cameras[i].Name</option> }
+                </select>
+            </label>
+        }
+        <label><span>@T["tune.good"]</span><input class="wide" value="@GoodFolder" disabled="@(_run is not null)" @onchange="e => GoodFolder = e.Value?.ToString() ?? string.Empty" /></label>
+        <label><span>@T["tune.bad"]</span><input class="wide" value="@BadFolder" disabled="@(_run is not null)" @onchange="e => BadFolder = e.Value?.ToString() ?? string.Empty" /></label>
+        <div class="row">
+            @if (_run is null)
+            {
+                <button class="big primary" disabled="@S.Running" @onclick="Start">▶ @T["tune.run"]</button>
+            }
+            else
+            {
+                <button class="big stop" @onclick="() => _cancel?.Cancel()">■ @T["run.stop"]</button>
+                <span>@Step · @Done / @Total</span>
+            }
+        </div>
+        @if (Message is not null) { <div class="alert">@Message</div> }
+    </div>
+
+    @if (Proposal is { } p)
+    {
+        <div class="card">
+            @if (p.Problem is not null)
+            {
+                <div class="alert">@p.Problem</div>
+                @if (p.BadNotSeparable.Count > 0) { <p>@T["tune.not_separable"] @string.Join(", ", p.BadNotSeparable)</p> }
+            }
+            else
+            {
+                <table class="tools">
+                    <tr><th>@T["tune.tool"]</th><th>@T["tune.setting"]</th><th>@T["tune.now"]</th><th>@T["tune.new"]</th><th>@T["tune.lowest_good"]</th><th>@T["tune.highest_bad"]</th></tr>
+                    @foreach (var k in p.Knobs)
+                    {
+                        <tr class="@(k.Looser ? "ng" : "")">
+                            <td>@k.Tool</td><td>@k.Setting</td><td>@k.Show(k.Current)</td>
+                            <td><b>@k.Show(k.Proposed)</b>@(k.Looser ? " " + T["tune.looser"] : "")</td>
+                            <td>@(k.LowestGood is { } g ? k.Show(g) : "–")</td>
+                            <td>@(k.HighestBad is { } b ? k.Show(b) : T["tune.no_bad"])</td>
+                        </tr>
+                    }
+                </table>
+            }
+            @if (p.GoodAlwaysFail.Count > 0) { <p>@T["tune.good_always_fail"] @string.Join(", ", p.GoodAlwaysFail)</p> }
+            @if (Verdict is { } v)
+            {
+                <p><b>@v.Words</b></p>
+                @if (v.CanApply)
+                {
+                    <div class="row">
+                        <button class="big primary" disabled="@S.Running" @onclick="Accept">✓ @T["tune.accept"]</button>
+                        <button class="big" @onclick="Discard">✗ @T["tune.discard"]</button>
+                        @if (S.Running) { <span class="muted">@T["tune.stop_line"]</span> }
+                    </div>
+                }
+            }
+        </div>
+    }
+
+    @if (After.Count > 0)
+    {
+        <div class="card">
+            <table class="tools">
+                @foreach (var r in After.Where(r => r.Result.Pass != r.Image.Good).Concat(After.Where(r => r.Result.Pass == r.Image.Good)).Take(500))
+                {
+                    bool right = r.Result.Pass == r.Image.Good;
+                    <tr class="@(right ? "ok" : "ng")">
+                        <td>@(right ? "✓" : "✗")</td>
+                        <td>@(r.Image.Good ? T["tune.good_part"] : T["tune.bad_part"])</td>
+                        <td>@r.Name</td>
+                        <td>@(r.Result.Pass ? "OK" : r.Result.FirstProblem)</td>
+                        <td class="num">@r.Result.TotalMs.ToString("0")</td>
+                    </tr>
+                }
+            </table>
+        </div>
+    }
+}
+
+@code {
+    private int Camera;
+    private string GoodFolder = "", BadFolder = "";
+    private string? Message, Step;
+    private int Done, Total;
+    private Task? _run;
+    private CancellationTokenSource? _cancel;
+    private Job? TunedFrom;
+    private TuneProposal? Proposal;
+    private TuneVerdict? Verdict;
+    private List<TuneSample> After = new();
+
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? Auth { get; set; }
+
+    protected override void OnInitialized() => PickCamera(0);
+
+    // good and bad images default to the good and bad folders inside the camera's test folder
+    private void PickCamera(int camera)
+    {
+        Camera = camera;
+        var test = S.Job?.Cameras.ElementAtOrDefault(camera)?.TestFolder;
+        GoodFolder = string.IsNullOrWhiteSpace(test) ? "" : Path.Combine(test, "good");
+        BadFolder = string.IsNullOrWhiteSpace(test) ? "" : Path.Combine(test, "bad");
+        Discard();
+    }
+
+    private void Discard()
+    {
+        Proposal = null;
+        Verdict = null;
+        TunedFrom = null;
+        After = new();
+    }
+
+    private void Start()
+    {
+        if (S.Job is null) return;
+        Message = null;
+        Discard();
+        // three runs of the job take the PC's time from the line, and its timing makes reads fail
+        if (S.Running) { Message = T["tune.stop_line"]; return; }
+        // the job as saved: the station keeps the version it opened while a line ran
+        var job = Jobs.Load(S.Job.Name);
+        if (job is null) { Message = T["tune.job_changed"]; return; }
+        var missing = S.Job.BatchFields().Where(f => S.Batch.Get(f.Key) is null).Select(f => f.Label).ToList();
+        if (missing.Count > 0) { Message = T["batch.missing"] + " " + string.Join(", ", missing); return; }
+        var images = FolderSource.List(GoodFolder.Trim().Trim('"')).Select(f => new TuneImage(f, true))
+            .Concat(FolderSource.List(BadFolder.Trim().Trim('"')).Select(f => new TuneImage(f, false))).ToList();
+        if (images.Count == 0) { Message = T["teach.no_bmp"]; return; }
+        var batch = S.Batch;
+        int camera = Camera;
+        Total = images.Count;
+        _cancel = new CancellationTokenSource();
+        var token = _cancel.Token;
+        _run = Task.Run(async () =>
+        {
+            try
+            {
+                // 1. the job as it is, 2. with the tuned checks relaxed (scores), 3. with the proposal (the proof)
+                var before = await Pass(T["tune.step_now"], job, camera, images, batch, token);
+                var relaxed = await Pass(T["tune.step_scores"], AutoTune.Relaxed(job, camera), camera, images, batch, token);
+                var p = AutoTune.Propose(job, camera, relaxed);
+                List<TuneSample>? after = null;
+                if (p.Problem is null) after = await Pass(T["tune.step_check"], AutoTune.Apply(job, p), camera, images, batch, token);
+                await InvokeAsync(() =>
+                {
+                    Proposal = p;
+                    if (after is not null)
+                    {
+                        Verdict = AutoTune.Verify(p, before, after);
+                        TunedFrom = job;
+                    }
+                    After = after ?? before;
+                });
+            }
+            catch (OperationCanceledException) { await Ui(Discard); }
+            catch (Exception e) { await Ui(() => { Message = e.Message; Discard(); }); }
+            finally
+            {
+                _run = null;
+                await Ui(StateHasChanged);
+            }
+        });
+    }
+
+    // the page may be closed while a run ends
+    private async Task Ui(Action a)
+    {
+        try { await InvokeAsync(a); }
+        catch (ObjectDisposedException) { }
+    }
+
+    private async Task<List<TuneSample>> Pass(string step, Job job, int camera, IReadOnlyList<TuneImage> images, BatchFields batch, CancellationToken token)
+    {
+        await Ui(() => { Step = step; Done = 0; StateHasChanged(); });
+        var last = DateTime.UtcNow;
+        return AutoTune.Run(job, camera, images, Models, batch, token, n =>
+        {
+            if ((DateTime.UtcNow - last).TotalMilliseconds > 300) { last = DateTime.UtcNow; _ = Ui(() => { Done = n; StateHasChanged(); }); }
+        });
+    }
+
+    private async Task Accept()
+    {
+        if (TunedFrom is null || Proposal is null || Verdict is not { CanApply: true }) return;
+        // nothing that decides OK or NG changes while the line runs (AS-04)
+        if (S.Running) { Message = T["tune.stop_line"]; return; }
+        // the job saved since the tune (in Teach, also while a line ran) is not overwritten with settings worked
+        // out on the old one
+        if (Jobs.Load(TunedFrom.Name)?.Version != TunedFrom.Version) { Message = T["tune.job_changed"]; Discard(); return; }
+        try
+        {
+            var who = Auth is null ? null : (await Auth).User;
+            string user = who?.FindFirst("full_name")?.Value ?? who?.Identity?.Name ?? "tune";
+            var saved = Jobs.Save(AutoTune.Apply(TunedFrom, Proposal), user);
+            S.Reload();
+            Message = T.Format("teach.saved", saved.Name, saved.Version);
+            Discard();
+        }
+        catch (Exception e) { Message = e.Message; }
+    }
+
+    public void Dispose()
+    {
+        _cancel?.Cancel();
+        _cancel?.Dispose();
+    }
+}

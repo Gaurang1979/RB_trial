@@ -1,0 +1,40 @@
+{
+ "doctype": "DocType",
+ "name": "Remote Service Log Action",
+ "module": "Remote Service",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "time",
+  "kind",
+  "detail"
+ ],
+ "fields": [
+  {
+   "fieldname": "time",
+   "label": "Time",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "kind",
+   "label": "Kind",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail",
+   "label": "Detail",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "read_only": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "istable": 1,
+ "permissions": []
+}

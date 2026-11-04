@@ -1,0 +1,197 @@
+<!-- The learning session's sorting (owner, 2026-11-04): the saved good and bad pictures of the open job nearly full
+     screen, with zoom and pan (wheel, two fingers, one finger or the mouse drags), Accept / Reject / Back / Next / Skip
+     (keys A, R, ←, →), the second validation, Learn with the acceptable and not acceptable percentages, Apply,
+     and the setting that turns the session on. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.SortView"
+             x:DataType="vm:SortViewModel"
+             Focusable="True">
+  <Border Classes="card" Margin="8" Padding="{DynamicResource Vs.Pad.M}">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Grid.Column="0" Classes="vs" Command="{Binding CloseCommand}" Name="SortClose" MinWidth="100">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T common.back}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="20,0,0,0" VerticalAlignment="Center">
+          <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="20" Height="20"
+                    Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{Binding Title}" Classes="title" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" Margin="0,0,12,0">
+          <Button Classes="vs" Name="SortAll" Command="{Binding ShowAllCommand}"><TextBlock Text="{l:T sort.filter.all}" /></Button>
+          <Button Classes="vs" Name="SortGood" Command="{Binding ShowGoodCommand}"><TextBlock Text="{l:T sort.filter.good}" /></Button>
+          <Button Classes="vs" Name="SortBad" Command="{Binding ShowBadCommand}"><TextBlock Text="{l:T sort.filter.bad}" /></Button>
+          <Button Classes="vs" Name="SortWasOk" Command="{Binding ShowWasOkCommand}" ToolTip.Tip="{l:T sort.filter.was_ok.tip}"><TextBlock Text="{l:T sort.filter.was_ok}" /></Button>
+          <Button Classes="vs" Name="SortReviewed" Command="{Binding ShowReviewedCommand}" ToolTip.Tip="{l:T sort.filter.reviewed.tip}"><TextBlock Text="{l:T sort.filter.reviewed}" /></Button>
+        </StackPanel>
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2" ToolTip.Tip="{l:T sort.zoom}">
+          <Button Classes="vs" Name="SortZoomOut" Padding="10,0"><TextBlock Text="−" FontWeight="Bold" /></Button>
+          <Button Classes="vs" Name="SortZoomIn" Padding="10,0"><TextBlock Text="+" FontWeight="Bold" /></Button>
+          <Button Classes="vs" Name="SortZoomFit" Padding="8,0">
+            <PathIcon Width="16" Height="16" Data="{Binding Source={x:Static vm:Icons.Fit}, Converter={x:Static ui:IconConverter.Instance}}" />
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <Grid Grid.Row="1" ColumnDefinitions="*,320">
+        <Border Grid.Column="0" Classes="frame" ui:Ui.Tone="{Binding Tone}" Margin="0,0,8,0" Name="SortImageFrame">
+          <Panel>
+            <ui:ZoomBox Name="SortZoom" PanTool="True">
+              <Image Source="{Binding Image}" Stretch="Uniform" />
+            </ui:ZoomBox>
+            <Border Classes="toned" ui:Ui.Tone="Info" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                    Margin="{DynamicResource Vs.Pad.M}" Padding="12,6" CornerRadius="{DynamicResource Vs.Radius.M}"
+                    IsVisible="{Binding ImageNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding ImageNote}" TextWrapping="Wrap" MaxWidth="600" />
+            </Border>
+          </Panel>
+        </Border>
+
+        <Border Grid.Column="1" Classes="card" Padding="10">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="8">
+              <!-- A reviewed picture: the decision kept, with who and when (AS-04j); an operator's "Was OK" (AS-04k). -->
+              <TextBlock Text="{Binding ReviewedText}" Name="SortReviewedText" TextWrapping="Wrap" FontWeight="SemiBold"
+                         IsVisible="{Binding IsReviewed}" />
+              <TextBlock Text="{Binding FlagText}" Name="SortFlagText" Classes="glyph" ui:Ui.Tone="Info" TextWrapping="Wrap"
+                         IsVisible="{Binding FlagText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Text="{l:T sort.found}" Classes="muted" IsVisible="{Binding HasFaults}" />
+              <ItemsControl ItemsSource="{Binding Faults}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="8,0,0,0" /></DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <Grid ColumnDefinitions="*,6,*" IsVisible="{Binding !DoubleCheck}">
+                <Button Classes="vs" Name="SortAccept" Command="{Binding AcceptCommand}" IsEnabled="{Binding HasPicture}"
+                        HorizontalAlignment="Stretch" MinHeight="56" ToolTip.Tip="{l:T sort.accept.tip}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Classes="glyph" ui:Ui.Tone="Ok" Width="18" Height="18"
+                              Data="{Binding Source={x:Static vm:Icons.Check}, Converter={x:Static ui:IconConverter.Instance}}" />
+                    <TextBlock Text="{l:T sort.accept}" FontSize="{DynamicResource Vs.Font.Title}" />
+                  </StackPanel>
+                </Button>
+                <Button Grid.Column="2" Classes="vs" Name="SortReject" Command="{Binding RejectCommand}" IsEnabled="{Binding HasPicture}"
+                        HorizontalAlignment="Stretch" MinHeight="56" ToolTip.Tip="{l:T sort.reject.tip}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <PathIcon Classes="glyph" ui:Ui.Tone="Ng" Width="18" Height="18"
+                              Data="{Binding Source={x:Static vm:Icons.Cross}, Converter={x:Static ui:IconConverter.Instance}}" />
+                    <TextBlock Text="{l:T sort.reject}" FontSize="{DynamicResource Vs.Font.Title}" />
+                  </StackPanel>
+                </Button>
+              </Grid>
+
+              <Button Classes="vs" Name="SortRemoveReview" Command="{Binding RemoveReviewCommand}" IsVisible="{Binding IsReviewed}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T sort.reviewed.remove.tip}">
+                <TextBlock Text="{l:T sort.reviewed.remove}" />
+              </Button>
+
+              <!-- Second validation: clearly bad, or could not be read. The safe choices come first. -->
+              <Border Classes="toned" ui:Ui.Tone="Warn" Padding="8" IsVisible="{Binding DoubleCheck}" Name="SortCheckPanel"
+                      CornerRadius="{DynamicResource Vs.Radius.M}">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{l:T review.looks_bad}" TextWrapping="Wrap" FontWeight="SemiBold" IsVisible="{Binding !Unreadable}" />
+                  <TextBlock Text="{l:T review.unreadable}" TextWrapping="Wrap" FontWeight="SemiBold" IsVisible="{Binding Unreadable}" />
+                  <ItemsControl ItemsSource="{Binding CheckFaults}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="8,0,0,0" /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                  <Button Classes="vs primary" Name="SortCheckBad" Command="{Binding RejectCommand}" HorizontalAlignment="Stretch">
+                    <TextBlock Text="{l:T review.it_is_bad}" />
+                  </Button>
+                  <Button Classes="vs" Name="SortCheckRecord" Command="{Binding KeepAsRecordCommand}" HorizontalAlignment="Stretch"
+                          ToolTip.Tip="{l:T review.record_only.tip}">
+                    <TextBlock Text="{l:T review.record_only}" />
+                  </Button>
+                  <Button Classes="vs" Name="SortCheckGood" Command="{Binding AcceptCheckedCommand}" HorizontalAlignment="Stretch"
+                          IsVisible="{Binding Unreadable}" ToolTip.Tip="{l:T review.accept_checked.tip}">
+                    <TextBlock Text="{l:T review.accept_checked}" />
+                  </Button>
+                  <Button Classes="vs" Command="{Binding CancelCheckCommand}" HorizontalAlignment="Stretch">
+                    <TextBlock Text="{l:T common.back}" />
+                  </Button>
+                </StackPanel>
+              </Border>
+
+              <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Name="SortMessage" Classes="glyph" ui:Ui.Tone="{Binding MessageTone}"
+                         IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              <TextBlock Text="{Binding CountsText}" Classes="muted" TextWrapping="Wrap" />
+
+              <Button Classes="vs" Name="SortLearn" Command="{Binding LearnCommand}" IsEnabled="{Binding !Busy}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T sort.learn.tip}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Teach}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T sort.learn}" />
+                </StackPanel>
+              </Button>
+              <Button Classes="vs" Name="SortStopLearn" Command="{Binding StopLearningCommand}" IsVisible="{Binding Learning}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T sort.learn.stop.tip}">
+                <TextBlock Text="{l:T sort.learn.stop}" />
+              </Button>
+              <StackPanel IsVisible="{Binding HasLearning}" Spacing="2">
+                <ItemsControl ItemsSource="{Binding LearnLines}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate DataType="vm:LearnLine">
+                      <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontWeight="{Binding Looser, Converter={x:Static vm:ReviewConverters.LooserWeight}}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding LearnText}" TextWrapping="Wrap" Classes="muted" />
+                <Button Classes="vs primary" Name="SortApply" Command="{Binding ApplyLearningCommand}" IsVisible="{Binding CanApplyLearning}"
+                        HorizontalAlignment="Stretch" ToolTip.Tip="{l:T review.apply.tip}">
+                  <TextBlock Text="{l:T review.apply}" />
+                </Button>
+              </StackPanel>
+
+              <!-- The setting (Supervisor and above). -->
+              <Border Classes="card" Padding="8" Name="SortSettings">
+                <StackPanel Spacing="4">
+                  <TextBlock Text="{l:T sort.settings}" FontWeight="SemiBold" />
+                  <CheckBox IsChecked="{Binding Enabled}" Name="SortEnabled"><TextBlock Text="{l:T sort.settings.enabled}" TextWrapping="Wrap" /></CheckBox>
+                  <TextBlock Text="{l:T sort.settings.idle}" TextWrapping="Wrap" />
+                  <NumericUpDown Value="{Binding IdleMinutes}" Minimum="2" Maximum="60" Increment="1" FormatString="0" Width="160"
+                                 HorizontalAlignment="Left" Name="SortIdle" />
+                  <TextBlock Text="{Binding SettingsText}" Classes="muted" TextWrapping="Wrap" />
+                  <Button Classes="vs" Command="{Binding SaveSettingsCommand}" Name="SortSaveSettings" HorizontalAlignment="Stretch">
+                    <TextBlock Text="{l:T sort.settings.save}" />
+                  </Button>
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </ScrollViewer>
+        </Border>
+      </Grid>
+
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Grid.Column="0" Classes="vs" Name="SortPrevious" Command="{Binding PreviousCommand}"
+                Classes.unavailable="{Binding !HasPrevious}" MinWidth="120" MinHeight="48">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Previous}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T ng.previous}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <TextBlock Grid.Column="1" Text="{Binding PositionText}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   FontSize="{DynamicResource Vs.Font.Title}" />
+        <Button Grid.Column="2" Classes="vs" Name="SortSkip" Command="{Binding SkipCommand}" MinWidth="100" MinHeight="48"
+                Classes.unavailable="{Binding !HasNext}" Margin="0,0,8,0" ToolTip.Tip="{l:T sort.skip.tip}">
+          <TextBlock Text="{l:T sort.skip}" VerticalAlignment="Center" />
+        </Button>
+        <Button Grid.Column="3" Classes="vs" Name="SortNext" Command="{Binding NextCommand}"
+                Classes.unavailable="{Binding !HasNext}" MinWidth="120" MinHeight="48">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="{l:T ng.next}" VerticalAlignment="Center" />
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Next}, Converter={x:Static ui:IconConverter.Instance}}" />
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

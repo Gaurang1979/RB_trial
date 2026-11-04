@@ -1,0 +1,450 @@
+{
+  "organization": {
+    "id": "ORG-DEMO",
+    "name": "Demo Manufacturing (SYNTHETIC DEMO DATA)"
+  },
+  "simulation": {
+    "seed": 42,
+    "start_time": "2026-09-21T06:00:00Z",
+    "duplicate_rate": 0.0,
+    "queue_sample_interval_s": 10,
+    "heartbeat_interval_s": 30
+  },
+  "plants": [
+    {
+      "id": "PLANT-VAD",
+      "name": "Vadodara Plant",
+      "areas": [
+        {
+          "id": "AREA-VAD-ASM",
+          "name": "Assembly",
+          "lines": [
+            {
+              "id": "LINE-VAD-01",
+              "name": "Line 01",
+              "gateway_id": "GW-VAD-01",
+              "target_per_hour": 110,
+              "equipment": [
+                {
+                  "id": "PRESS-01",
+                  "name": "Press 01",
+                  "type": "press",
+                  "standard_cycle_time_s": 20,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": 5400,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "PRESS-01.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 55,
+                      "noise": 0.4,
+                      "producing_delta": 12,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    },
+                    {
+                      "id": "PRESS-01.VIB",
+                      "name": "vibration",
+                      "unit": "mm/s",
+                      "base": 2.0,
+                      "noise": 0.15,
+                      "producing_delta": 1.5,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        0,
+                        30
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "PRESS-02",
+                  "name": "Press 02",
+                  "type": "press",
+                  "standard_cycle_time_s": 30,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "PRESS-02.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 55,
+                      "noise": 0.4,
+                      "producing_delta": 12,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    },
+                    {
+                      "id": "PRESS-02.VIB",
+                      "name": "vibration",
+                      "unit": "mm/s",
+                      "base": 2.0,
+                      "noise": 0.15,
+                      "producing_delta": 1.5,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        0,
+                        30
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "ASSEMBLY-01",
+                  "name": "Assembly 01",
+                  "type": "assembly",
+                  "standard_cycle_time_s": 24,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "ASSEMBLY-01.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 40,
+                      "noise": 0.4,
+                      "producing_delta": 6,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "TEST-01",
+                  "name": "Test Station 01",
+                  "type": "test",
+                  "standard_cycle_time_s": 22,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.03,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "TEST-01.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 35,
+                      "noise": 0.4,
+                      "producing_delta": 3,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "queues": [
+                {
+                  "id": "QUEUE-A",
+                  "name": "Queue A",
+                  "capacity": 10
+                },
+                {
+                  "id": "QUEUE-B",
+                  "name": "Queue B",
+                  "capacity": 10
+                },
+                {
+                  "id": "QUEUE-C",
+                  "name": "Queue C",
+                  "capacity": 10
+                }
+              ]
+            },
+            {
+              "id": "LINE-VAD-02",
+              "name": "Line 02",
+              "gateway_id": "GW-VAD-02",
+              "target_per_hour": 130,
+              "equipment": [
+                {
+                  "id": "PRESS-03",
+                  "name": "Press 03",
+                  "type": "press",
+                  "standard_cycle_time_s": 26,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "PRESS-03.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 55,
+                      "noise": 0.4,
+                      "producing_delta": 12,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    },
+                    {
+                      "id": "PRESS-03.VIB",
+                      "name": "vibration",
+                      "unit": "mm/s",
+                      "base": 2.0,
+                      "noise": 0.15,
+                      "producing_delta": 1.5,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        0,
+                        30
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "ASSEMBLY-02",
+                  "name": "Assembly 02",
+                  "type": "assembly",
+                  "standard_cycle_time_s": 28,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "ASSEMBLY-02.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 40,
+                      "noise": 0.4,
+                      "producing_delta": 6,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "TEST-02",
+                  "name": "Test Station 02",
+                  "type": "test",
+                  "standard_cycle_time_s": 25,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "TEST-02.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 35,
+                      "noise": 0.4,
+                      "producing_delta": 3,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    }
+                  ]
+                }
+              ],
+              "queues": [
+                {
+                  "id": "QUEUE-D",
+                  "name": "Queue D",
+                  "capacity": 8
+                },
+                {
+                  "id": "QUEUE-E",
+                  "name": "Queue E",
+                  "capacity": 8
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PLANT-PUN",
+      "name": "Pune Plant",
+      "areas": [
+        {
+          "id": "AREA-PUN-MCH",
+          "name": "Machining",
+          "lines": [
+            {
+              "id": "LINE-PUN-01",
+              "name": "Line 01",
+              "gateway_id": "GW-PUN-01",
+              "target_per_hour": 100,
+              "equipment": [
+                {
+                  "id": "CNC-01",
+                  "name": "CNC 01",
+                  "type": "cnc",
+                  "standard_cycle_time_s": 32,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": 7200,
+                  "mttr_s": 420,
+                  "sensors": [
+                    {
+                      "id": "CNC-01.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 45,
+                      "noise": 0.4,
+                      "producing_delta": 15,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    },
+                    {
+                      "id": "CNC-01.VIB",
+                      "name": "vibration",
+                      "unit": "mm/s",
+                      "base": 2.0,
+                      "noise": 0.15,
+                      "producing_delta": 1.5,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        0,
+                        30
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "CNC-02",
+                  "name": "CNC 02",
+                  "type": "cnc",
+                  "standard_cycle_time_s": 34,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.01,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": [
+                    {
+                      "id": "CNC-02.TEMP",
+                      "name": "temperature",
+                      "unit": "C",
+                      "base": 45,
+                      "noise": 0.4,
+                      "producing_delta": 15,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        -20,
+                        150
+                      ]
+                    },
+                    {
+                      "id": "CNC-02.VIB",
+                      "name": "vibration",
+                      "unit": "mm/s",
+                      "base": 2.0,
+                      "noise": 0.15,
+                      "producing_delta": 1.5,
+                      "sample_interval_s": 10,
+                      "valid_range": [
+                        0,
+                        30
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "id": "INSPECT-01",
+                  "name": "Inspection 01",
+                  "type": "inspection",
+                  "standard_cycle_time_s": 28,
+                  "cycle_time_cv": 0.05,
+                  "reject_rate": 0.02,
+                  "mtbf_s": null,
+                  "mttr_s": 300,
+                  "sensors": []
+                }
+              ],
+              "queues": [
+                {
+                  "id": "QUEUE-F",
+                  "name": "Queue F",
+                  "capacity": 6
+                },
+                {
+                  "id": "QUEUE-G",
+                  "name": "Queue G",
+                  "capacity": 6
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "kind": "fault",
+      "equipment_id": "PRESS-03",
+      "start_s": 900,
+      "duration_s": 300
+    },
+    {
+      "kind": "fault",
+      "equipment_id": "PRESS-01",
+      "start_s": 1800,
+      "duration_s": 600
+    },
+    {
+      "kind": "sensor_stuck",
+      "equipment_id": "PRESS-02",
+      "sensor_id": "PRESS-02.TEMP",
+      "start_s": 2400,
+      "duration_s": 3600
+    },
+    {
+      "kind": "device_comm_loss",
+      "equipment_id": "TEST-01",
+      "start_s": 3000,
+      "duration_s": 300
+    },
+    {
+      "kind": "fault",
+      "equipment_id": "ASSEMBLY-01",
+      "start_s": 4200,
+      "duration_s": 420
+    },
+    {
+      "kind": "network_outage",
+      "gateway_id": "GW-VAD-01",
+      "start_s": 5000,
+      "duration_s": 600
+    },
+    {
+      "kind": "bypass",
+      "equipment_id": "PRESS-02",
+      "start_s": 6000,
+      "duration_s": 900
+    }
+  ]
+}

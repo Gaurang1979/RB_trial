@@ -1,0 +1,73 @@
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Grpc": "Warning"
+    }
+  },
+  "Runtime": {
+    "Endpoint": "",
+    "NetworkPort": 0,
+    "WebPort": 0,
+    "CertificateFile": "",
+    "Source": "camera",
+    "SimulatorFolder": "",
+    "SupportRelay": "",
+    "LineSpeedPpm": 225,
+    "CycleBudgetMs": 100
+  },
+  "Studio": {
+    "JobsFolder": "C:\\ProgramData\\VisionSystem\\jobs",
+    "DataFolder": "C:\\ProgramData\\VisionSystem\\data",
+    "ModelsFolder": "models",
+    "Language": "en",
+    "FolderIntervalMs": 300,
+    "LicenceRequired": false
+  },
+  "Micro850": {
+    "Enabled": true,
+    "PlcIp": "192.168.1.5",
+    "Port": 502,
+    "UnitId": 1,
+    "TimeoutMs": 300,
+    "HeartbeatMs": 1000,
+    "StatusMs": 500,
+    "CameraTrigger": "Line0",
+    "TriggerDebounceUs": 50,
+    "CameraDelayMs": [
+      0,
+      0,
+      5,
+      120
+    ],
+    "ToleranceMs": 40,
+    "ResultNotBeforeMs": 0,
+    "ResultDeadlineMs": 200,
+    "WriteSetpointsOnConnect": false,
+    "Setpoints": {
+      "0": 30,
+      "1": 500,
+      "2": 40,
+      "28": 200,
+      "39": 10,
+      "40": 5,
+      "41": 5,
+      "42": 5,
+      "44": 400,
+      "46": 35,
+      "47": 170,
+      "48": 1,
+      "49": 200
+    },
+    "LogFolder": "micro850",
+    "RegisterBase": 0
+  },
+  "Plant": {
+    "ServerUrl": "",
+    "TokenFile": "",
+    "Plant": "",
+    "Line": "",
+    "Station": ""
+  }
+}

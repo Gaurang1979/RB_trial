@@ -1,0 +1,58 @@
+@using System.Globalization
+@* Horizontal bars, the largest first; each row is its label, the bar and the count as text. *@
+@if (_rows.Length == 0)
+{
+    <div class="vc-empty" role="img" aria-label="@Label: –" title="@Label: –">–</div>
+}
+else
+{
+    <ul class="vc-bars" aria-label="@Label" @attributes="Extra">
+        @foreach (var r in _rows)
+        {
+            <li title="@r.Label: @r.Value">
+                <span class="vc-bar-label">@r.Label</span>
+                <span class="vc-bar-track" aria-hidden="true"><span class="vc-bar-fill" style="width:@r.Width%"></span></span>
+                <span class="vc-bar-n">@r.Value</span>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    /// <summary>The items in any order; they are shown largest first. Pass a new list when the data changes.</summary>
+    [Parameter] public IReadOnlyList<BarItem>? Items { get; set; }
+    /// <summary>Most rows shown; the rest are added up in one row named <see cref="OtherLabel"/> (or left out when that is empty).</summary>
+    [Parameter] public int Max { get; set; } = 8;
+    [Parameter] public string? OtherLabel { get; set; }
+    /// <summary>What the bars show, for screen readers.</summary>
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Extra { get; set; }
+
+    private readonly record struct Row(string Label, long Value, string Width);
+
+    private IReadOnlyList<BarItem>? _items;
+    private int _max;
+    private string? _other;
+    private bool _dirty = true;
+    private Row[] _rows = [];
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_items, Items) && _max == Max && _other == OtherLabel && !_dirty) return;
+        (_items, _max, _other) = (Items, Max, OtherLabel);
+        _dirty = true;
+        var src = (Items ?? []).Where(i => i.Value > 0).OrderByDescending(i => i.Value).ToList();
+        var shown = Math.Max(1, Max);
+        var list = src.Take(shown).ToList();
+        if (src.Count > shown && !string.IsNullOrEmpty(OtherLabel)) list.Add(new BarItem(OtherLabel, src.Skip(shown).Sum(i => i.Value)));
+        var top = list.Count > 0 ? list.Max(i => i.Value) : 1;
+        _rows = list.Select(i => new Row(i.Label, i.Value, (100.0 * i.Value / top).ToString("0.#", CultureInfo.InvariantCulture))).ToArray();
+    }
+
+    protected override bool ShouldRender()
+    {
+        var d = _dirty;
+        _dirty = false;
+        return d;
+    }
+}

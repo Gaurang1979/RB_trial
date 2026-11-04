@@ -1,0 +1,60 @@
+# Expected codes per sample image. Counts marked 'by eye' must be confirmed by the owner.
+# Second image set (Barcodeimages 2): 25--Raw and 27--Raw clash with first-set names and are
+# listed as set2-25--Raw.bmp / set2-27--Raw.bmp (link them under those names for the bench).
+# Counts for the shrink-wrapped images: labels whose QR is visible in the image (2026-10-23).
+file,format,expected,note
+14--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+15--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+16--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+17--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+19--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+22--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+25--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+27--Raw.bmp,qr,24,by eye: 24 cans; each label carries the same QR twice
+case 1.bmp,qr,45,by eye: 9 x 5 cartons
+case 2.bmp,qr,45,by eye: 9 x 5 cartons
+case 3.bmp,qr,45,by eye: 9 x 5 cartons
+case 4.bmp,qr,45,by eye: 9 x 5 cartons
+case 5.bmp,qr,45,by eye: 9 x 5 cartons
+Image_20230727113846240.bmp,dm,24,by eye: 4 x 6 caps
+Image_20230731102244944.bmp,dm,48,by eye: 6 x 8 caps
+Image_20231008113153221 - Copy.bmp,qr,42,cropped copy: 42 bottles fully in frame
+Image_20231008113153221.bmp,qr,48,by eye: 6 x 8 bottles
+Image_20231008113208619.bmp,qr,48,by eye: 6 x 8 bottles
+Image_20250125192045895.bmp,qr,40,shrink-wrapped TN excise case: 40 labels with the QR visible (counted 2026-10-23)
+Image_20250125194126243.bmp,qr,40,same case as 192045895
+Image_20250125194253018.bmp,qr,40,same case as 192045895
+Image_20250125194659743.bmp,qr,28,owner review 2026-10-23: 28 (two labels covered by the hand removed)
+Image_20250125194723873.bmp,qr,40,shrink-wrapped case: 40 visible QR
+Image_20250125194744613.bmp,qr,11,owner 2026-10-27: 11 distinct codes (14 labels with the QR visible; 499, 502 and 507 appear twice: duplicates, not misses)
+Image_20250125201109413.bmp,qr,5,5 excise labels (4 corners + centre)
+Image_20250125201124463.bmp,qr,5,5 excise labels
+Image_20250125201205013.bmp,qr,5,5 excise labels
+Image_20260605100414975.bmp,qr,48,by eye: 6 x 8 boxes
+Image_20260605100429695.bmp,qr,47,6 x 8 boxes; one box lies on its side (EAN-13 face up, QR not visible): 47 visible
+Image_20260605100440915.bmp,qr,48,by eye: 6 x 8 boxes
+Image_20260619102411326.bmp,qr,48,by eye: 6 x 8 envelopes
+Image_20260619102417807.bmp,qr,48,by eye: 6 x 8 envelopes
+Image_20260619102436905.bmp,qr,48,by eye: 6 x 8 envelopes
+Image_20260619102444090.bmp,qr,48,by eye: 6 x 8 envelopes
+11.bmp,qr,48,by eye: 6 x 8 bottles (2nd image set 2026-10-23)
+1868.bmp,qr,24,by eye: 6 x 4 bottle caps
+2084.bmp,qr,24,by eye: 6 x 4 bottle caps
+2198.bmp,qr,24,by eye: 6 x 4 bottle caps
+set2-25--Raw.bmp,qr,46,by eye: 4 + 6 x 7 cartons (the cartons at the right edge belong to the next pallet)
+26--Raw.bmp,qr,48,by eye: 48 cartons
+set2-27--Raw.bmp,qr,48,by eye: 48 cartons
+28--Raw.bmp,qr,48,by eye: 48 cartons
+29--Raw.bmp,qr,48,by eye: 48 cartons
+30--Raw.bmp,qr,48,by eye: 48 cartons
+31--Raw.bmp,qr,48,by eye: 48 cartons
+35--Raw.bmp,qr,45,by eye: 9 x 5 cartons
+5.bmp,qr,48,by eye: 6 x 8 bottles
+Image_20220312160710251.bmp,dm,47,owner 2026-10-23: 47 (all caps; 46 now read: CLUK A 060715180-226 without 183)
+Image_20250311101601937.bmp,qr,24,by eye: 24 cans; each label carries the code twice
+Image_20250311101614724.bmp,qr,24,by eye: 24 cans; each label carries the code twice
+Image_20250311152948003.bmp,qr,24,by eye: 24 cans; each label carries the code twice
+Image_20250311153603230.bmp,qr,24,by eye: 24 cans; each label carries the code twice
+Image_20250312103037605.bmp,qr,24,by eye: 24 cans; each label carries the code twice
+TestImage.bmp,qr,48,by eye: 6 x 8 bottles
+TestImage_.bmp,dm,24,by eye: 6 x 4 caps (bottom row cut by the frame edge)

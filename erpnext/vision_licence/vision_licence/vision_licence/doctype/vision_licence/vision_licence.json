@@ -1,0 +1,153 @@
+{
+ "doctype": "DocType",
+ "name": "Vision Licence",
+ "module": "Vision Licence",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "licence_key",
+  "customer",
+  "status",
+  "valid_until",
+  "column_break_1",
+  "installation",
+  "last_check",
+  "section_terms",
+  "tools",
+  "max_cameras",
+  "column_break_2",
+  "check_interval_hours",
+  "grace_days",
+  "section_devices",
+  "allow_customer_serials",
+  "devices"
+ ],
+ "fields": [
+  {
+   "fieldname": "licence_key",
+   "label": "Licence Key",
+   "fieldtype": "Data",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "customer",
+   "label": "Customer",
+   "fieldtype": "Link",
+   "options": "Customer",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "label": "Status",
+   "fieldtype": "Select",
+   "options": "Active\nSuspended\nCancelled",
+   "default": "Active",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "valid_until",
+   "label": "Valid Until",
+   "fieldtype": "Date",
+   "description": "Empty = no end date"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "installation",
+   "label": "Installation",
+   "fieldtype": "Data",
+   "description": "Bound on the first check. Clear it to move the licence to another PC."
+  },
+  {
+   "fieldname": "last_check",
+   "label": "Last Check",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_terms",
+   "label": "Terms",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "tools",
+   "label": "Licensed Tools",
+   "fieldtype": "Small Text",
+   "default": "barcode, ocr, locate",
+   "description": "Comma separated: barcode, ocr, locate. Empty = all tools."
+  },
+  {
+   "fieldname": "max_cameras",
+   "label": "Max Cameras",
+   "fieldtype": "Int",
+   "default": "3"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "check_interval_hours",
+   "label": "Check Interval (hours)",
+   "fieldtype": "Float",
+   "default": "24"
+  },
+  {
+   "fieldname": "grace_days",
+   "label": "Offline Grace (days)",
+   "fieldtype": "Float",
+   "default": "7"
+  },
+  {
+   "fieldname": "section_devices",
+   "label": "Parts",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "allow_customer_serials",
+   "label": "Accept any serial delivered to this customer",
+   "fieldtype": "Check",
+   "default": "0"
+  },
+  {
+   "fieldname": "devices",
+   "label": "Registered Parts",
+   "fieldtype": "Table",
+   "options": "Vision Licence Device"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "links": [],
+ "actions": [],
+ "autoname": "field:licence_key",
+ "track_changes": 1,
+ "title_field": "customer"
+}

@@ -1,0 +1,7 @@
+# Same stack and caps as plant_server/requirements.txt (REQUIREMENTS 13, DEP-03).
+fastapi>=0.162,<1
+uvicorn>=0.54,<1
+websockets>=15,<17   # uvicorn's WebSocket support: the line PCs' links
+# tests
+pytest>=9,<10
+httpx2>=2.16,<3     # starlette.testclient

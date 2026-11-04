@@ -1,0 +1,77 @@
+<!-- Parts: every part's own result, newest first; gaps say where parts are missing from the list. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.PartsView"
+             x:DataType="vm:PartsViewModel">
+  <UserControl.Styles>
+    <Style Selector="Border.partRow">
+      <Setter Property="Padding" Value="6,3" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+    </Style>
+    <Style Selector="Border.partRow.gap">
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+    </Style>
+    <Style Selector="Border.partRow TextBlock">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="card" Margin="{DynamicResource Vs.Pad.Xl}" Name="PartsPanel">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="12">
+      <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{l:T parts.title}" Classes="title" />
+          <TextBlock Text="{Binding SummaryText}" FontSize="{DynamicResource Vs.Font.Body}" Name="PartsSummary" />
+        </StackPanel>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+          <Button Classes="vs" Classes.selected="{Binding BadOnly}" Command="{Binding ToggleBadOnlyCommand}"
+                  MinWidth="100" Name="BadOnlyButton">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Classes="glyph" ui:Ui.Tone="Ng"
+                        Data="{Binding Source={x:Static vm:Icons.Cross}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{l:T parts.bad_only}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="vs" Classes.selected="{Binding Holding}" Command="{Binding ToggleHoldCommand}"
+                  MinWidth="120" Name="HoldButton">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Pause}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding HoldText}" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+      <TextBlock Grid.Row="1" Text="{Binding NoteText}" Classes="muted" TextWrapping="Wrap" />
+      <ScrollViewer Grid.Row="2" Name="PartsScroll">
+        <ItemsControl ItemsSource="{Binding Rows}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:PartRow">
+              <Border Classes="partRow" Classes.gap="{Binding IsGap}">
+                <Grid ColumnDefinitions="22,80,110,240,250,*,80" ColumnSpacing="10">
+                  <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="14" Height="14"
+                            Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Grid.Column="1" Text="{Binding Time}" />
+                  <TextBlock Grid.Column="2" Text="{Binding Result}" FontWeight="Bold" />
+                  <TextBlock Grid.Column="3" Text="{Binding PartId}" />
+                  <TextBlock Grid.Column="4" Text="{Binding Image}" ToolTip.Tip="{l:T parts.image}" Name="PartImage" />
+                  <TextBlock Grid.Column="5" Text="{Binding Why}" />
+                  <TextBlock Grid.Column="6" Text="{Binding Cycle}" HorizontalAlignment="Right" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Button Grid.Row="3" Classes="vs" Command="{Binding BackCommand}" HorizontalAlignment="Left" MinWidth="100">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{l:T common.back}" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>

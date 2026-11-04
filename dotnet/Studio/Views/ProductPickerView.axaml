@@ -1,0 +1,50 @@
+<!-- Change product: large tiles, one tap changes. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.ProductPickerView"
+             x:DataType="vm:ProductPickerViewModel">
+  <Border Classes="card" Margin="{DynamicResource Vs.Pad.Xl}">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+      <TextBlock Grid.Row="0" Text="{Binding Title}" Classes="title" />
+      <TextBlock Grid.Row="1" Text="{Binding Message}" FontSize="{DynamicResource Vs.Font.Title}" Margin="0,8"
+                 IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <ScrollViewer Grid.Row="2" Margin="0,12">
+        <ItemsControl ItemsSource="{Binding Products}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:ProductTile">
+              <Button Classes="vs" Classes.selected="{Binding IsCurrent}" Width="240" Height="180" Margin="8"
+                      Command="{Binding $parent[ItemsControl].((vm:ProductPickerViewModel)DataContext).PickCommand}"
+                      CommandParameter="{Binding}">
+                <StackPanel Spacing="10">
+                  <!-- The product picture from the runtime; the initial letter until it comes, or without one. -->
+                  <Border Classes="toned" ui:Ui.Tone="Neutral" Width="120" Height="90" CornerRadius="{DynamicResource Vs.Radius.M}"
+                          ClipToBounds="True">
+                    <Panel>
+                      <TextBlock Text="{Binding Initial}" FontSize="{DynamicResource Vs.Font.Counter}" FontWeight="Bold"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" IsVisible="{Binding !HasPicture}" />
+                      <Image Source="{Binding Picture}" Stretch="UniformToFill" IsVisible="{Binding HasPicture}" />
+                    </Panel>
+                  </Border>
+                  <TextBlock Text="{Binding Name}" FontSize="{DynamicResource Vs.Font.Title}" TextWrapping="Wrap"
+                             TextAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Button Grid.Row="3" Classes="vs" Command="{Binding BackCommand}" HorizontalAlignment="Left" MinWidth="100">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{l:T common.back}" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>

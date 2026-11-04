@@ -1,0 +1,39 @@
+# Measure tool: ellipse, corner, gap, pin pitch and edge count (spec 2.4, 2.5, 2.7-2.9), constructions of 2.6; struct_size on vs_measure.h results
+
+- Status: done
+- Session: keen-neumann-195cbc, 2026-10-31
+- Pull request: #205
+- Section 5 item: Measure tool: the remaining tools of spec 2
+- Components/files: engine (vs_measure.h, src/measure/measure_tool.cpp, tests/measure_tests.cpp, CMakeLists.txt comment), dotnet VisionCore (Tools/MeasureTool.cs), VisionCore.Tests/MeasureToolTests.cs, VisionStudio i18n/en.json (11 keys), docs/vision-system/JOB-FILE-FORMAT.md section 7
+- Depends on: none
+
+## Section 5
+- Done in this pull request (PR #205, 2026-10-31): ellipse (2.4), corner (2.5), gap (2.7), pin pitch (2.8) and edge count (2.9) in the engine (vs_meas_ellipse, vs_meas_corner, vs_meas_gap, vs_meas_pitch, vs_meas_edges) and VisionCore (features ellipse, corner, gap, pitch, edges), and the 2.6 intersections, perpendiculars and constructions (VisionCore construct feature). Still open from this item: Tukey reweighting for line fit
+- replace `the remaining tools of spec 2: ellipse (2.4), corner (2.5), gap (2.7), pin pitch (2.8) and edge count (2.9); intersections, perpendiculars and constructions of 2.6; Tukey reweighting` with `Tukey reweighting`
+- "vs_measure.h result structs have no struct_size": `[x] (done 2026-10-31, PR #205: every vs_measure.h result carries struct_size; the caller sets it, a smaller one is refused, the library writes back its size and VisionCore fails the feature when it differs from its mirror)` vs_measure.h result structs have no struct_size (as vs_locate.h): add one before they ever grow
+- "Vision Studio panel for the Measure tool": also the new features (ellipse, corner, gap, pins, edge count, constructions)
+
+## Timeline (section 3)
+| 2026-10-31 | Measure tool completed to spec 2: ellipse (radial calipers, RANSAC on five-point direct fits, then geometric Levenberg-Marquardt on true rim distances), corner (two line fits met, parallel within 0.5° refused), gap (pair calipers in slices across a box; a slice without a width fails), pin pitch (all edges along a box paired by polarity; count, pitches, widths; the missing or out-of-place pin named), edge count (edges, spacings, the period from the autocorrelation) and the 2.6 constructions in VisionCore. Every result struct of vs_measure.h now carries struct_size (refused when smaller than the library's; the library writes back its size, which VisionCore checks against its mirror and fails the feature on a mismatch). Engine measure_tests 90/90 (55 new: a burr in a gap leaves 4 slices without a width; ellipse centre 0.010 px worst, axes within 0.07 px, angle 0.017°; corner 0.002 px and 0.002° at 90° and 75°; gap widths 0.024 px; pin centres 0.028 px, widths 0.050 px; thread edges inside the row 0.009 px, period 6.411 for 6.4; ellipse 0.57 ms, gap of 20 slices 0.05 ms, 40 pins 0.11 ms, edge count 0.06 ms); VisionCore MeasureToolTests 26/26 (10 new) | 13, 15 |
+
+## Decisions (section 4)
+| Ellipse fit on core only | OpenCV 5 moved fitEllipseDirect out of imgproc (to the geometry module), and the Windows build may be on OpenCV 4: the direct fit (Fitzgibbon in Halir and Flusser's stable form) is written on core, so vs_measure still links opencv_core alone | 13 |
+| Results carry struct_size | The caller sets it to sizeof(result); a smaller one is refused (-1); the library writes back the size it filled. VisionCore sets it for every call and fails the feature when the size written back differs from its mirror (another library version): a mismatched layout must never be read as a measurement | 12, 13 |
+| Dense edges by a symmetric centroid | Where an edge's response meets a neighbour's (pins, threads), the centroid over the samples of one sign was cut unevenly by the sample grid (0.5 px off on a thread). Such edges are placed by the centroid of the interpolated response over a window symmetric about the edge, up to the nearer zero crossing: 0.009 px inside a thread, 0.028 px on pin centres. Pitch and edge count default to 1 px smoothing, which keeps a neighbour's tail out of the window | 13, 15 |
+| A row's end edges lean | The first and last edge of a row on a soft image lean outwards (0.35 px on a 1 px blur at 3.2 px spacing; part of it is the blurred profile's own peak). Edge count's mean spacing uses the inner spacings when there are four or more edges. Pin centres are not affected (both edges lean alike) | 12, 15 |
+| Review before ready | An Opus review found a burr inside a gap read as the full open width, ellipse dents not checkable, the 1 px smoothing not reaching jobs, end crests unchecked, gap, pin and edge features passing without any tolerance, faint stubs counted as pins, lone edges switched to the new placement by noise and the wrong text for collinear points; all fixed with tests | 12 |
+| Gap, pins and corners fail in doubt | A gap slice with no pair, two pairs nearly as good, or any edge between its pair (a burr or partial bridge, which pair mode alone would skip when fainter than the slot's edges) gives no width and fails (reads as narrow); a pin count other than expected fails, naming the missing pin where one pitch is half as long again as the usual; an edge belonging to no pin fails, and so does a pin under half the row's usual contrast (a stub or a missing pin's trace that the dense threshold still counts); a corner of parallel edges and constructions from parallel lines or collinear points fail | 12 |
+| Gap, pins and edge counts need a tolerance | Spec 2.7-2.9 make their tolerances Essential: a job is refused when a gap has no width check with a limit, pins no Pitch check with a limit, or an edge count neither ExpectedCount nor a check with a limit, so none of them can pass without deciding anything | 12 |
+| Ellipse roundness | Roundness is also an ellipse's: largest minus smallest signed distance of every point found from the fitted rim, so a dent or bulge up to 40 % of the rim (MinShare 0.6) left out of the fit still fails, as for circles | 12 |
+| End spacings with an allowance | An edge count's two end spacings are checked against the Pitch limits widened by 0.5 px (the measured lean 0.35 px), not left out: a damaged first or last crest still fails | 12 |
+| A cut response only from a real neighbour | The symmetric centroid is used only when the opposite lobe is above a fifth of the threshold, so a lone caliper edge on a noisy image keeps the centroid placement of PR #182 | 13 |
+| Constructions in VisionCore | The 2.6 constructions are closed-form on found features in measure space, so they live with the checks in VisionCore (`construct` feature, inputs listed before it) rather than in the engine | 15 |
+
+## Update log (section 8)
+| 2026-10-31 | JOB-FILE-FORMAT.md section 7: feature kinds ellipse, corner, gap, pitch, edges and construct, check values Major, Minor, AxisRatio, CornerAngle, MinWidth, MaxWidth, MeanWidth, Count, Pitch, MeanPitch, unit None, run rules. en.json: 11 English explain keys (ellipse, corner, gap, pitch, edges, geometry.parallel) | Claude (Mac, branch claude/keen-neumann-195cbc) |
+
+## Pending
+- Measure tool: translate the 11 new explain keys (explain.ellipse.*, corner.*, gap.*, pitch.*, edges.*, geometry.parallel) into the other 14 languages once the Studio string tables carry them
+- Measure tool: end edges of a row of edges on a soft image lean outwards (0.35 px at 1 px blur, 3.2 px spacing): a joint fit of neighbouring edge responses would remove it
+- Measure tool: explain texts for gap, pins and edges with their {index}, {value}, {found} and {expected} arguments (spec 2.7-2.9), once the explain mechanism carries arguments
+- Measure tool: a partial-arc ellipse's final fit is not kept to the searched ring (only the RANSAC samples are); limit it when partial arcs are used

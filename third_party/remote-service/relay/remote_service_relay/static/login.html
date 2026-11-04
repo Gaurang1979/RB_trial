@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Sundaram remote support</title>
+<link rel="stylesheet" href="/static/relay.css">
+<script src="/static/relay.js" defer></script>
+</head>
+<body data-page="login">
+<main class="narrow">
+  <h1>Remote support</h1>
+  <p class="muted">Sundaram service engineers. After signing in, open a machine and enter today's Service code for it.</p>
+  <form id="login-form" class="card" method="post">
+    <label>Name <input name="name" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Sign in</button>
+    <p id="error" class="error" role="alert"></p>
+  </form>
+</main>
+</body>
+</html>

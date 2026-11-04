@@ -1,0 +1,43 @@
+# build output
+engine/build/
+engine/build-*/
+.vcpkg/
+out/
+/dist/
+/third_party/installers/
+build/
+bin/
+obj/
+*.dylib
+*.so
+*.dll
+*.exe
+# vendor SDK developer files are kept on purpose
+!third_party/**
+
+# sample and production images are customer data: keep them out of the repository
+*.bmp
+*.tif
+*.tiff
+*.png
+*.jpg
+*.zip
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+.DS_Store
+.venv/
+ml/models/candidates/
+__pycache__/
+*.pyc
+dotnet/Dashboard/data/
+
+# licence signing key: never commit
+licence-private.pem
+
+# the plant server's own images (dashboard icons, presentation graphics) are not customer data
+!plant_server/dashboard/*.png
+!plant_server/docs/**/*.png

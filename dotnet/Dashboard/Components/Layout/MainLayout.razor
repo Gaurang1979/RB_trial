@@ -1,0 +1,40 @@
+@inherits LayoutComponentBase
+
+<div class="shell">
+    <nav class="side">
+        <div class="brand">Code Reader</div>
+        <AuthorizeView>
+            <Authorized>
+                <NavLink href="" Match="NavLinkMatch.All">Live</NavLink>
+                <NavLink href="calibrate">Calibrate</NavLink>
+                <NavLink href="products">Products</NavLink>
+                <NavLink href="tuning">Tuning</NavLink>
+                <NavLink href="trends">Trends</NavLink>
+                <NavLink href="models">AI models</NavLink>
+                <NavLink href="audit">Audit trail</NavLink>
+                @if (context.User.IsInRole(Roles.QA))
+                {
+                    <NavLink href="admin">Admin</NavLink>
+                    <NavLink href="sundaram">Sundaram Telemetry</NavLink>
+                }
+                <div class="who">
+                    <div>@(context.User.FindFirst("full_name")?.Value ?? context.User.Identity?.Name)</div>
+                    <div class="muted">@string.Join(", ", Roles.All.Where(r => context.User.IsInRole(r)))</div>
+                    <form method="post" action="/account/logout">
+                        <AntiforgeryToken />
+                        <button class="link" type="submit">Sign out</button>
+                    </form>
+                </div>
+            </Authorized>
+        </AuthorizeView>
+    </nav>
+    <main class="content">
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">x</a>
+</div>

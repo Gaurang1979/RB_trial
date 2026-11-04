@@ -1,0 +1,135 @@
+@using System.Globalization
+@using System.Text
+@* A line of values over time, drawn as SVG (no script). A null, NaN or infinite value is a gap in the line.
+   Pass a new list when the data changes: the picture is rebuilt only when a parameter changed. *@
+@if (_empty)
+{
+    <div class="vc-empty" role="img" aria-label="@_aria" title="@_aria">–</div>
+}
+else
+{
+    <svg class="vc-trend" viewBox="0 0 @W @H" role="img" aria-label="@_aria" @attributes="Extra">
+        <title>@_aria</title>
+        <line class="vc-grid" x1="@Left" x2="@(W - Right)" y1="@Top" y2="@Top" />
+        <line class="vc-grid" x1="@Left" x2="@(W - Right)" y1="@(H - Bottom)" y2="@(H - Bottom)" />
+        @foreach (var l in _limits)
+        {
+            <g>
+                <line class="vc-limit" x1="@Left" x2="@(W - Right)" y1="@l.Y" y2="@l.Y" />
+                <text class="vc-axis" x="@(W - Right)" y="@(l.Y - 3)" text-anchor="end">@l.Text</text>
+            </g>
+        }
+        <text class="vc-axis" x="@(Left - 4)" y="@(Top + 4)" text-anchor="end">@_maxText</text>
+        <text class="vc-axis" x="@(Left - 4)" y="@(H - Bottom)" text-anchor="end">@_minText</text>
+        <path class="vc-line" d="@_path" />
+        @if (_hasLast) { <circle class="vc-dot" cx="@_lastX" cy="@_lastY" r="3.5" /> }
+    </svg>
+}
+
+@code {
+    private const int W = 320, H = 110, Left = 40, Right = 8, Top = 10, Bottom = 10, MaxPoints = 400;
+
+    /// <summary>The values, oldest first; null, NaN or infinity = no reading (a gap).</summary>
+    [Parameter] public IReadOnlyList<double?>? Values { get; set; }
+    /// <summary>Lines to mark (for example a limit); drawn dashed.</summary>
+    [Parameter] public IReadOnlyList<double>? Limits { get; set; }
+    /// <summary>Fixed bottom / top of the scale; empty = from the data.</summary>
+    [Parameter] public double? Min { get; set; }
+    [Parameter] public double? Max { get; set; }
+    [Parameter] public string Unit { get; set; } = "";
+    [Parameter] public int Decimals { get; set; }
+    /// <summary>What the chart shows, for screen readers and the tooltip.</summary>
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Extra { get; set; }
+
+    private readonly record struct Lim(double Y, string Text);
+
+    private IReadOnlyList<double?>? _v;
+    private IReadOnlyList<double>? _l;
+    private double? _min, _max;
+    private string _unit = "", _label = "";
+    private int _dec;
+    private bool _dirty = true, _empty = true, _hasLast;
+    private string _path = "", _aria = "", _minText = "–", _maxText = "–";
+    private double _lastX, _lastY;
+    private Lim[] _limits = [];
+    private readonly StringBuilder _sb = new();
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_v, Values) && ReferenceEquals(_l, Limits) && _min == Min && _max == Max
+            && _unit == Unit && _dec == Decimals && _label == Label && !_dirty) return;
+        (_v, _l, _min, _max, _unit, _dec, _label) = (Values, Limits, Min, Max, Unit, Decimals, Label);
+        _dirty = true;
+        Build();
+    }
+
+    protected override bool ShouldRender()
+    {
+        var d = _dirty;
+        _dirty = false;
+        return d;
+    }
+
+    private void Build()
+    {
+        var vals = Values;
+        var n = vals?.Count ?? 0;
+        double lo = double.PositiveInfinity, hi = double.NegativeInfinity;
+        int valid = 0, lastIdx = -1;
+        for (var i = 0; i < n; i++)
+        {
+            if (!ChartNum.Good(vals![i])) continue;
+            var d = vals[i]!.Value;
+            valid++; lastIdx = i;
+            if (d < lo) lo = d;
+            if (d > hi) hi = d;
+        }
+        if (valid == 0)
+        {
+            _empty = true;
+            _aria = Label + ": " + T["chart.no_data"];
+            return;
+        }
+        _empty = false;
+        var dataLo = lo; var dataHi = hi;
+        var lims = Limits;
+        if (lims is not null) foreach (var l in lims) if (double.IsFinite(l)) { lo = Math.Min(lo, l); hi = Math.Max(hi, l); }
+        if (Min is { } mn && double.IsFinite(mn)) lo = mn;
+        if (Max is { } mx && double.IsFinite(mx)) hi = mx;
+        if (!(hi > lo)) { var pad = Math.Abs(lo) > 1 ? Math.Abs(lo) * 0.05 : 1; lo -= pad; hi += pad; }
+        else if (Min is null && Max is null) { var pad = (hi - lo) * 0.08; lo -= pad; hi += pad; }
+
+        double X(int i) => n <= 1 ? Left + (W - Left - Right) / 2.0 : Left + (W - Left - Right) * (double)i / (n - 1);
+        double Y(double v) => Top + (H - Top - Bottom) * (hi - Math.Clamp(v, lo, hi)) / (hi - lo);
+
+        _sb.Clear();
+        var step = Math.Max(1, (int)Math.Ceiling(n / (double)MaxPoints));
+        var inRun = false;
+        for (var i = 0; i < n; i += step)
+        {
+            // when thinning, the point stands for its whole step: take the last valid value in it
+            double? v = null;
+            for (var j = Math.Min(i + step - 1, n - 1); j >= i; j--) if (ChartNum.Good(vals![j])) { v = vals[j]; break; }
+            if (v is null) { inRun = false; continue; }
+            var x = X(i);
+            _sb.Append(CultureInfo.InvariantCulture, $"{(inRun ? 'L' : 'M')}{x:0.#} {Y(v.Value):0.#}");
+            if (!inRun) _sb.Append("h0.1");   // a lone point still shows as a dot
+            inRun = true;
+        }
+        _path = _sb.ToString();
+        _hasLast = true;
+        _lastX = Math.Round(X(lastIdx), 1);
+        _lastY = Math.Round(Y(vals![lastIdx]!.Value), 1);
+        _minText = ChartNum.Text(lo, Decimals, "");
+        _maxText = ChartNum.Text(hi, Decimals, "");
+        if (lims is { Count: > 0 })
+        {
+            var list = new List<Lim>(lims.Count);
+            foreach (var l in lims) if (double.IsFinite(l) && l >= lo && l <= hi) list.Add(new Lim(Math.Round(Y(l), 1), ChartNum.Text(l, Decimals, Unit)));
+            _limits = list.ToArray();
+        }
+        else _limits = [];
+        _aria = $"{Label}: {T["chart.latest"]} {ChartNum.Text(vals[lastIdx], Decimals, Unit)}, {T["chart.lowest"]} {ChartNum.Text(dataLo, Decimals, Unit)}, {T["chart.highest"]} {ChartNum.Text(dataHi, Decimals, Unit)}";
+    }
+}

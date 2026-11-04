@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../HikCamera/HikCamera.csproj" />
+    <ProjectReference Include="../StationGuard/StationGuard.csproj" />
+    <ProjectReference Include="../StationAgent/StationAgent.csproj" />
+    <ProjectReference Include="../VisionCore/VisionCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../ml/models/codenet.onnx" Condition="Exists('../../ml/models/codenet.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/codenet.onnx" />
+    <None Include="../../ml/models/enhancer.onnx" Condition="Exists('../../ml/models/enhancer.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/enhancer.onnx" />
+    <None Include="../../engine/build/Release/codereader.dll" Condition="Exists('../../engine/build/Release/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+  </ItemGroup>
+
+</Project>

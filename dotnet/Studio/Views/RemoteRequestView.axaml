@@ -1,0 +1,57 @@
+<!-- Remote service at the line PC (REMOTE-SUPPORT.md 4b): what will change, from "Sundaram remote service" (never who).
+     A confirmation: Yes or No. A correction: each field's recorded and corrected value, the reason, then a supervisor's
+     name and PIN (or password), Approve or No. A badge on the reader approves too. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             x:Class="VisionSystem.Studio.Views.RemoteRequestView"
+             x:DataType="vm:RemoteRequestViewModel">
+  <Border Classes="panel" MinWidth="640" MaxWidth="760" HorizontalAlignment="Center" VerticalAlignment="Center">
+    <StackPanel Spacing="8">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <TextBlock Text="{Binding From}" Classes="muted" />
+      <TextBlock Text="{Binding Kind}" FontWeight="SemiBold" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding What}" Name="RemoteWhat" FontSize="{DynamicResource Vs.Font.Title}" TextWrapping="Wrap" />
+      <ItemsControl ItemsSource="{Binding Changes}" Name="RemoteChanges" IsVisible="{Binding HasChanges}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="x:String">
+            <TextBlock Text="{Binding}" FontSize="{DynamicResource Vs.Font.Title}" TextWrapping="Wrap" Margin="0,2" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <StackPanel Spacing="2" IsVisible="{Binding HasReason}">
+        <TextBlock Text="{Binding ReasonLabel}" Classes="muted" />
+        <TextBlock Text="{Binding Reason}" Name="RemoteReason" TextWrapping="Wrap" />
+      </StackPanel>
+      <TextBlock Text="{Binding CheckText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+      <StackPanel Spacing="8" IsVisible="{Binding IsApproval}">
+        <TextBlock Text="{Binding NameLabel}" />
+        <TextBox Text="{Binding UserName}" Name="RemoteUser" MinHeight="{DynamicResource Vs.Size.Touch}" />
+        <TextBlock Text="{Binding SecretLabel}" />
+        <TextBox Text="{Binding Secret}" Name="RemoteSecret" PasswordChar="●" RevealPassword="False"
+                 MinHeight="{DynamicResource Vs.Size.Touch}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding YesCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <TextBlock Text="{Binding CardHint}" Classes="muted" TextWrapping="Wrap" />
+      </StackPanel>
+      <Border Classes="toned" ui:Ui.Tone="Ng" Padding="{DynamicResource Vs.Pad.S}" CornerRadius="{DynamicResource Vs.Radius.S}"
+              IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Message}" Name="RemoteMessage" TextWrapping="Wrap" />
+      </Border>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Grid.Column="0" Classes="vs" Command="{Binding SwitchSecretCommand}" Name="RemoteSwitch" MinWidth="140" IsVisible="{Binding IsApproval}">
+          <TextBlock Text="{Binding SwitchText}" VerticalAlignment="Center" />
+        </Button>
+        <Button Grid.Column="2" Classes="vs action" Command="{Binding NoCommand}" IsEnabled="{Binding !Busy}" Name="RemoteNo" Margin="0,0,8,0">
+          <TextBlock Text="{Binding NoText}" />
+        </Button>
+        <Button Grid.Column="3" Classes="vs action primary" Command="{Binding YesCommand}" IsEnabled="{Binding !Busy}" Name="RemoteYes">
+          <TextBlock Text="{Binding YesText}" />
+        </Button>
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

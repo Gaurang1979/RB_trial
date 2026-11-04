@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="/manifest.webmanifest">
+<title>Sundaram Smart Production Intelligence</title>
+<style>
+:root{--bg:#0b1220;--panel:#111a2e;--line:#1f2b46;--txt:#e5e9f2;--mut:#8fa0c0;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--acc:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:#0e1730;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.06em;font-size:13px}.brand small{display:block;color:var(--mut);font-weight:500;letter-spacing:.02em}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+.tab{background:#16213b;border:1px solid var(--line);color:var(--txt);padding:6px 12px;border-radius:6px;cursor:pointer;font:inherit}
+.tab.on{background:var(--acc);color:#04121f;border-color:var(--acc);font-weight:600}
+.clock{color:var(--mut);font-variant-numeric:tabular-nums;text-align:right}
+.demo{background:#3b2a05;color:#fbbf24;border:1px solid #92610a;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.05em}
+main{padding:14px 16px;max-width:1500px;margin:0 auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.card h3{margin:0 0 6px;font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+.big{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}.sub{color:var(--mut);font-size:12px}
+.bar{height:6px;background:#1b2740;border-radius:3px;overflow:hidden;margin-top:8px}.bar u{display:block;height:100%;background:var(--acc)}
+.flowwrap{margin-bottom:14px}
+.flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:0;row-gap:12px}
+.mc{position:relative;width:190px;background:#0f1a31;border:1px solid var(--line);border-top:4px solid var(--c);border-radius:10px;padding:10px 12px}
+.code{font:700 13px ui-monospace,Menlo,Consolas,monospace}.nm{color:var(--mut);font-size:12px}
+.badge{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-weight:700;font-size:12px;color:var(--c)}.badge i{width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}
+.since{font-size:12px;color:var(--mut)}.cnt{font-size:12px;margin-top:6px}
+.tag{position:absolute;top:-10px;right:8px;background:#0c4a6e;color:#bae6fd;border:1px solid #0369a1;border-radius:4px;font-size:10px;font-weight:700;padding:1px 6px;letter-spacing:.05em}
+.q{width:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--mut);font-size:11px}
+.q .arrow{color:#3b4c72;font-size:18px;line-height:1}
+.qb{width:22px;height:54px;background:#1b2740;border:1px solid var(--line);border-radius:4px;display:flex;align-items:flex-end;overflow:hidden;margin:3px 0}.qb u{display:block;width:100%;background:var(--ok)}
+.qb.full u{background:var(--bad)}.qb.empty u{background:var(--warn)}
+.qn{font:600 10px ui-monospace,Menlo,Consolas,monospace}
+.grid{display:grid;grid-template-columns:minmax(300px,1fr) minmax(320px,1.4fr);gap:14px}
+@media(max-width:900px){.grid{grid-template-columns:1fr}.mc{width:100%}.q{width:100%;flex-direction:row;gap:10px;padding:2px 0}.qb{width:90px;height:16px;align-items:stretch}.qb u{height:100%!important}.q .arrow{transform:rotate(90deg)}}
+.att{border-left:4px solid var(--c);padding:8px 10px;margin-bottom:8px;background:#0f1a31;border-radius:0 8px 8px 0}
+.att b{display:block}.att .why,.att .eff,.att .act,.att .est{font-size:12px;color:var(--mut)}.att .act{color:#cbd5e1}
+.sev{color:var(--c);font-size:10px;font-weight:700;letter-spacing:.08em}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+th{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:.06em}th:first-child,td:first-child{text-align:left}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+footer{padding:12px 16px 24px;color:var(--mut);font-size:12px;max-width:1500px;margin:0 auto}
+.leg{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:6px}.leg span i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--c)}
+.empty-msg{color:var(--mut);padding:20px}
+.al{border-left:4px solid var(--c);padding:8px 12px;margin-bottom:8px;background:#0f1a31;border-radius:0 8px 8px 0}
+.al b{display:block}.al .why,.al .est{font-size:12px;color:var(--mut)}
+.ackbtn{margin-top:6px;background:var(--acc);color:#04121f;border:0;border-radius:6px;padding:6px 14px;font:inherit;font-weight:700;cursor:pointer}
+#notifybtn{font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SUNDARAM SMART PRODUCTION INTELLIGENCE<small>Know what is happening on every line, why production is lost, and act early</small></div>
+  <div class="tabs" id="tabs"></div>
+  <button class="tab" id="loginbtn"></button>
+  <button class="tab" id="notifybtn" hidden>Enable notifications</button>
+  <span class="demo" id="demo" hidden>DEMO &middot; SYNTHETIC DATA</span>
+  <div class="clock" id="clock">connecting&hellip;</div>
+</header>
+<main>
+  <div class="kpis" id="kpis"></div>
+  <div class="card flowwrap"><h3>Production flow &mdash; equipment &rarr; queue &rarr; equipment</h3><div class="flow" id="flow"><div class="empty-msg">Waiting for data&hellip;</div></div></div>
+  <div class="card" style="margin-bottom:14px"><h3>Alerts <span id="alertcount"></span></h3><div id="alerts"><div class="empty-msg">Waiting for data&hellip;</div></div></div>
+  <div class="grid">
+    <div class="card"><h3>What needs attention</h3><div id="attention"></div></div>
+    <div class="card"><h3>Equipment performance (calculated over the KPI window)</h3><div id="table" style="overflow-x:auto"></div></div>
+  </div>
+</main>
+<footer>
+  <div class="leg" id="legend"></div>
+  States are <b>detected</b> from machine signals; KPIs are <b>calculated</b>; counts and readings are <b>measured</b>. Estimated losses use the standard cycle time. Bypass wording is a signal inconsistency, not a judgement about people.
+</footer>
+<script>
+"use strict";
+const P = new URLSearchParams(location.search), KEY = P.get("key");
+function authHeaders(){
+  const t = localStorage.getItem("spi_token");
+  if(t) return {"Authorization": "Bearer " + t};
+  if(KEY) return {"X-API-Key": KEY};
+  return {};
+}
+function authQuery(){
+  const t = localStorage.getItem("spi_token");
+  if(t) return "&token=" + encodeURIComponent(t);
+  if(KEY) return "&api_key=" + encodeURIComponent(KEY);
+  return "";
+}
+let HDR = authHeaders();
+function refreshAuth(){ HDR = authHeaders(); }
+function clearSession(){ localStorage.removeItem("spi_token"); localStorage.removeItem("spi_username"); localStorage.removeItem("spi_name"); refreshAuth(); }
+const STATES = {PRODUCING:["#22c55e","PRODUCING"],STARVED:["#f59e0b","STARVED"],BLOCKED:["#fb923c","BLOCKED"],FAULT:["#ef4444","FAULT"],
+  BYPASSED:["#a855f7","BYPASS SUSPECTED"],IDLE:["#94a3b8","IDLE"],OFF:["#64748b","OFF"],COMMUNICATION_ERROR:["#38bdf8","NO COMMUNICATION"],NO_DATA:["#64748b","NO DATA"],UNKNOWN:["#475569","UNKNOWN"]};
+const SEV = {high:"#ef4444",medium:"#f59e0b",low:"#38bdf8"};
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+const st = s => STATES[s] || STATES.UNKNOWN;
+const dur = s => s == null ? "" : s >= 3600 ? `${Math.floor(s/3600)} h ${Math.floor(s%3600/60)} min` : s >= 120 ? `${Math.floor(s/60)} min` : `${s} s`;
+const pct = x => x == null ? "&ndash;" : `${Math.round(x*100)}%`;
+const cls = x => x == null ? "" : x >= .85 ? "ok" : x >= .6 ? "warn" : "bad";
+
+function renderKpis(d){
+  const k = d.kpi, n = (d.attention||[]).filter(a => a.severity !== "low").length;
+  if(!k){ $("kpis").innerHTML = ""; return; }
+  const b = k.bottleneck, names = Object.fromEntries(d.equipment.map(e => [e.equipment_id, e.name]));
+  const mins = Math.round((Date.parse(k.window[1]) - Date.parse(k.window[0])) / 60000);
+  $("kpis").innerHTML =
+    `<div class="card"><h3>Good output vs target</h3><div class="big">${esc(k.good_output)} <span class="sub">/ ${esc(Math.round(k.target))}</span></div>
+      <div class="bar"><u style="width:${Math.min(100,(k.achievement||0)*100)}%"></u></div><div class="sub">last ${mins} min of data time &middot; target ${esc(k.target_per_hour)}/h</div></div>
+     <div class="card"><h3>Target achievement</h3><div class="big ${cls(k.achievement)}">${pct(k.achievement)}</div><div class="sub">calculated</div></div>
+     <div class="card"><h3>Line constraint</h3><div class="big" style="font-size:20px">${esc(b.candidate ? (names[b.candidate]||b.candidate) : "n/a")}</div>
+      <div class="sub">${b.clear ? "clear bottleneck" : "candidate only &mdash; not a clear margin"}</div></div>
+     <div class="card"><h3>Needs attention</h3><div class="big ${n ? "bad" : "ok"}">${n}</div><div class="sub">${n ? "open items below" : "no high/medium items"}</div></div>`;
+}
+
+function renderFlow(d){
+  const k = d.kpi, cand = k && k.bottleneck.clear ? k.bottleneck.candidate : null, qs = Object.fromEntries((d.queues||[]).map(q => [q.from, q]));
+  const parts = d.equipment.map(e => {
+    const [c, label] = st(e.state), oee = k && k.equipment[e.equipment_id] ? k.equipment[e.equipment_id].oee : null;
+    let h = `<div class="mc" style="--c:${c}">${cand === e.equipment_id ? '<div class="tag">CONSTRAINT</div>' : ""}
+      <div class="code">${esc(e.equipment_id)}</div><div class="nm">${esc(e.name)}</div>
+      <div class="badge"><i></i>${esc(label)}</div><div class="since">for ${esc(dur(e.duration_s))}</div>
+      <div class="cnt">Count <b>${esc(e.counters.total)}</b> &middot; OEE <b class="${cls(oee)}">${pct(oee)}</b></div></div>`;
+    const q = qs[e.equipment_id];
+    if(q){
+      const lvl = q.level ?? 0, f = Math.min(100, lvl / q.capacity * 100), kind = q.level != null && q.level >= q.capacity ? "full" : lvl === 0 ? "empty" : "";
+      h += `<div class="q"><span class="arrow">&rarr;</span><span class="qn">${esc(q.queue_id)}</span><div class="qb ${kind}"><u style="height:${f}%"></u></div><span>${esc(q.level ?? "?")}/${esc(q.capacity)}</span></div>`;
+    }
+    return h;
+  });
+  $("flow").innerHTML = parts.join("") || '<div class="empty-msg">No equipment</div>';
+}
+
+function renderAttention(d){
+  const a = d.attention || [];
+  $("attention").innerHTML = a.length ? a.map(x => `<div class="att" style="--c:${SEV[x.severity]||"#38bdf8"}">
+      <span class="sev">${esc(x.severity.toUpperCase())}</span><b>${esc(x.title)}</b>
+      <div class="why">Why: ${esc(x.why)}</div>${x.effects.length ? `<div class="eff">Effect: ${esc(x.effects.join("; "))}</div>` : ""}
+      <div class="act">Check: ${esc(x.action)}</div><div class="est">Impact: ${esc(x.estimate_basis)}</div></div>`).join("")
+    : '<div class="empty-msg ok">All lines within expected behaviour for this window.</div>';
+}
+
+function renderTable(d){
+  const k = d.kpi; if(!k){ $("table").innerHTML = ""; return; }
+  const rows = d.equipment.map(e => { const q = k.equipment[e.equipment_id] || {};
+    return `<tr><td><b>${esc(e.equipment_id)}</b> <span class="sub">${esc(e.name)}</span></td><td class="${cls(q.availability)}">${pct(q.availability)}</td>
+      <td class="${cls(q.performance)}">${pct(q.performance)}</td><td class="${cls(q.quality)}">${pct(q.quality)}</td><td class="${cls(q.oee)}"><b>${pct(q.oee)}</b></td><td>${esc(q.count_total)}</td></tr>`; });
+  $("table").innerHTML = `<table><tr><th>Equipment</th><th>Avail.</th><th>Perf.</th><th>Quality</th><th>OEE</th><th>Count</th></tr>${rows.join("")}</table>`;
+}
+
+const seen = new Set(); let firstAlerts = true;
+function notify(alerts){
+  const fresh = alerts.filter(a => a.state === "OPEN" && !seen.has(a.id));
+  alerts.forEach(a => seen.add(a.id));
+  if(firstAlerts){ firstAlerts = false; return; }              // alerts that already existed on load are not "new"
+  if(typeof Notification === "undefined" || Notification.permission !== "granted") return;
+  fresh.filter(a => a.severity !== "low").forEach(a => {
+    const o = {body: String(a.detail).slice(0, 140), tag: "spi-" + a.id};
+    if(navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r => r.showNotification(a.title, o)).catch(() => new Notification(a.title, o));
+    else new Notification(a.title, o);
+  });
+}
+function renderAlerts(d){
+  const a = d.alerts || [], si = d.sensor_issues || [];
+  $("alertcount").textContent = a.length ? `(${a.length})` : "";
+  let h = a.map(x => `<div class="al" style="--c:${SEV[x.severity] || "#38bdf8"}"><span class="sev">${esc(String(x.severity).toUpperCase())}${x.level ? " &middot; ESCALATED L" + esc(x.level) : ""}</span>
+      <b>${esc(x.title)}</b><div class="why">${esc(x.detail)}</div>
+      <div class="est">Open for ${esc(dur(x.duration_s))} &middot; notified: ${esc((x.recipients || []).join(", "))}${x.acked_by ? " &middot; acknowledged by " + esc(x.acked_by) : ""}</div>
+      ${x.state === "OPEN" ? `<button class="ackbtn" data-ack="${esc(x.id)}">Acknowledge</button>` : '<span class="ok">Acknowledged</span>'}</div>`).join("");
+  if(!a.length) h = si.length ? si.map(x => `<div class="al" style="--c:#f59e0b"><b>Sensor ${esc(x.sensor_id)}: ${esc(String(x.status).toLowerCase())}</b><div class="why">${esc(x.reason)}</div></div>`).join("") : '<div class="empty-msg ok">No open alerts.</div>';
+  $("alerts").innerHTML = h;
+  notify(a);
+}
+async function ack(id){
+  let u = localStorage.getItem("spi_username") || localStorage.getItem("spi_user") || prompt("Your name (recorded in the alert audit trail)");
+  if(!u || !u.trim()) return;
+  if(!localStorage.getItem("spi_username")) localStorage.setItem("spi_user", u.trim());
+  try{
+    const r = await fetch(`/alerts/${encodeURIComponent(id)}/acknowledge`, {method: "POST", headers: {...HDR, "Content-Type": "application/json"}, body: JSON.stringify({user: u.trim(), note: ""})});
+    if(!r.ok) throw new Error(r.status);
+  }catch(e){ $("clock").textContent = `could not acknowledge (${e.message})`; }
+}
+function render(d){
+  $("clock").textContent = d.as_of ? `data time ${d.as_of.replace("T"," ").replace("Z"," UTC")}` : "no data yet";
+  renderKpis(d); renderFlow(d); renderAlerts(d); renderAttention(d); renderTable(d);
+}
+
+let cur = null, ws = null, poll = null;
+const EMPTY = {as_of: null, equipment: [], queues: [], kpi: null, attention: [], alerts: [], sensor_issues: []};
+function noProduction(id){
+  stop(); cur = id; document.querySelectorAll(".tab[data-id]").forEach(t => t.classList.toggle("on", t.dataset.id === id));
+  render(EMPTY); $("clock").textContent = "no production data on this line (vision or printing only)";
+}
+function stop(){ if(ws){ ws.onclose = null; ws.close(); ws = null; } if(poll){ clearInterval(poll); poll = null; } }
+function startPolling(){ if(poll) return; const id = cur; const go = () => fetch(`/lines/${encodeURIComponent(id)}/status`, {headers: HDR}).then(r => r.ok ? r.json() : Promise.reject(r.status)).then(d => { if(cur === id) render(d); }).catch(e => { if(cur !== id) return; if(e === 401 && sessionEnded()) return; $("clock").textContent = `API error ${e}`; }); go(); poll = setInterval(go, 2000); }
+// The server ended this sign-in (idle time, sign-out elsewhere, account disabled): forget it and carry on without it.
+function sessionEnded(){ if(!localStorage.getItem("spi_token")) return false; clearSession(); refreshHeaderUI(); connect(cur); return true; }
+function connect(id){
+  stop(); cur = id; document.querySelectorAll(".tab[data-id]").forEach(t => t.classList.toggle("on", t.dataset.id === id));
+  try {
+    const proto = location.protocol === "https:" ? "wss" : "ws";
+    ws = new WebSocket(`${proto}://${location.host}/stream/lines/${encodeURIComponent(id)}?interval=1${authQuery()}`);
+    ws.onmessage = m => render(JSON.parse(m.data));
+    ws.onclose = e => { ws = null; if(!(e.code === 4401 && sessionEnded())) startPolling(); };
+  } catch(e){ startPolling(); }
+}
+function urlBase64ToUint8Array(base64){
+  const padding = "=".repeat((4 - base64.length % 4) % 4);
+  const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+async function enablePush(){
+  if(typeof Notification === "undefined"){ return; }
+  const perm = await Notification.requestPermission();
+  $("notifybtn").hidden = perm !== "default";
+  if(perm !== "granted" || !("serviceWorker" in navigator) || !localStorage.getItem("spi_token")) return;
+  try{
+    const keyResp = await fetch("/webpush/public-key");
+    if(!keyResp.ok) return;                                       // web push not configured on this server; same-tab alerts still work
+    const {key} = await keyResp.json();
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key)});
+    const j = sub.toJSON();
+    await fetch("/webpush/subscribe", {method: "POST", headers: {...HDR, "Content-Type": "application/json"},
+      body: JSON.stringify({endpoint: j.endpoint, keys: j.keys, device: navigator.userAgent.slice(0, 120)})});
+  }catch(e){ console.warn("push subscribe failed", e); }
+}
+function refreshHeaderUI(){
+  const token = localStorage.getItem("spi_token"), name = localStorage.getItem("spi_name") || localStorage.getItem("spi_username");
+  const lb = $("loginbtn");
+  lb.textContent = token ? `${name} (sign out)` : "Sign in";
+  lb.onclick = token ? doLogout : doLogin;
+  const nb = $("notifybtn");
+  if(!nb.hidden || (typeof Notification !== "undefined" && Notification.permission === "default")) nb.textContent = token ? "Enable phone alerts" : "Enable notifications";
+}
+async function doLogin(){
+  const username = prompt("Username"); if(!username) return;
+  const password = prompt("Password"); if(!password) return;
+  try{
+    const r = await fetch("/auth/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username, password})});
+    if(!r.ok) throw new Error(r.status === 401 ? "invalid username or password" : `HTTP ${r.status}`);
+    const data = await r.json();
+    localStorage.setItem("spi_token", data.token);
+    localStorage.setItem("spi_username", data.user.username);
+    localStorage.setItem("spi_name", data.user.name || data.user.username);
+    refreshAuth(); refreshHeaderUI();
+    await init();
+  }catch(e){ alert("Sign-in failed: " + e.message); }
+}
+async function doLogout(){
+  try{ await fetch("/auth/logout", {method: "POST", headers: HDR}); }catch(e){}
+  clearSession(); refreshHeaderUI();
+  await init();
+}
+async function init(){
+  try{
+    const h = await (await fetch("/health")).json(); $("demo").hidden = !h.demo;
+    let r = await fetch("/plants", {headers: HDR});
+    if(r.status === 401){ clearSession(); refreshHeaderUI(); r = await fetch("/plants", {headers: HDR}); }   // stale/expired token: fall back to anon
+    const plants = await r.json();
+    // Lines added in the master tables for vision or printing show beside Production's; they have no production status.
+    const lines = plants.flatMap(p => p.lines.map(l => ({...l, plant: p.name})));
+    $("tabs").innerHTML = lines.map(l => `<button class="tab" data-id="${esc(l.id)}" data-production="${l.production !== false}">${esc(l.plant)} &middot; ${esc(l.name)}</button>`).join("");
+    document.querySelectorAll(".tab[data-id]").forEach(t => t.onclick = () => t.dataset.production === "true" ? connect(t.dataset.id) : noProduction(t.dataset.id));
+    const first = lines.find(l => l.production !== false) || lines[0];
+    if(!first){ stop(); cur = null; render(EMPTY); }
+    else if(first.production !== false) connect(first.id);
+    else noProduction(first.id);
+  }catch(e){ $("clock").textContent = "cannot reach API"; }
+  $("legend").innerHTML = Object.values(STATES).slice(0,9).map(([c,l]) => `<span style="--c:${c}"><i></i>${l}</span>`).join("");
+  refreshHeaderUI();
+}
+$("alerts").addEventListener("click", ev => { const b = ev.target.closest("[data-ack]"); if(b) ack(b.dataset.ack); });
+if(typeof Notification !== "undefined" && Notification.permission === "default"){
+  $("notifybtn").hidden = false;
+}
+$("notifybtn").onclick = enablePush;
+if("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+window.SPI = {render, esc, STATES, ack};
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+{
+ "doctype": "DocType",
+ "name": "Remote Service Settings",
+ "module": "Remote Service",
+ "custom": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "activity_type",
+  "create_timesheet"
+ ],
+ "fields": [
+  {
+   "fieldname": "activity_type",
+   "label": "Activity Type for Remote Service",
+   "fieldtype": "Link",
+   "options": "Activity Type"
+  },
+  {
+   "fieldname": "create_timesheet",
+   "label": "Create Draft Timesheet",
+   "fieldtype": "Check",
+   "default": "1"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "issingle": 1,
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  }
+ ]
+}

@@ -1,0 +1,33 @@
+<!-- One camera's live image on the Run screen (UI-UX-SPEC.md 4.1): its picture with result graphics and its
+     own verdict frame; with two or more cameras a heading with the camera's name and result. A tile with no
+     picture, or a stale one, is dimmed and its frame is never green (requirements section 12). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.CameraTileView"
+             x:DataType="vm:CameraTile">
+  <Border Name="ImageFrame" Classes="frame" ui:Ui.Tone="{Binding FrameTone}">
+    <Grid RowDefinitions="Auto,*">
+      <Border Name="TileHeader" IsVisible="{Binding ShowHeader}" Padding="8,3"
+              BorderThickness="0,0,0,1" BorderBrush="{DynamicResource Vs.Brush.Border}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Classes="glyph" ui:Ui.Tone="{Binding FrameTone}" Width="14" Height="14"
+                    Data="{Binding ResultIcon, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+      </Border>
+      <Panel Grid.Row="1">
+        <Image Name="LiveImage" Source="{Binding LiveImage}" Stretch="Uniform" Classes.dim="{Binding Dimmed}" />
+        <!-- A tap on a result graphic shows its tooltip for a few seconds. -->
+        <ui:ResultOverlay Name="Overlay" Graphics="{Binding Graphics}" ImageWidth="{Binding ImageWidth}"
+                          ImageHeight="{Binding ImageHeight}" Classes.dim="{Binding Dimmed}"
+                          TooltipText="{Binding TooltipText}" TooltipAt="{Binding TooltipAt}" />
+        <TextBlock Text="{l:T run.no_image}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding ShowNoPicture}" />
+      </Panel>
+    </Grid>
+  </Border>
+</UserControl>

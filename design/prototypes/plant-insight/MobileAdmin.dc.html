@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile: admin</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden">
+  <header style="padding: 20px 20px 8px">
+    <div style="font-size: 13px; color: #9FB0C0">Plant admin · [PLANT NAME]</div>
+    <h1 style="margin: 2px 0 0; font-size: 24px; font-weight: 700">Admin</h1>
+  </header>
+  <div style="flex: 1; overflow: hidden; padding: 8px 20px; display: flex; flex-direction: column; gap: 14px">
+    <section aria-label="Waiting for you" style="background: #16212C; border: 1px solid #22303D; border-radius: 14px; padding: 14px 16px">
+      <h2 style="margin: 0 0 6px; font-size: 16px; font-weight: 600">Waiting for your approval · 3</h2>
+      <sc-for list="{{approvals}}" as="a" hint-placeholder-count="3">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #22303D">
+          <div style="flex: 1; min-width: 0">
+            <div style="font-size: 15px; font-weight: 600">{{a.title}}</div>
+            <div style="font-size: 13px; color: #9FB0C0">{{a.detail}}</div>
+          </div>
+          <button style="height: 44px; padding: 0 14px; background: #1F3A57; color: #E6EDF3; border: 1px solid #2F5A86; border-radius: 10px; font: inherit; font-size: 14px; font-weight: 600">Review</button>
+        </div>
+      </sc-for>
+    </section>
+    <section aria-label="Manage" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+      <sc-for list="{{tiles}}" as="t" hint-placeholder-count="6">
+        <button style="display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; background: #16212C; color: #E6EDF3; border: 1px solid #22303D; border-radius: 14px; padding: 14px; min-height: 92px; font: inherit">
+          <span style="font-weight: 600; font-size: 15px">{{t.title}}</span>
+          <span style="font-size: 13px; color: #9FB0C0">{{t.sub}}</span>
+        </button>
+      </sc-for>
+    </section>
+    <button style="display: flex; align-items: center; justify-content: center; gap: 10px; height: 64px; background: #58A6FF; color: #0E151C; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7V3h4M17 3h4v4M21 17v4h-4M7 21H3v-4"></path><rect x="8" y="8" width="8" height="8"></rect></svg>Add a line: scan its station QR code</button>
+  </div>
+  <nav aria-label="Main" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #121C25; border-top: 1px solid #22303D; padding: 6px 4px 18px">
+    <a href="MobileLines.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #C4D0DB; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Lines</a>
+    <a href="MobileAlarm.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #C4D0DB; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>Alarms · 2</a>
+    <a href="MobileReview.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #C4D0DB; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M8 13l3 3 5-6"></path></svg>Review</a>
+    <a href="MobileAdmin.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #7CB7FF; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Admin</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      approvals: [
+        { title: 'New AI model · Line 9 print', detail: 'Validated: 0 missed NG, false rejects 0.3% → 0.1%' },
+        { title: 'Tolerance change · Line 4', detail: 'Label offset 0.50 → 0.60 mm · asked by Priya' },
+        { title: 'New user · Night shift', detail: 'Operator on Lines 1–3 · asked by Ravi' }
+      ],
+      tiles: [
+        { title: 'Users and roles', sub: '64 users · 5 roles' },
+        { title: 'Lines and stations', sub: '12 lines · 26 cameras' },
+        { title: 'Alarm rules', sub: 'Who is called, and when' },
+        { title: 'Licences', sub: '12 of 15 lines used' },
+        { title: 'Audit trail', sub: 'Every change, signed' },
+        { title: 'Data and backup', sub: 'Last backup 02:00' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

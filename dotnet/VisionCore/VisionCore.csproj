@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>VisionCore</RootNamespace>
+    <AssemblyName>VisionCore</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>Vision tools, jobs and the job runner: code reading (codereader) and OCR / OCV (vs_ocr).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodeReader\CodeReader.csproj" />
+  </ItemGroup>
+
+  <!-- draws a system font for Check text without teaching (FontRender) -->
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+  </ItemGroup>
+
+</Project>

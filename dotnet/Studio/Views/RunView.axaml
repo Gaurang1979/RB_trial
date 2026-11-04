@@ -1,0 +1,424 @@
+<!-- Run screen (UI-UX-SPEC.md 4.1): one compact density for touch, mouse and keyboard (principle 3).
+     Fits 1366 x 768 without scrolling: top bar 40, toolbar 40, banner 36 when needed, then one live
+     image tile per camera over the Overview / Last bad parts tabs, and the result, counters, speed,
+     "This picture" and the Batch and PLC card on the right. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             xmlns:views="using:VisionSystem.Studio.Views"
+             x:Class="VisionSystem.Studio.Views.RunView"
+             x:DataType="vm:RunViewModel">
+  <UserControl.Styles>
+    <Style Selector=":is(Control).dim">
+      <Setter Property="Opacity" Value="0.4" />
+    </Style>
+    <Style Selector="TextBlock.counter">
+      <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Counter}" />
+      <Setter Property="FontWeight" Value="Bold" />
+      <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Mono}" />
+      <Setter Property="HorizontalAlignment" Value="Right" />
+    </Style>
+    <Style Selector="TextBlock.counterLabel">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <Style Selector="TextBlock.chartTitle">
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Label}" />
+    </Style>
+    <Style Selector="TextBlock.header">
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.missing">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.Status.Warn}" />
+      <Setter Property="FontWeight" Value="Normal" />
+    </Style>
+    <Style Selector="TextBlock.note">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+      <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Small}" />
+      <Setter Property="VerticalAlignment" Value="Bottom" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto,Auto,*" Name="RunRoot">
+
+    <!-- Toolbar (UI-UX-SPEC.md 2): actions in groups, icon, label and shortcut; faded with a reason when not possible. -->
+    <Border Grid.Row="0" Classes="bar" BorderThickness="0,0,0,1" Padding="6,4" Name="ActionBar">
+      <DockPanel LastChildFill="False">
+        <Button DockPanel.Dock="Right" Classes="vs action" Name="HelpButton" Command="{Binding HelpCommand}"
+                ToolTip.Tip="{l:T run.tip.help}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Help}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.help}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="F1" /></Border>
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="StartButton" Command="{Binding StartCommand}"
+                Classes.primary="{Binding StartAvailable}" Classes.unavailable="{Binding !StartAvailable}"
+                ToolTip.Tip="{l:T run.tip.start}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Play}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.start}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="F5" /></Border>
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="StopButton" Command="{Binding StopCommand}"
+                Classes.unavailable="{Binding !StopAvailable}"
+                ToolTip.Tip="{l:T run.tip.stop}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Pause}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.stop}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="Shift+F5" /></Border>
+          </StackPanel>
+        </Button>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="ChangeButton" Command="{Binding ChangeProductCommand}"
+                Classes.unavailable="{Binding !ChangeAvailable}"
+                ToolTip.Tip="{l:T run.tip.change_product}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Product}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.change_product}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="F2" /></Border>
+          </StackPanel>
+        </Button>
+        <!-- Start batch: what is printed on this batch; Start opens it by itself while the batch is not entered. -->
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="BatchButton" Command="{Binding BatchCommand}"
+                Classes.unavailable="{Binding !BatchAvailable}"
+                ToolTip.Tip="{l:T run.tip.batch}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Batch}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.batch}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="F3" /></Border>
+          </StackPanel>
+        </Button>
+        <Border DockPanel.Dock="Left" Classes="separator" />
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="PartsButton" Command="{Binding OpenPartsCommand}"
+                ToolTip.Tip="{l:T run.tip.parts}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.List}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.parts}" VerticalAlignment="Center" />
+            <Border Classes="kbd"><TextBlock Text="F4" /></Border>
+          </StackPanel>
+        </Button>
+        <Button DockPanel.Dock="Left" Classes="vs action" Name="BadPartsButton" Command="{Binding ShowBadPartsCommand}"
+                ToolTip.Tip="{l:T run.tip.bad_parts}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Cross}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.bad_parts}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+
+      </DockPanel>
+    </Border>
+
+    <!-- Banner: only when something needs the operator, with what to do. -->
+    <Border Grid.Row="1" Classes="toned" ui:Ui.Tone="{Binding BannerTone}" IsVisible="{Binding HasBanner}"
+            MinHeight="36" Padding="10,3" Name="Banner">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <PathIcon Data="{Binding BannerIcon, Converter={x:Static ui:IconConverter.Instance}}" Width="20" Height="20" />
+          <TextBlock Text="{Binding BannerText}" FontSize="{DynamicResource Vs.Font.Title}" FontWeight="SemiBold"
+                     VerticalAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+        <!-- The alarm's steps (UI-UX-SPEC.md 4.4), when the runtime sent them. -->
+        <Button Grid.Column="1" Classes="vs" Name="WhatToDoButton" Command="{Binding WhatToDoCommand}"
+                IsVisible="{Binding HasBannerHelp}" Margin="12,0,0,0"
+                ToolTip.Tip="{l:T run.tip.what_to_do}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <!-- The banner's own colour would make the icon vanish on the button. -->
+            <PathIcon Foreground="{Binding $parent[Button].Foreground}"
+                      Data="{Binding Source={x:Static vm:Icons.Help}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T run.what_to_do}" VerticalAlignment="Center" FontWeight="SemiBold" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" Margin="12,0,0,0">
+          <!-- The supervisor refused the changeover and the values are right (CHANGEOVER-VERIFY.md). -->
+          <Button Classes="vs" Name="AskAgainButton" Command="{Binding AskAgainCommand}"
+                  IsVisible="{Binding CanAskAgain}"
+                  ToolTip.Tip="{l:T run.tip.ask_again}">
+            <TextBlock Text="{l:T run.ask_again}" VerticalAlignment="Center" FontWeight="SemiBold" />
+          </Button>
+          <!-- The plant server cannot be reached: a second person accepts at the line PC. -->
+          <Button Classes="vs" Name="AcceptHereButton" Command="{Binding AcceptHereCommand}"
+                  IsVisible="{Binding CanAcceptHere}"
+                  ToolTip.Tip="{l:T run.tip.accept_here}">
+            <TextBlock Text="{l:T run.changeover.accept_here}" VerticalAlignment="Center" FontWeight="SemiBold" />
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="2" ColumnDefinitions="*,312" RowDefinitions="*,212" ColumnSpacing="6" RowSpacing="6" Margin="6">
+
+      <!-- One live image tile per camera, side by side in job order; one camera fills the area. -->
+      <Panel Grid.Column="0" Name="ImageArea">
+        <ItemsControl Name="ImageTiles" ItemsSource="{Binding Tiles}" Margin="-3,0">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:CameraTile">
+              <views:CameraTileView Margin="3,0" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <!-- The learning session's notice (owner, 2026-11-04): small, in a corner, closable; it never starts learning. -->
+        <Border Classes="toned" ui:Ui.Tone="Info" IsVisible="{Binding HasLearningNotice}" Name="LearningNotice"
+                VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="12" Padding="10,6"
+                CornerRadius="{DynamicResource Vs.Radius.M}">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Teach}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{Binding LearningNoticeText}" TextWrapping="Wrap" MaxWidth="320" VerticalAlignment="Center" />
+            <Button Classes="vs" Name="LearningNoticeOpen" Command="{Binding OpenSortingCommand}" IsVisible="{Binding CanSort}" Padding="8,2">
+              <TextBlock Text="{l:T run.learning.open}" />
+            </Button>
+            <Button Classes="vs" Name="LearningNoticeClose" Command="{Binding CloseLearningNoticeCommand}" Padding="6,2"
+                    ToolTip.Tip="{l:T common.close}">
+              <TextBlock Text="✕" />
+            </Button>
+          </StackPanel>
+        </Border>
+        <!-- Why a tapped action is not possible now; shown for a few seconds. -->
+        <Border Classes="toned" ui:Ui.Tone="Info" IsVisible="{Binding HasNotice}" Name="Notice"
+                VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="12"
+                Padding="{DynamicResource Vs.Pad.M}" CornerRadius="{DynamicResource Vs.Radius.M}">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Info}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{Binding NoticeText}" TextWrapping="Wrap" MaxWidth="600" />
+          </StackPanel>
+        </Border>
+      </Panel>
+
+      <!-- Overview charts and the last bad parts (UI-UX-SPEC.md 4.1, principle 15). -->
+      <Border Grid.Row="1" Grid.Column="0" Classes="card" Padding="0" Name="BottomPanel">
+        <TabControl SelectedIndex="{Binding BottomTab}" Classes="compact">
+          <TabItem Header="{l:T run.tab.overview}" Name="OverviewTab">
+            <Grid ColumnDefinitions="1.15*,*,*" Margin="0,4,0,0">
+              <Grid Grid.Column="0" RowDefinitions="Auto,*" Margin="10,2,10,4">
+                <DockPanel>
+                  <TextBlock Classes="chartTitle" Text="{l:T run.chart.per_minute}" />
+                  <TextBlock Classes="note" Text="{l:T run.chart.per_minute.note}" HorizontalAlignment="Right" />
+                </DockPanel>
+                <ui:MinutesChart Grid.Row="1" Name="MinutesChart" Data="{Binding Overview}" LineSpeed="{Binding LineSpeedPpm}" Margin="0,4,0,0" />
+              </Grid>
+              <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="10,2,10,4">
+                <DockPanel>
+                  <TextBlock Classes="chartTitle" Text="{l:T run.chart.reasons}" />
+                  <TextBlock Classes="note" Text="{l:T run.chart.reasons.note}" HorizontalAlignment="Right" />
+                </DockPanel>
+                <ui:ReasonsChart Grid.Row="1" Name="ReasonsChart" Data="{Binding Overview}" Margin="0,4,0,0" />
+              </Grid>
+              <Grid Grid.Column="2" RowDefinitions="Auto,*" Margin="10,2,10,4">
+                <DockPanel>
+                  <TextBlock Classes="chartTitle" Text="{l:T run.chart.cycle}" />
+                  <TextBlock Classes="note" Text="{Binding CycleNote}" HorizontalAlignment="Right" />
+                </DockPanel>
+                <ui:CycleChart Grid.Row="1" Name="CycleChart" Data="{Binding Overview}" BudgetMs="{Binding CycleBudgetMs}" Margin="0,4,0,0" />
+              </Grid>
+              <Rectangle Grid.Column="1" Width="1" HorizontalAlignment="Left" Fill="{DynamicResource Vs.Brush.Border}" />
+              <Rectangle Grid.Column="2" Width="1" HorizontalAlignment="Left" Fill="{DynamicResource Vs.Brush.Border}" />
+            </Grid>
+          </TabItem>
+          <TabItem Header="{l:T run.tab.bad_parts}" Name="BadPartsTab">
+            <DockPanel Margin="8">
+            <!-- The learning session (owner, 2026-11-04): sorting and learning, for a supervisor; the toolbar keeps its 7 actions. -->
+            <Button DockPanel.Dock="Right" Classes="vs" Name="LearningButton" Command="{Binding OpenSortingCommand}"
+                    IsVisible="{Binding CanSort}" ToolTip.Tip="{l:T run.tip.learning}" VerticalAlignment="Center" Margin="8,0,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Data="{Binding Source={x:Static vm:Icons.Teach}, Converter={x:Static ui:IconConverter.Instance}}" />
+                <TextBlock Text="{l:T run.learning}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <!-- Bad parts waiting for a review (AS-04i), for a supervisor: opens them. -->
+            <Button DockPanel.Dock="Right" Classes="vs" Name="ReviewWaitingButton" Command="{Binding OpenReviewWaitingCommand}"
+                    IsVisible="{Binding HasReviewWaiting}" ToolTip.Tip="{l:T run.tip.review_waiting}" VerticalAlignment="Center" Margin="8,0,0,0">
+              <TextBlock Text="{Binding ReviewWaitingText}" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="220" />
+            </Button>
+            <Grid Name="NgStrip">
+              <TextBlock Text="{l:T run.no_bad}" Classes="muted" VerticalAlignment="Center"
+                         IsVisible="{Binding !NgStrip.Count}" />
+              <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+        <ItemsControl ItemsSource="{Binding NgStrip}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:NgThumb">
+              <!-- A tap opens the NG image viewer on this part. -->
+              <Button Padding="0" Background="Transparent" BorderThickness="0" Classes="thumb"
+                      Command="{Binding $parent[ItemsControl].((vm:RunViewModel)DataContext).OpenNgCommand}"
+                      CommandParameter="{Binding}">
+              <Border Classes="frame" ui:Ui.Tone="{Binding Tone}" BorderThickness="2" Width="{DynamicResource Vs.Size.NgThumb}" Height="{DynamicResource Vs.Size.NgThumb}">
+                <Panel>
+                  <Image Source="{Binding Image}" Stretch="UniformToFill" />
+                  <Border Classes="toned" ui:Ui.Tone="{Binding Tone}" VerticalAlignment="Bottom" Padding="4,0">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <PathIcon Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" Width="12" Height="12" />
+                      <TextBlock Text="{Binding Time}" FontSize="{DynamicResource Vs.Font.Small}" />
+                    </StackPanel>
+                  </Border>
+                </Panel>
+              </Border>
+              </Button>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+              </ScrollViewer>
+            </Grid>
+            </DockPanel>
+          </TabItem>
+        </TabControl>
+      </Border>
+
+      <!-- Result, counters and speed. -->
+      <StackPanel Grid.Column="1" Grid.RowSpan="2" Spacing="6">
+        <Border Name="ResultBlock" Classes="toned" ui:Ui.Tone="{Binding ResultTone}"
+                CornerRadius="{DynamicResource Vs.Radius.L}" Padding="{DynamicResource Vs.Pad.L}" Height="112">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+            <PathIcon Data="{Binding ResultIcon, Converter={x:Static ui:IconConverter.Instance}}"
+                      Width="{DynamicResource Vs.Size.ResultGlyph}" Height="{DynamicResource Vs.Size.ResultGlyph}" />
+            <!-- Long words in any language shrink to fit; never cut, never broken mid-word. -->
+            <Viewbox StretchDirection="DownOnly" MaxWidth="210" Height="52">
+              <TextBlock Text="{Binding ResultText}" FontSize="{DynamicResource Vs.Font.Result}" FontWeight="Bold"
+                         FontFamily="{DynamicResource Vs.Typeface.Display}" TextAlignment="Center" />
+            </Viewbox>
+          </StackPanel>
+        </Border>
+
+        <Border Classes="card" Name="Counters" Padding="10,6">
+          <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,16,Auto,*,Auto" RowSpacing="4">
+            <TextBlock Grid.Row="0" Grid.Column="0" Classes="counterLabel" Text="{l:T run.good}" />
+            <Viewbox Grid.Row="0" Grid.Column="1" StretchDirection="DownOnly" HorizontalAlignment="Right">
+              <TextBlock Classes="counter" Text="{Binding GoodText}" />
+            </Viewbox>
+            <TextBlock Grid.Row="0" Grid.Column="3" Classes="counterLabel" Text="{l:T run.bad}" />
+            <Viewbox Grid.Row="0" Grid.Column="4" Grid.ColumnSpan="2" StretchDirection="DownOnly" HorizontalAlignment="Right">
+              <TextBlock Classes="counter" Text="{Binding BadText}" />
+            </Viewbox>
+            <TextBlock Grid.Row="1" Grid.Column="0" Classes="counterLabel" Text="{l:T run.total}" />
+            <Viewbox Grid.Row="1" Grid.Column="1" StretchDirection="DownOnly" HorizontalAlignment="Right">
+              <TextBlock Classes="counter" Text="{Binding TotalText}" />
+            </Viewbox>
+            <!-- Good % from GetCounters, with the yield ring as its glyph. -->
+            <TextBlock Grid.Row="1" Grid.Column="3" Classes="counterLabel" Text="{l:T run.good_percent}" />
+            <Viewbox Grid.Row="1" Grid.Column="4" StretchDirection="DownOnly" HorizontalAlignment="Right">
+              <TextBlock Classes="counter" Text="{Binding GoodPercentText}" />
+            </Viewbox>
+            <ui:YieldRing Grid.Row="1" Grid.Column="5" Name="YieldRing" Value="{Binding YieldValue}" Thickness="4"
+                          Width="18" Height="18" Margin="6,0,0,0" />
+          </Grid>
+        </Border>
+
+        <!-- Cycle time from GetCounters (median of the batch and its slowest part), and good % per minute. -->
+        <Border Classes="card" Name="CyclePanel" Padding="10,6">
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+              <TextBlock Text="{l:T run.cycle}" Classes="counterLabel" />
+              <TextBlock Grid.Column="1" Text="{Binding CycleMaxText}" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="{Binding CycleText}" Classes="counter" Name="CycleText" />
+            </Grid>
+            <TextBlock Text="{l:T run.good_trend}" Classes="counterLabel" />
+            <ui:GoodTrend Name="GoodTrend" Data="{Binding Overview}" Height="40" />
+          </StackPanel>
+        </Border>
+
+        <!-- The tools and codes of the pictures shown, failed ones first, under each camera's heading when there
+             are two or more; dimmed with a stale picture. -->
+        <Border Classes="card" Name="LastPartPanel" Padding="10,6" Classes.dim="{Binding ImageDimmed}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="{l:T run.last_part}" Classes="counterLabel" />
+            <TextBlock Text="{l:T run.last_part.none}" Classes="muted" IsVisible="{Binding !LastPart.Count}" />
+            <ItemsControl ItemsSource="{Binding LastPart}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:CheckLine">
+                  <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,1">
+                    <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="12" Height="12"
+                              Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" MaxWidth="260"
+                               Classes.header="{Binding Header}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- Setup check at job load (AS-13, AS-14): the lens, light and pixel advice from one or two pictures per
+             camera taken after the job was loaded; only while the line is stopped. Advice only: Start is not changed. -->
+        <Border Classes="card" Name="SetupCheckPanel" Padding="10,6" IsVisible="{Binding HasSetupCheck}"
+                ToolTip.Tip="{l:T run.tip.setup}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="{l:T run.setup}" Classes="counterLabel" />
+            <ItemsControl ItemsSource="{Binding SetupLines}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:CheckLine">
+                  <DockPanel Margin="0,1">
+                    <PathIcon DockPanel.Dock="Left" Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="12" Height="12"
+                              Margin="0,2,6,0" VerticalAlignment="Top"
+                              Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxWidth="260" HorizontalAlignment="Left" />
+                  </DockPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{l:T run.setup.note}" Classes="muted" TextWrapping="Wrap" MaxWidth="280" />
+          </StackPanel>
+        </Border>
+
+        <!-- Batch and PLC: the batch values, the PLC's link, heartbeat and RunEnable, and its last part. -->
+        <Border Classes="card" Name="BatchPlcPanel" Padding="10,6" ToolTip.Tip="{l:T run.tip.batch_plc}">
+          <StackPanel Spacing="3">
+            <TextBlock Text="{l:T run.batch_plc}" Classes="counterLabel" />
+            <ItemsControl Name="BatchValues" ItemsSource="{Binding BatchLines}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:BatchLine">
+                  <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,1,12,1">
+                    <TextBlock Text="{Binding Label}" Classes="muted" />
+                    <TextBlock Text="{Binding Value}" FontWeight="SemiBold" Classes.missing="{Binding Missing}"
+                               TextTrimming="CharacterEllipsis" MaxWidth="200" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding BatchNote}" Classes="muted"
+                       IsVisible="{Binding BatchNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <ItemsControl Name="PlcSignals" ItemsSource="{Binding PlcLines}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate DataType="vm:SignalLine">
+                  <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,1,12,1">
+                    <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="12" Height="12"
+                              Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                    <TextBlock Text="{Binding Label}" />
+                  </StackPanel>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding PlcNote}" Classes="muted"
+                       IsVisible="{Binding PlcNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding HasPlcLast}" Name="PlcLast">
+              <PathIcon Classes="glyph" ui:Ui.Tone="{Binding PlcLastTone}" Width="12" Height="12"
+                        Data="{Binding PlcLastIcon, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding PlcLastText}" TextTrimming="CharacterEllipsis" MaxWidth="260" />
+            </StackPanel>
+            <!-- PLC test signal (PLC-INTERFACE.md 7): Engineer and Admin only, usable only in Teach. -->
+            <StackPanel Orientation="Horizontal" Spacing="6" Name="PlcTest" IsVisible="{Binding PlcTestShown}"
+                        ToolTip.Tip="{l:T run.plc.tip.test}">
+              <Button Classes="vs" Name="PlcTestOkButton" Command="{Binding PlcTestOkCommand}"
+                      Classes.unavailable="{Binding !PlcTestAvailable}" Content="{l:T run.plc.test_ok}" />
+              <Button Classes="vs" Name="PlcTestNgButton" Command="{Binding PlcTestNgCommand}"
+                      Classes.unavailable="{Binding !PlcTestAvailable}" Content="{l:T run.plc.test_ng}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

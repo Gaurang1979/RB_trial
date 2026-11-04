@@ -1,0 +1,27 @@
+[hidden] { display: none !important; }   /* a display rule below must never show a hidden element */
+:root { --bg: #f5f7fa; --card: #fff; --text: #17202b; --muted: #5b6878; --line: #dbe2ea; --accent: #1f5fbf; --on-accent: #fff; --ok: #1d8a4e; --bad: #c0392b; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f141a; --card: #171e27; --text: #e6ebf1; --muted: #9aa8b8; --line: #2a3542; --accent: #4a8ef0; --on-accent: #0b1220; --ok: #3cc27a; --bad: #ef6b5e; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+a { color: var(--accent); }
+.narrow { max-width: 520px; margin: 8vh auto; padding: 0 16px; }
+.top { display: flex; gap: 12px; align-items: center; padding: 10px 16px; background: var(--card); border-bottom: 1px solid var(--line); }
+.top + .narrow { margin-top: 24px; }
+.grow { flex: 1; }
+.muted { color: var(--muted); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; }
+input, button { font: inherit; color: inherit; }
+input { border: 1px solid var(--line); background: var(--bg); border-radius: 6px; padding: 8px; }
+button { border: 1px solid var(--line); background: var(--card); border-radius: 6px; padding: 8px 14px; cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.link { border: 0; background: none; color: var(--accent); padding: 0; }
+.row { display: flex; gap: 8px; }
+.row input { flex: 1; min-width: 0; }
+.error { color: var(--bad); min-height: 1.2em; margin: 0; }
+.machines { list-style: none; padding: 0; margin: 16px 0; }
+.machines a { display: flex; gap: 10px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); flex: none; }
+.dot.on { background: var(--ok); }

@@ -1,0 +1,13 @@
+{
+  "SchemaVersion": "0.0",
+  "Name": "Floor cleaner 1L",
+  "Number": 12,
+  "Description": "Schema 0.0 written out: reads with defaults",
+  "Version": 1,
+  "UpdatedAt": "2026-10-30T09:00:00+05:30",
+  "UpdatedBy": "engineer",
+  "Cameras": [ { "Name": "Top", "ExposureUs": 1500 } ],
+  "Tools": [
+    { "kind": "code", "Name": "Case code", "Format": "Itf", "MinLength": 14, "MaxLength": 14, "CheckDigit": "Verify" }
+  ]
+}

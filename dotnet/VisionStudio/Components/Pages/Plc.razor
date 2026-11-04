@@ -1,0 +1,203 @@
+@page "/plc"
+@attribute [Authorize(Roles = "Engineer")]
+@implements IDisposable
+@inject PlcService P
+@inject Station S
+@using VisionCore.Plc
+
+<PageTitle>@T["plc.title"]</PageTitle>
+<h1>@T["plc.title"]</h1>
+
+<div class="card form">
+    <label><span>@T["plc.protocol"]</span>
+        <select @bind="Protocol">
+            <option value="Off">@T["plc.off"]</option>
+            <option value="ModbusTcp">Modbus TCP (@T["plc.server"])</option>
+        </select>
+    </label>
+    <label><span>@T["plc.port"]</span><input type="number" @bind="Port" /></label>
+    <label><span>@T["plc.watchdog"]</span><input type="number" @bind="Watchdog" /></label>
+    <label><span>@T["plc.bind"]</span><input @bind="BindAddress" placeholder="0.0.0.0" /></label>
+    <p class="muted">@T["plc.bind_hint"]</p>
+    <div class="row">
+        <button class="big primary" @onclick="Save">✓ @T["common.save"]</button>
+        @if (P.Runtime is { } rt)
+        {
+            <span class="@(rt.Connected ? "good" : "bad")">@(rt.Connected ? "● " + T["plc.connected"] : "○ " + T["plc.waiting"]) · @rt.LinkName</span>
+        }
+        @if (P.LastError is not null) { <span class="bad">@P.LastError</span> }
+    </div>
+    @if (Message is not null) { <div class="alert">@Message</div> }
+</div>
+
+@if (P.Runtime is { } r)
+{
+    var (i, o) = r.Snapshot();
+    <div class="row">
+        <button class="big" disabled="@(S.Running)" @onclick="Simulate">▶ @T["plc.simulate"]</button>
+        <button class="big" disabled="@(!S.Running)" @onclick="() => S.Stop()">■ @T["run.stop"]</button>
+        @if (MayTest)
+        {
+            <button class="big" disabled="@(S.Running || i.RunEnable)" @onclick="() => AskTest(true)">@T["plc.test_ok"]</button>
+            <button class="big" disabled="@(S.Running || i.RunEnable)" @onclick="() => AskTest(false)">@T["plc.test_ng"]</button>
+            <span class="muted">@T["plc.test_hint"]</span>
+        }
+        else { <span class="muted">@T["plc.test_engineer"]</span> }
+    </div>
+    @if (TestAsked is { } ask)
+    {
+        <div class="alert row">
+            <span>@T["plc.test_question"] (@T[ask ? "plc.test_ok" : "plc.test_ng"])</span>
+            <button class="big primary" @onclick="SendTest">@T["plc.test_yes"]</button>
+            <button class="big" @onclick="() => TestAsked = null">@T["plc.test_no"]</button>
+        </div>
+    }
+    @if (TestMessage is not null) { <div class="alert">@TestMessage</div> }
+    <div class="split">
+        <div class="card">
+            <h3>@T["plc.from_plc"]</h3>
+            <table class="tools">
+                @Row("Trigger", i.Trigger) @Row("JobChange", i.JobChange) @Row("ResetAlarm", i.ResetAlarm) @Row("RunEnable", i.RunEnable)
+                <tr><td>Heartbeat</td><td>@i.Heartbeat</td></tr>
+                <tr><td>JobSelect</td><td>@i.JobSelect</td></tr>
+                <tr><td>TriggerID</td><td>@i.TriggerId</td></tr>
+                <tr><td>PartID</td><td>@i.PartId</td></tr>
+            </table>
+        </div>
+        <div class="card">
+            <h3>@T["plc.to_plc"]</h3>
+            <table class="tools">
+                @Row("Ready", o.Ready) @Row("Busy", o.Busy) @Row("Done", o.Done) @Row("OK", o.Ok) @Row("NG", o.Ng) @Row("Error", o.Error)
+                @Row("JobActive", o.JobActive) @Row("TriggerRejected", o.TriggerRejected) @Row("Simulation", o.Simulation)
+                <tr><td>ErrorCode</td><td>@o.ErrorCode</td></tr>
+                <tr><td>ActiveJob</td><td>@o.ActiveJob</td></tr>
+                <tr><td>TriggerIDEcho</td><td>@o.TriggerIdEcho</td></tr>
+                <tr><td>NGReason</td><td>@o.NgReason</td></tr>
+                <tr><td>InspectionCount</td><td>@o.InspectionCount</td></tr>
+                <tr><td>Text1</td><td>@o.B.Str(120)</td></tr>
+                <tr><td>Text2</td><td>@o.B.Str(188)</td></tr>
+            </table>
+        </div>
+    </div>
+    <div class="card">
+        <h3>@T["plc.channels"]</h3>
+        <p class="muted">@T["plc.channels_hint"]</p>
+        @{ var co = r.CameraOutSnapshot(); }
+        <table class="tools">
+            <tr><th>@T["plc.camera"]</th><th>Ready</th><th>Busy</th><th>Done</th><th>OK</th><th>TriggerRejected</th><th>TriggerIDEcho</th><th>NGReason</th><th>ms</th></tr>
+            @for (int c = 0; c < PlcCameraChannels.Max; c++)
+            {
+                <tr><td>@(c + 1)</td>
+                    <td>@Dot(PlcCameraChannels.Ready(co, c))</td><td>@Dot(PlcCameraChannels.Busy(co, c))</td>
+                    <td>@Dot(PlcCameraChannels.Done(co, c))</td><td>@Dot(PlcCameraChannels.Ok(co, c))</td>
+                    <td>@Dot(PlcCameraChannels.Rejected(co, c))</td><td>@PlcCameraChannels.IdEcho(co, c)</td>
+                    <td>@co.U16(8 * c + 4)</td><td>@co.U16(8 * c + 6)</td></tr>
+            }
+        </table>
+    </div>
+    @if (P.Options.Protocol == "ModbusTcp")
+    {
+        var lim = P.ModbusLimits;
+        <div class="card">
+            <h3>@T["plc.limits"]</h3>
+            <p class="muted">@T["plc.limits_hint"]</p>
+            <table class="tools">
+                <tr><td>@T["plc.limit_connections"]</td><td>@lim.MaxConnections</td></tr>
+                <tr><td>@T["plc.limit_idle"]</td><td>@(lim.IdleTimeoutMs / 1000.0) s</td></tr>
+                <tr><td>@T["plc.limit_frame"]</td><td>@(lim.FrameTimeoutMs / 1000.0) s</td></tr>
+            </table>
+        </div>
+    }
+    <div class="card">
+        <h3>@T["plc.map"]</h3>
+        <p class="muted">@T["plc.map_hint"]</p>
+        <table class="tools">
+            <tr><th>@T["plc.registers"]</th><th>@T["plc.content"]</th></tr>
+            <tr><td>0–31 (@T["plc.write"])</td><td>@T["plc.in_block"]</td></tr>
+            <tr><td>32–39 (@T["plc.write"])</td><td>@T["plc.cam_in"]</td></tr>
+            <tr><td>40–87 (@T["plc.write"])</td><td>@T["plc.diag_block"]</td></tr>
+            <tr><td>100–227 (@T["plc.read"])</td><td>@T["plc.out_block"]</td></tr>
+            <tr><td>228–243 (@T["plc.read"])</td><td>@T["plc.cam_out"]</td></tr>
+            <tr><td>300–323 (@T["plc.read"])</td><td>@T["plc.set_block"]</td></tr>
+            <tr><td>0 bit 0 / 1 / 2 / 3</td><td>Trigger / JobChange / ResetAlarm / RunEnable</td></tr>
+            <tr><td>1 · 2 · 4</td><td>Heartbeat · JobSelect · TriggerID</td></tr>
+            <tr><td>100 bit 0–7</td><td>Ready, Busy, Done, OK, NG, Error, JobActive, JobChangeDone</td></tr>
+            <tr><td>101 · 103 · 104 · 105 · 107</td><td>HeartbeatEcho · ErrorCode · ActiveJob · TriggerIDEcho · NGReason</td></tr>
+            <tr><td>160–193 · 194–226</td><td>Text1 (code read) · Text2 (text line), S7 string layout</td></tr>
+        </table>
+    </div>
+}
+
+@code {
+    private static string Dot(bool b) => b ? "●" : "○";
+    private string Protocol = "Off";
+    private int Port = 502;
+    private int Watchdog = 1000;
+    private string BindAddress = "";
+    private string? Message;
+    private bool MayTest;
+    /// <summary>The test signal waiting for "Is the machine safe?": true OK, false NG, null none.</summary>
+    private bool? TestAsked;
+    private string? TestMessage;
+
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private RenderFragment Row(string name, bool on) => @<tr><td>@name</td><td class="@(on ? "good" : "muted")">@(on ? "● 1" : "○ 0")</td></tr>;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // PLC-INTERFACE.md section 7: engineers only, as the runtime's may_test_plc
+        var user = Auth is null ? null : (await Auth).User;
+        MayTest = user?.IsInRole(Roles.Engineer) == true;
+        BindAddress = P.Options.BindAddress;
+        Protocol = P.Options.Protocol;
+        Port = P.Options.Port;
+        Watchdog = P.Options.WatchdogMs;
+        P.Changed += OnChanged;
+        _ = Refresh();
+    }
+
+    private readonly CancellationTokenSource _cts = new();
+    private async Task Refresh()
+    {
+        try { while (!_cts.IsCancellationRequested) { await Task.Delay(250, _cts.Token); await InvokeAsync(StateHasChanged); } }
+        catch (OperationCanceledException) { }
+    }
+
+    private void OnChanged() { }
+
+    private void Save()
+    {
+        Message = null;
+        if (PlcService.BindAddressError(BindAddress) is { } bad) { Message = bad; return; }
+        try { P.Save(new PlcOptions { Protocol = Protocol, Port = Port, WatchdogMs = Math.Clamp(Watchdog, 200, 5000),
+                                     PollMs = P.Options.PollMs, PlcModel = P.Options.PlcModel, BindAddress = BindAddress.Trim() }); }
+        catch (Exception e) { Message = e.Message; }
+    }
+
+    private void AskTest(bool ok)
+    {
+        TestMessage = null;
+        TestAsked = MayTest ? ok : null;
+    }
+
+    private void SendTest()
+    {
+        if (TestAsked is not { } ok || !MayTest) return;
+        TestAsked = null;
+        TestMessage = T[P.TestSignal(ok) ?? "plc.test_sent"];
+    }
+
+    private void Simulate()
+    {
+        Message = null;
+        try { S.Start(RunMode.PlcSimulation); }
+        catch (Exception e) { Message = e.Message; }
+    }
+
+    public void Dispose()
+    {
+        P.Changed -= OnChanged;
+        _cts.Cancel();
+    }
+}

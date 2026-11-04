@@ -1,0 +1,42 @@
+{
+  "organization": {"id": "ORG-DEMO"},
+  "mqtt": {"host": "127.0.0.1", "port": 1883, "prefix": "spi/v1"},
+  "lines": [
+    {
+      "id": "LINE-VAD-01", "plant_id": "PLANT-VAD", "area_id": "AREA-VAD-ASM", "gateway_id": "GW-VAD-01",
+      "token_file": "/etc/spi/GW-VAD-01.token",
+      "heartbeat_interval_s": 30,
+      "equipment": [
+        {
+          "id": "PRESS-01", "protocol": "modbus_tcp", "connection": {"host": "192.168.1.50", "port": 502, "device_id": 1},
+          "poll_interval_s": 1, "comm_fail_threshold": 3,
+          "points": [
+            {"kind": "digital", "signal": "machine_on", "address": {"type": "coil", "addr": 0}},
+            {"kind": "digital", "signal": "running", "address": {"type": "coil", "addr": 1}},
+            {"kind": "digital", "signal": "fault", "address": {"type": "coil", "addr": 2}},
+            {"kind": "counter", "role": "total", "address": {"type": "holding", "addr": 100, "words": 2, "encoding": "u32"}},
+            {"kind": "counter", "role": "reject", "address": {"type": "holding", "addr": 102, "words": 2, "encoding": "u32"}},
+            {"kind": "analog", "sensor_id": "PRESS-01.TEMP", "name": "temperature", "unit": "C",
+             "address": {"type": "holding", "addr": 10}, "scale": 0.1, "sample_interval_s": 10, "valid_range": [-20, 150]},
+            {"kind": "analog", "sensor_id": "PRESS-01.VIB", "name": "vibration", "unit": "mm/s",
+             "address": {"type": "holding", "addr": 12}, "scale": 0.01, "sample_interval_s": 10, "valid_range": [0, 30]}
+          ],
+          "queue_after": {"id": "QUEUE-A", "capacity": 10, "sample_interval_s": 10,
+                          "level_point": {"kind": "analog", "address": {"type": "holding", "addr": 20}}}
+        },
+        {
+          "id": "PRESS-02", "protocol": "opcua", "connection": {"url": "opc.tcp://192.168.1.51:4840/press02/"},
+          "poll_interval_s": 1,
+          "points": [
+            {"kind": "digital", "signal": "machine_on", "address": {"browse_path": ["2:Press02", "2:MachineOn"]}},
+            {"kind": "digital", "signal": "running", "address": {"browse_path": ["2:Press02", "2:Running"]}},
+            {"kind": "digital", "signal": "fault", "address": {"browse_path": ["2:Press02", "2:Fault"]}},
+            {"kind": "counter", "role": "total", "address": {"browse_path": ["2:Press02", "2:PartCount"]}},
+            {"kind": "analog", "sensor_id": "PRESS-02.TEMP", "name": "temperature", "unit": "C",
+             "address": {"browse_path": ["2:Press02", "2:Temperature"]}, "sample_interval_s": 10}
+          ]
+        }
+      ]
+    }
+  ]
+}

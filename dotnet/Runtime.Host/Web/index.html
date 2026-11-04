@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision System</title>
+<link rel="stylesheet" href="web/tokens.g.css">
+<link rel="stylesheet" href="web/app.css">
+<script src="web/app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <span class="brand">Vision System</span>
+  <span id="line-job" class="job"></span>
+  <span id="pill" class="pill stopped"><span class="glyph">‖</span><span class="text">Stopped</span></span>
+  <nav id="tabs" class="tabs" hidden>
+    <button data-page="live" class="on">Live</button>
+    <button data-page="trends">Trends</button>
+    <button data-page="reports">Reports</button>
+    <button data-page="audit">Audit trail</button>
+  </nav>
+  <span class="grow"></span>
+  <select id="theme" aria-label="Theme">
+    <option value="dark">Dark</option><option value="light">Light</option><option value="highContrast">High contrast</option>
+  </select>
+  <span id="user" class="user"></span>
+  <button id="sign-out" class="link" hidden>Sign out</button>
+</header>
+
+<div id="banner" class="banner" hidden></div>
+
+<main>
+  <section id="sign-in" class="card narrow" hidden>
+    <h1>Sign in</h1>
+    <p class="muted">The dashboard only shows the line. To change anything, use Vision Studio on the line PC.</p>
+    <form id="sign-in-form" method="post" hidden>
+      <label>Name <input name="user" autocomplete="username" required></label>
+      <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="primary" type="submit">Sign in</button>
+      <p id="sign-in-error" class="error" role="alert"></p>
+    </form>
+    <!-- through remote service (REQ-11): the engineer signs in on the service console with today's code, never a password here -->
+    <div id="service-form" hidden>
+      <p>Through remote service, sign in on the service console with today's Service code. The dashboard then opens with the same session.</p>
+      <p><a id="console-link" class="primary" href="_rs/ui/">Open the service console</a></p>
+    </div>
+    <p id="sign-in-note" class="error" role="alert"></p>
+  </section>
+
+  <section id="page-live" class="page" hidden>
+    <div class="grid live">
+      <div class="card images">
+        <div class="card-title">Last image</div>
+        <div id="frames" class="frames"></div>
+      </div>
+      <div class="side">
+        <div class="card counters">
+          <div class="counter"><span class="label">Parts</span><span id="c-total" class="value">0</span></div>
+          <div class="counter ok"><span class="label">✓ OK</span><span id="c-ok" class="value">0</span></div>
+          <div class="counter ng"><span class="label">✗ NG</span><span id="c-ng" class="value">0</span></div>
+          <div class="counter"><span class="label">Cycle (median)</span><span id="c-cycle" class="value">–</span></div>
+          <div class="ring-box"><svg id="yield-ring" viewBox="0 0 120 120" class="ring" role="img" aria-label="Yield"></svg></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Alarms</div>
+          <ul id="alarms" class="alarms"><li class="muted">None</li></ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Batch</div>
+          <dl id="batch" class="kv"></dl>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Bad parts <span class="muted">(tap one to see it larger)</span></div>
+      <div id="ng-strip" class="ng-strip"><span class="muted">No bad parts yet.</span></div>
+    </div>
+    <p class="muted note">Open Vision Studio on the line PC to change this.</p>
+  </section>
+
+  <section id="page-trends" class="page" hidden>
+    <div class="chips" id="range">
+      <button data-range="shift" class="on">Shift</button><button data-range="day">Day</button><button data-range="week">Week</button>
+    </div>
+    <div class="card"><div class="card-title" id="parts-title">Parts per hour</div><div id="ch-parts" class="chart"></div></div>
+    <div class="grid two">
+      <div class="card"><div class="card-title">Yield per hour (%)</div><div id="ch-yield" class="chart"></div></div>
+      <div class="card"><div class="card-title">Average cycle time per hour (ms)</div><div id="ch-cycle" class="chart"></div></div>
+    </div>
+    <div class="card"><div class="card-title">NG reasons</div><div id="ch-reasons" class="chart"></div></div>
+    <div class="card"><div class="card-title">Print quality <span class="muted">(grade of the graded parts, A best; dashed line = lowest allowed grade)</span></div><div id="quality"></div></div>
+  </section>
+
+  <section id="page-reports" class="page" hidden>
+    <!-- the tabs of UI-UX-SPEC.md 4.11, read only (requirements 6.4 WEB-07) -->
+    <div class="chips no-print" id="report-tabs">
+      <button data-tab="shift" class="on">Shift</button>
+      <button data-tab="find">Find a part</button>
+      <button data-tab="flags">Operator flags</button>
+      <button data-tab="files">Files</button>
+    </div>
+
+    <div id="tab-shift" class="report-tab">
+      <div class="chips no-print">
+        <button id="shift-print" class="primary">Print</button>
+        <span class="muted">Save the shift:</span>
+        <select id="shift-pick" aria-label="Shift"></select>
+        <button id="shift-pdf">Save as PDF</button>
+        <button id="shift-xlsx">Save as Excel</button>
+        <span id="shift-note" class="muted" role="status"></span>
+      </div>
+      <div class="card">
+        <div class="card-title" id="shift-title">Shifts</div>
+        <table class="table"><thead><tr><th>Shift</th><th>Good</th><th>Bad</th><th>Total</th><th>Good %</th></tr></thead><tbody id="shift-rows"></tbody></table>
+      </div>
+      <div class="card"><div class="card-title" id="shift-reasons-title">Top 5 reasons for bad parts</div><div id="shift-reasons" class="chart"></div></div>
+    </div>
+
+    <div id="tab-find" class="report-tab" hidden>
+      <form id="find-form" class="chips no-print">
+        <input id="find-q" name="q" placeholder="Code, text or part id" aria-label="Code" autocomplete="off">
+        <select id="find-days" aria-label="Search in"><option value="1">Last day</option><option value="7" selected>7 days</option><option value="31">31 days</option></select>
+        <button class="primary" type="submit">Find</button>
+        <span class="muted">or at</span>
+        <input id="find-at" type="datetime-local" aria-label="Time">
+        <button id="find-at-go" type="button">Find at this time</button>
+      </form>
+      <p id="find-note" class="muted" role="status"></p>
+      <div id="find-results" class="find-results"></div>
+    </div>
+
+    <div id="tab-flags" class="report-tab" hidden>
+      <div class="card">
+        <div class="card-title">Operator flags <span class="muted">(bad parts reviewed at the line; agree or disagree in Vision Studio)</span></div>
+        <table class="table"><thead><tr><th>Time</th><th>Job</th><th>Camera</th><th>Decision</th><th>By</th><th>Note</th><th>Part</th></tr></thead><tbody id="flags"></tbody></table>
+      </div>
+    </div>
+
+    <div id="tab-files" class="report-tab" hidden>
+      <div class="card">
+        <div class="card-title">Report files <span class="muted">(shift, batch and grade reports written on the line PC)</span></div>
+        <table class="table"><thead><tr><th>Report</th><th>Written</th><th>Size</th></tr></thead><tbody id="reports"></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-audit" class="page" hidden>
+    <div class="chips" id="audit-days">
+      <button data-days="1" class="on">Today</button><button data-days="7">7 days</button><button data-days="31">31 days</button>
+      <input id="audit-filter" placeholder="Filter by kind, user or text" aria-label="Filter">
+    </div>
+    <div class="card">
+      <div class="card-title">Batches</div>
+      <table class="table"><thead><tr><th>Batch</th><th>Job</th><th>Started</th><th>Ended</th><th>By</th></tr></thead><tbody id="batches"></tbody></table>
+    </div>
+    <div class="card">
+      <div class="card-title">Line events</div>
+      <table class="table"><thead><tr><th>Time</th><th>Kind</th><th>State</th><th>Detail</th></tr></thead><tbody id="events"></tbody></table>
+    </div>
+  </section>
+</main>
+
+<div id="viewer" class="viewer" hidden>
+  <div class="viewer-box">
+    <img id="viewer-img" alt="Bad part">
+    <div id="viewer-text" class="viewer-text"></div>
+    <button id="viewer-close" class="primary">Close</button>
+  </div>
+</div>
+</body>
+</html>

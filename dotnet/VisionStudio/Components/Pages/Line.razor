@@ -1,0 +1,265 @@
+@page "/line"
+@attribute [Authorize(Roles = "Engineer")]
+@implements IDisposable
+@inject PlcService P
+@inject Station S
+@inject IJSRuntime JS
+
+<PageTitle>@T["line.title"]</PageTitle>
+<div class="runbar noprint">
+    <h1>@T["line.title"]</h1>
+    <select class="big" value="@P.Options.PlcModel" @onchange="Pick">
+        @foreach (var p in LineProfiles.Profiles) { <option value="@p.Key">@p.Title</option> }
+    </select>
+    <button class="big" @onclick="Print">⎙ @T["line.print"]</button>
+    <div class="spacer"></div>
+    @if (P.Runtime is { } rt)
+    {
+        <span class="@(rt.Connected ? "good" : "bad")">@(rt.Connected ? "● " + T["plc.connected"] : "○ " + T["plc.waiting"])</span>
+    }
+    else { <span class="bad">@T["line.plc_off"] <a href="plc">@T["nav.plc"]</a></span> }
+</div>
+
+@{
+    var profile = LineProfiles.Profile(P.Options.PlcModel);
+    var diag = P.Runtime?.Diagnostics();
+    var health = LineHealth.Evaluate(profile, diag, P.Line);
+}
+
+<div class="card">
+    <WiringDiagram Profile="profile" Health="health" Cameras="@P.Line.CameraCount" Line="P.Line" Port="@P.Options.Port" />
+</div>
+
+<div class="card form noprint">
+    <h3>@T["ls.title"]</h3>
+    <p class="muted">@T["ls.hint"]</p>
+    <div class="cols">
+        <div>
+            <label><span>@T["ls.speed"]</span><input type="number" step="0.5" @bind="Ls.ConveyorHz" /></label>
+            <label><span>@T["ls.camera_delay"]</span><input type="number" @bind="Ls.CameraDelayMs" /></label>
+            <label><span>@T["ls.light_delay"]</span><input type="number" @bind="Ls.LightDelayMs" /></label>
+            <label><span>@T["ls.light_on"]</span><input type="number" @bind="Ls.LightOnMs" /></label>
+            <label><span>@T["ls.jam_time"]</span><input type="number" @bind="Ls.JamTimeMs" /></label>
+            <label><span>@T["ls.resume"]</span><input type="number" @bind="Ls.ResumeDelayMs" /></label>
+            <label><span>@T["ls.max_ng"]</span><input type="number" @bind="Ls.MaxConsecutiveNg" /></label>
+        </div>
+        <div>
+            <label><span>@T["ls.reject_mode"]</span>
+                <select value="@(Ls.RejectByEncoder ? "true" : "false")" @onchange="@(e => Ls.RejectByEncoder = e.Value?.ToString() == "true")">
+                    <option value="true">@T["ls.by_encoder"]</option>
+                    <option value="false">@T["ls.by_time"]</option>
+                </select>
+            </label>
+            @if (Ls.RejectByEncoder)
+            {
+                <label><span>@T["ls.learn"]</span>
+                    <select value="@(Ls.LearnAuto ? "true" : "false")" @onchange="@(e => Ls.LearnAuto = e.Value?.ToString() == "true")">
+                        <option value="true">@T["ls.learn_auto"]</option>
+                        <option value="false">@T["ls.learn_manual"]</option>
+                    </select>
+                </label>
+                <label><span>@T["ls.distance"]</span><input type="number" @bind="Ls.RejectDistance" disabled="@Ls.LearnAuto" />
+                    @if (diag is not null && diag.LearnedDistance > 0)
+                    {
+                        <span class="muted">@T.Format("ls.learned", diag.LearnedDistance)</span>
+                        <button @onclick="() => { Ls.RejectDistance = diag.LearnedDistance; Ls.LearnAuto = false; }">@T["ls.use_learned"]</button>
+                    }
+                </label>
+                <label><span>@T["ls.offset"]</span><input type="number" @bind="Ls.RejectOffset" /></label>
+            }
+            else
+            {
+                <label><span>@T["ls.reject_delay"]</span><input type="number" @bind="Ls.RejectDelayMs" /></label>
+            }
+            <label><span>@T["ls.reject_on"]</span><input type="number" @bind="Ls.RejectOnMs" /></label>
+            <label><span>@T["ls.verify"]</span><input type="number" @bind="Ls.VerifyWindowMs" /></label>
+            <label><span>@T["ls.stop_on_fail"]</span><input type="checkbox" @bind="Ls.StopOnRejectFail" /></label>
+        </div>
+    </div>
+    <div class="cols">
+        <div>
+            <label><span>@T["ls.cameras"]</span>
+                <select @bind="Ls.CameraCount">
+                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+                </select>
+            </label>
+            @if (Ls.CameraCount >= 2)
+            {
+                <label><span>@T["ls.cam2_sensor"]</span>
+                    <select @bind="Ls.Camera2Sensor">
+                        <option value="2">@T["ls.own_sensor"]</option>
+                        <option value="1">@T.Format("ls.same_as", 1)</option>
+                    </select>
+                </label>
+            }
+            @if (Ls.CameraCount >= 3)
+            {
+                <label><span>@T["ls.cam3_sensor"]</span>
+                    <select @bind="Ls.Camera3Sensor">
+                        <option value="3">@T["ls.own_sensor"]</option>
+                        <option value="1">@T.Format("ls.same_as", 1)</option>
+                        <option value="2">@T.Format("ls.same_as", 2)</option>
+                    </select>
+                </label>
+            }
+            <p class="muted small">@T["ls.cameras_hint"]</p>
+        </div>
+        <div>
+            <h4>@T["ls.bypass"]</h4>
+            <AuthorizeView Roles="QA">
+                <Authorized>
+                    <p class="muted small">@T["ls.bypass_hint"]</p>
+                    @foreach (var b in Bypasses)
+                    {
+                        <label><span>@T["ls.bypass_" + b.ToString().ToLowerInvariant()]</span>
+                            <input type="checkbox" checked="@Ls.Bypassed.HasFlag(b)" @onchange="e => SetBypass(b, (bool)e.Value!)" /></label>
+                    }
+                </Authorized>
+                <NotAuthorized>
+                    <p class="muted small">@T["ls.bypass_qa_only"]</p>
+                    @foreach (var b in Bypasses.Where(b => Ls.Bypassed.HasFlag(b)))
+                    {
+                        <div>⊘ @T["ls.bypass_" + b.ToString().ToLowerInvariant()]</div>
+                    }
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+    <h3>@T["ls.drive_title"]</h3>
+    <div class="cols">
+        <div>
+            <label><span>@T["ls.drive"]</span>
+                <select @bind="Ls.Drive">
+                    @foreach (var d in Enum.GetValues<LineSettings.DriveKind>())
+                    {
+                        <option value="@d">@T["ls.drive_" + d.ToString().ToLowerInvariant()]</option>
+                    }
+                </select>
+            </label>
+            @if (Ls.Drive == LineSettings.DriveKind.StarDelta)
+            {
+                <label><span>@T["ls.star_time"]</span><input type="number" @bind="Ls.StarDeltaMs" /></label>
+                <label><span>@T["ls.changeover"]</span><input type="number" @bind="Ls.ChangeoverMs" /></label>
+            }
+        </div>
+        <div>
+            <label><span>@T["ls.fault_contact"]</span>
+                <select value="@(Ls.DriveFaultNc ? "true" : "false")" @onchange="@(e => Ls.DriveFaultNc = e.Value?.ToString() == "true")">
+                    <option value="true">@T["ls.fault_nc"]</option>
+                    <option value="false">@T["ls.fault_no"]</option>
+                </select>
+            </label>
+            <p class="muted small">@T["ls.drive_hint"]</p>
+        </div>
+    </div>
+    <h3>@T["ls.length_title"]</h3>
+    <p class="muted">@T["ls.length_hint"]</p>
+    <div class="cols">
+        <div>
+            <label><span>@T["ls.ppm"]</span><input type="number" @bind="Ls.PulsesPerMetre" /></label>
+            <label><span>@T["ls.ppr"]</span><input type="number" @bind="Ls.EncoderPpr" style="width:110px" />
+                <span class="muted">@T["ls.roller"]</span><input type="number" step="0.1" @bind="Ls.RollerDiameterMm" style="width:90px" />
+                <button @onclick="() => Ls.PulsesPerMetre = Ls.CalculatedPulsesPerMetre">= @Ls.CalculatedPulsesPerMetre</button></label>
+            <label><span>@T["ls.product_len"]</span><input type="number" @bind="Ls.ProductLengthMm" />
+                @if (diag is { ProductLength: > 0 } && Ls.MmOf(diag.ProductLength) is { } learnedMm)
+                {
+                    <span class="muted">@T.Format("ls.product_len_plc", learnedMm.ToString("0.0"))</span>
+                    <button @onclick="() => Ls.ProductLengthMm = (int)Math.Round(learnedMm)">@T["ls.use_learned"]</button>
+                }
+            </label>
+        </div>
+        <div>
+            <label><span>@T["ls.len_tol"]</span><input type="number" @bind="Ls.LengthTolerancePct" /></label>
+            <label><span>@T["ls.min_gap"]</span><input type="number" @bind="Ls.MinGapMm" /></label>
+            <label><span>@T["ls.reject_touching"]</span><input type="checkbox" @bind="Ls.RejectTouching" /></label>
+            <label><span>@T["ls.reject_length"]</span><input type="checkbox" @bind="Ls.RejectLengthOut" /></label>
+        </div>
+    </div>
+    @if (diag is not null)
+    {
+        <p class="muted">@T.Format("ls.length_counts", diag.TouchingGroups, diag.LengthOutOfTolerance, diag.SmallGaps)</p>
+    }
+    <div class="row">
+        <button class="big primary" @onclick="SaveSettings">✓ @T["ls.send"]</button>
+        @if (Ls.RejectByEncoder) { <button class="big" @onclick="Relearn">↻ @T["ls.relearn"]</button> }
+        @if (Saved is not null) { <span class="good">@Saved</span> }
+    </div>
+</div>
+
+<div class="card">
+    <h3>@T["line.instruments"]</h3>
+    @if (diag is null) { <p class="muted">@T["line.no_diag"]</p> }
+    <table class="tools">
+        <tr><th></th><th>@T["line.instrument"]</th><th>@T["line.terminal"]</th><th>@T["line.signal"]</th><th>@T["line.condition"]</th><th>@T["line.detail"]</th></tr>
+        @foreach (var h in health)
+        {
+            var info = LineProfiles.Info(h.Id);
+            <tr class="@Row(h.Health)">
+                <td>@Icon(h.Health)</td>
+                <td><b>@h.Name</b><div class="muted small">@info.Device</div></td>
+                <td>@(h.Terminal ?? "–")</td>
+                <td>@(h.Signal switch { true => "● 1", false => "○ 0", _ => "–" })</td>
+                <td>@T["health." + h.Health.ToString().ToLowerInvariant()]</td>
+                <td>@h.Detail</td>
+            </tr>
+        }
+    </table>
+    @if (diag is not null)
+    {
+        <p class="muted">@T.Format("line.counts", diag.TriggerSensorCount, diag.TriggersSent, diag.ResultsReceived, diag.RejectsCommanded, diag.RejectsConfirmed, diag.PartsPerMinute)</p>
+    }
+</div>
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+
+    private LineSettings Ls = new();
+    private string? Saved;
+
+    protected override void OnInitialized()
+    {
+        Ls = System.Text.Json.JsonSerializer.Deserialize<LineSettings>(System.Text.Json.JsonSerializer.Serialize(P.Line))!;
+        _ = Refresh();
+    }
+
+    private static readonly LineSettings.Bypass[] Bypasses = Enum.GetValues<LineSettings.Bypass>().Where(b => b != 0).ToArray();
+
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private void SetBypass(LineSettings.Bypass b, bool on) => Ls.Bypassed = on ? Ls.Bypassed | b : Ls.Bypassed & ~b;
+
+    private async Task SaveSettings()
+    {
+        // bypasses are an admin decision: anyone but QA keeps what was saved before
+        var user = Auth is null ? null : (await Auth).User;
+        if (user is null || !user.IsInRole("QA")) Ls.Bypassed = P.Line.Bypassed;
+        P.SaveLine(Ls);
+        Saved = P.Runtime is null ? T["ls.saved_no_plc"] : T["ls.saved"];
+    }
+
+    private void Relearn()
+    {
+        Ls.RelearnNow = true;
+        P.SaveLine(Ls);
+        Saved = T["ls.relearn_sent"];
+    }
+
+    private async Task Refresh()
+    {
+        try { while (!_cts.IsCancellationRequested) { await Task.Delay(500, _cts.Token); await InvokeAsync(StateHasChanged); } }
+        catch (OperationCanceledException) { }
+    }
+
+    private void Pick(ChangeEventArgs e)
+    {
+        var o = P.Options;
+        P.Save(new PlcOptions { Protocol = o.Protocol, Port = o.Port, WatchdogMs = o.WatchdogMs, PollMs = o.PollMs, BindAddress = o.BindAddress, PlcModel = e.Value?.ToString() ?? o.PlcModel });
+    }
+
+    private async Task Print() => await JS.InvokeVoidAsync("print");
+
+    private static string Row(Health h) => h switch { Health.Ok => "ok", Health.Sometimes => "warn", Health.Fault => "ng", _ => "" };
+    private static string Icon(Health h) => h switch { Health.Ok => "✓", Health.Sometimes => "!", Health.Fault => "✗", Health.NotFitted => "–", Health.Bypassed => "⊘", _ => "?" };
+
+    public void Dispose() => _cts.Cancel();
+}

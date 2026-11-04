@@ -1,0 +1,48 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionCore\VisionCore.csproj" />
+    <ProjectReference Include="..\VisionReports\VisionReports.csproj" />
+    <ProjectReference Include="..\HikCamera\HikCamera.csproj" />
+    <ProjectReference Include="..\StationGuard\StationGuard.csproj" />
+    <ProjectReference Include="..\StationAgent\StationAgent.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>VisionStudio</RootNamespace>
+    <!-- the Hikrobot adapter is x64-only; it is loaded only when a camera is opened -->
+    <ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>None</ResolveAssemblyWarnOrErrorOnTargetArchitectureMismatch>
+  </PropertyGroup>
+
+  <!-- AI models, UI text and the native engines next to the app (build engine/ first, see README) -->
+  <ItemGroup>
+    <None Include="i18n/*.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../ml/models/ocrnet.onnx" Condition="Exists('../../ml/models/ocrnet.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/ocrnet.onnx" />
+    <None Include="../../ml/models/ocr_charset.txt" CopyToOutputDirectory="PreserveNewest" Link="models/ocr_charset.txt" />
+    <None Include="../../ml/models/codenet.onnx" Condition="Exists('../../ml/models/codenet.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/codenet.onnx" />
+    <None Include="../../engine/build/libcodereader.dylib" Condition="Exists('../../engine/build/libcodereader.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libcodereader.dylib" />
+    <None Include="../../engine/build/libvs_ocr.dylib" Condition="Exists('../../engine/build/libvs_ocr.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libvs_ocr.dylib" />
+    <None Include="../../engine/build/Release/codereader.dll" Condition="Exists('../../engine/build/Release/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+    <None Include="../../engine/build/libvs_locate.dylib" Condition="Exists('../../engine/build/libvs_locate.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libvs_locate.dylib" />
+    <None Include="../../engine/build/Release/vs_locate.dll" Condition="Exists('../../engine/build/Release/vs_locate.dll')" CopyToOutputDirectory="PreserveNewest" Link="vs_locate.dll" />
+    <None Include="../../engine/build/libvs_measure.dylib" Condition="Exists('../../engine/build/libvs_measure.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libvs_measure.dylib" />
+    <None Include="../../engine/build/Release/vs_measure.dll" Condition="Exists('../../engine/build/Release/vs_measure.dll')" CopyToOutputDirectory="PreserveNewest" Link="vs_measure.dll" />
+    <None Include="../../engine/build/Release/vs_ocr.dll" Condition="Exists('../../engine/build/Release/vs_ocr.dll')" CopyToOutputDirectory="PreserveNewest" Link="vs_ocr.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- public key of the licence server (tools/licence/make_keys.sh); the private key never goes in the repo -->
+    <None Include="licence-public.pem" Condition="Exists('licence-public.pem')" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="recipe-public.pem" Condition="Exists('recipe-public.pem')" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

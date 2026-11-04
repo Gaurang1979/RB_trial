@@ -1,0 +1,23 @@
+<Project>
+
+  <!--
+    .NET release hardening (docs/vision-system/PACKAGE-PROTECTION.md).
+
+    The shipped assemblies are built in Release, so this applies only to Release: a Debug build (how
+    `dotnet test` runs, and how a developer works) keeps its symbols and line numbers. In Release the
+    assemblies ship with no debug symbols (.pdb) and no source paths, removing the easiest hints a
+    decompiler leans on. This is the zero-risk layer; the stronger IL protection (renaming,
+    string encryption, control-flow flattening) is decided in PACKAGE-PROTECTION.md, not turned on
+    here — renaming breaks the reflection, DI, gRPC and Avalonia binding this code relies on and would
+    need its own testing before it could be line-safe.
+  -->
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <!-- a byte-for-byte reproducible build with no machine or source paths baked in -->
+    <Deterministic>true</Deterministic>
+    <!-- do not ship the XML doc comments (they name and describe every internal member) -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,270 @@
+@page "/products"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject ProductStore Store
+@inject UserStore Users
+@inject CaseLog Log
+
+<PageTitle>Products</PageTitle>
+
+<h1>Products</h1>
+
+<section class="panel">
+    <table>
+        <thead><tr><th>Code</th><th>Name</th><th>Codes</th><th>Parent</th><th>Exposure</th><th>Mode</th><th>Version</th><th></th></tr></thead>
+        <tbody>
+            @foreach (var p in list)
+            {
+                <tr class="@(edit?.ProductCode == p.ProductCode && !isNew ? "sel" : "")">
+                    <td>@p.ProductCode</td>
+                    <td>@p.Name</td>
+                    <td>@p.ChildFormat x @p.CodesPerCase@(p.IsStandardCaseSize ? "" : " (non-standard)")</td>
+                    <td>@p.ParentFormat</td>
+                    <td>@p.ChildCamera.ExposureUs us</td>
+                    <td>@p.Mode@(p.Mode == LearningMode.Locked ? $" ({p.ApprovedBy})" : "")</td>
+                    <td>v@(p.Version), @p.UpdatedBy, @p.UpdatedUtc.ToLocalTime().ToString("dd MMM HH:mm")</td>
+                    <td><button class="link" @onclick="() => Open(p)">@(canEdit ? "Edit" : "View")</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+    @if (canEdit)
+    {
+        <button @onclick="New">New product</button>
+    }
+</section>
+
+@if (edit is not null)
+{
+    bool ro = !canEdit;
+    <section class="panel form">
+        <h2>@(isNew ? "New product" : $"{edit.ProductCode} (v{edit.Version})")</h2>
+
+        <fieldset disabled="@ro">
+            <legend>Product</legend>
+            <label>Code <input @bind="edit.ProductCode" disabled="@(!isNew)" /></label>
+            <label>Name <input @bind="edit.Name" size="30" /></label>
+            <label>
+                Code type
+                <select @bind="edit.ChildFormat">
+                    <option value="@CodeFormat.QrCode">QR</option>
+                    <option value="@CodeFormat.DataMatrix">Data Matrix</option>
+                </select>
+            </label>
+            <label>
+                Codes per case
+                <select @bind="edit.CodesPerCase">
+                    @foreach (var n in ProductMaster.StandardCaseSizes)
+                    {
+                        <option value="@n">@n</option>
+                    }
+                    @if (!edit.IsStandardCaseSize)
+                    {
+                        <option value="@edit.CodesPerCase">@edit.CodesPerCase</option>
+                    }
+                </select>
+            </label>
+            <label>
+                Parent code
+                <select @bind="edit.ParentFormat">
+                    <option value="@CodeFormat.Gs1_128">GS1-128 / SSCC</option>
+                    <option value="@CodeFormat.QrCode">QR</option>
+                    <option value="@CodeFormat.DataMatrix">Data Matrix</option>
+                    <option value="@CodeFormat.Ean13">EAN-13</option>
+                </select>
+            </label>
+            <label>Expected GTIN <input @bind="edit.Gtin" placeholder="optional, 14 digits" /></label>
+        </fieldset>
+
+        <fieldset disabled="@ro">
+            <legend>Top camera (child codes)</legend>
+            <label>Exposure (us) <input type="number" @bind="edit.ChildCamera.ExposureUs" /></label>
+            <label>Gain (dB) <input type="number" step="0.1" @bind="edit.ChildCamera.GainDb" /></label>
+            <label>Trigger delay (us) <input type="number" @bind="edit.ChildCamera.TriggerDelayUs" /></label>
+            <label title="With 2 or 3, the PLC triggers the camera and the strobe that many times per case; the frames are read together (glare moves between frames, very small modules gain).">Frames per case
+                <select @bind="edit.ChildCamera.FramesPerCase"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+            <label><input type="checkbox" checked="@(edit.ChildCamera.Roi is not null)" @onchange="ToggleRoi" /> Region of interest</label>
+            @if (edit.ChildCamera.Roi is { } roi)
+            {
+                <label>X <input type="number" @bind="roi.X" /></label>
+                <label>Y <input type="number" @bind="roi.Y" /></label>
+                <label>Width <input type="number" @bind="roi.Width" /></label>
+                <label>Height <input type="number" @bind="roi.Height" /></label>
+            }
+        </fieldset>
+
+        <fieldset disabled="@ro">
+            <legend>Side camera (parent code)</legend>
+            <label>Exposure (us) <input type="number" @bind="edit.ParentCamera.ExposureUs" /></label>
+            <label>Gain (dB) <input type="number" step="0.1" @bind="edit.ParentCamera.GainDb" /></label>
+        </fieldset>
+
+        <fieldset disabled="@ro">
+            <legend>Reader (Auto = the tuning agent may change it while the line runs)</legend>
+            <label>Time budget (ms) <input type="number" min="0" @bind="edit.Reader.TimeBudgetMs" /></label>
+            <span class="muted">0 = line target for @edit.CodesPerCase codes: @ProductMaster.TargetTimeMs(edit.CodesPerCase) ms</span>
+            <label><input type="checkbox" @bind="edit.Reader.MatchSerials" /> Read faint codes by matching the serial run</label>
+            <label>
+                Locator
+                <select @bind="edit.Reader.Locator">
+                    <option value="@LocatorMode.Auto">AI, then classical</option>
+                    <option value="@LocatorMode.Ai">AI only (fastest)</option>
+                    <option value="@LocatorMode.Classical">Classical only</option>
+                </select>
+            </label>
+            <div class="knobs">
+                <div class="knob">
+                    <span>Brightness curve (gamma)</span>
+                    <input type="number" step="0.05" @bind="edit.Reader.Gamma" />
+                    <AutoToggle Product="edit" Knob="Gamma" />
+                </div>
+                <div class="knob">
+                    <span>Classical locator density</span>
+                    <input type="number" step="0.01" @bind="edit.Reader.LocatorDensity" />
+                    <AutoToggle Product="edit" Knob="LocatorDensity" />
+                </div>
+                <div class="knob">
+                    <span>AI locator threshold</span>
+                    <input type="number" step="0.05" @bind="edit.Reader.AiThreshold" />
+                    <AutoToggle Product="edit" Knob="AiThreshold" />
+                </div>
+                <div class="knob">
+                    <span>Largest upscale</span>
+                    <input type="number" min="1" max="3" @bind="edit.Reader.MaxUpscale" />
+                    <AutoToggle Product="edit" Knob="MaxUpscale" />
+                </div>
+                <div class="knob">
+                    <span>AI enhancer</span>
+                    <select @bind="edit.Reader.Enhancer">
+                        <option value="@EnhancerMode.Last">last, per region</option>
+                        <option value="@EnhancerMode.Early">early, per region</option>
+                        <option value="@EnhancerMode.SecondPass">second pass</option>
+                        <option value="@EnhancerMode.Off">off</option>
+                    </select>
+                    <AutoToggle Product="edit" Knob="Enhancer" />
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset disabled="@ro">
+            <legend>Mode</legend>
+            <label><input type="radio" name="mode" checked="@(edit.Mode == LearningMode.Learning)" @onchange="() => edit.Mode = LearningMode.Learning" /> Learning: Auto settings adapt on the line</label>
+            <label><input type="radio" name="mode" checked="@(edit.Mode == LearningMode.Locked)" @onchange="() => edit.Mode = LearningMode.Locked" /> Locked (validated): nothing changes on its own</label>
+        </fieldset>
+
+        @if (NeedsSignature)
+        {
+            <fieldset class="sign">
+                <legend>QA e-signature (locked product)</legend>
+                @if (!isQa)
+                {
+                    <p class="warn">Locking a product, or changing a locked one, needs a user with the QA role.</p>
+                }
+                else
+                {
+                    <label>Your password <input type="password" @bind="signPassword" autocomplete="current-password" /></label>
+                    <label>Reason <input @bind="signReason" size="40" placeholder="e.g. validated after PQ run 12" /></label>
+                }
+            </fieldset>
+        }
+
+        @if (message is not null)
+        {
+            <p class="@(messageOk ? "good" : "bad")">@message</p>
+        }
+        @if (canEdit)
+        {
+            <button @onclick="Save" disabled="@(NeedsSignature && !isQa)">Save as new version</button>
+        }
+        <button class="link" @onclick="() => edit = null">Close</button>
+    </section>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private IReadOnlyList<ProductMaster> list = Array.Empty<ProductMaster>();
+    private ProductMaster? edit;
+    private ProductMaster? original;
+    private bool isNew, canEdit, isQa, messageOk;
+    private string user = "", signPassword = "", signReason = "";
+    private string? message;
+
+    // a signature is needed to lock, and for every change while locked
+    private bool NeedsSignature => edit is not null && (edit.Mode == LearningMode.Locked || original?.Mode == LearningMode.Locked);
+
+    protected override async Task OnInitializedAsync()
+    {
+        list = Store.List();
+        if (Auth is not null)
+        {
+            var u = (await Auth).User;
+            canEdit = u.IsInRole(Roles.Engineer) || u.IsInRole(Roles.QA);
+            isQa = u.IsInRole(Roles.QA);
+            user = u.Identity?.Name ?? "";
+        }
+    }
+
+    private void Open(ProductMaster p)
+    {
+        original = p;
+        edit = Clone(p);
+        isNew = false;
+        message = null;
+    }
+
+    private void New()
+    {
+        original = null;
+        edit = new ProductMaster { CodesPerCase = 48 };
+        isNew = true;
+        message = null;
+    }
+
+    private void ToggleRoi(ChangeEventArgs e)
+    {
+        if (edit is null) return;
+        edit.ChildCamera.Roi = e.Value is true ? new RoiSettings { Width = 5472, Height = 3648 } : null;
+    }
+
+    private void Save()
+    {
+        if (edit is null) return;
+        message = null;
+        try
+        {
+            if (isNew && Store.Get(edit.ProductCode) is not null) throw new InvalidOperationException("this product code already exists");
+            edit.ApprovedBy = null;
+            if (NeedsSignature)
+            {
+                if (!isQa) throw new InvalidOperationException("QA role needed");
+                if (string.IsNullOrWhiteSpace(signReason)) throw new InvalidOperationException("give a reason for the signature");
+                if (Users.Verify(user, signPassword) is null)
+                {
+                    Log.Audit(user, "signature-failed", edit.ProductCode);
+                    throw new InvalidOperationException("password does not match: not signed");
+                }
+                edit.ApprovedBy = $"{user} {DateTime.Now:yyyy-MM-dd HH:mm}: {signReason}";
+            }
+            var saved = Store.Save(edit, user);
+            Log.Audit(user, edit.ApprovedBy is null ? "product-save" : "product-sign",
+                      $"{saved.ProductCode} v{saved.Version}{(saved.ApprovedBy is null ? "" : ", " + saved.ApprovedBy)}");
+            list = Store.List();
+            Open(saved);
+            message = $"Saved as version {saved.Version}.";
+            messageOk = true;
+        }
+        catch (Exception e)
+        {
+            message = e.Message;
+            messageOk = false;
+        }
+        finally
+        {
+            signPassword = "";
+        }
+    }
+
+    private static ProductMaster Clone(ProductMaster p) =>
+        System.Text.Json.JsonSerializer.Deserialize<ProductMaster>(System.Text.Json.JsonSerializer.Serialize(p))!;
+}

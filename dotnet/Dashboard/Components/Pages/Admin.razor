@@ -1,0 +1,63 @@
+@page "/admin"
+@attribute [Authorize(Roles = Roles.QA)]
+@rendermode InteractiveServer
+@inject DuplicateGuard Dups
+
+<PageTitle>Admin</PageTitle>
+
+<h1>Admin</h1>
+
+<section class="panel">
+    <h2>Duplicate check</h2>
+    <p class="muted">
+        A code already on one of the last accepted cases is a duplicate (a re-used or copied label): it shows
+        in orange on the Live page and the case is rejected. Only accepted cases are remembered, so a rejected
+        case run through again is not flagged. 0 turns the check off.
+    </p>
+    <div>
+        <label>
+            Child codes (holograms) remembered
+            <input type="number" min="0" max="@DuplicateSettings.Max" @bind="childCodes" />
+        </label>
+        <label>
+            Case codes remembered
+            <input type="number" min="0" max="@DuplicateSettings.Max" @bind="caseCodes" />
+        </label>
+    </div>
+    <p class="muted">Remembered now: @Dups.Remembered.Children.ToString("N0") child codes, @Dups.Remembered.Cases.ToString("N0") case codes.</p>
+    <button @onclick="Save" disabled="@(childCodes == Dups.Settings.ChildCodes && caseCodes == Dups.Settings.CaseCodes)">Save</button>
+    @if (message is not null)
+    {
+        <p class="@(failed ? "bad" : "good")">@message</p>
+    }
+</section>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private int childCodes, caseCodes;
+    private string? message;
+    private bool failed;
+
+    protected override void OnInitialized()
+    {
+        childCodes = Dups.Settings.ChildCodes;
+        caseCodes = Dups.Settings.CaseCodes;
+    }
+
+    private async Task Save()
+    {
+        string user = Auth is null ? "" : (await Auth).User.Identity?.Name ?? "";
+        try
+        {
+            Dups.Update(new DuplicateSettings(childCodes, caseCodes), user);
+            message = "Saved. The memory was rebuilt from the case log.";
+            failed = false;
+        }
+        catch (ArgumentException e)
+        {
+            message = e.Message;
+            failed = true;
+        }
+    }
+}

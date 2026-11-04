@@ -1,0 +1,112 @@
+<!-- Sign in (UI-UX-SPEC.md 4.5): a compact dialog in the middle of the screen with user tiles, the PIN
+     pad (Vs.Size.PinKey keys in fixed order; digits from the keyboard too), the card reader hint,
+     "Use password" (name and password), Back. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             x:Class="VisionSystem.Studio.Views.SignInView"
+             x:DataType="vm:SignInViewModel">
+  <Border Classes="card" Width="560" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="16">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="8">
+      <StackPanel Grid.Row="0" Spacing="2">
+        <TextBlock Text="{Binding Title}" Classes="title" />
+        <TextBlock Text="{Binding CardHint}" Name="CardHint" Classes="muted" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <ItemsControl Grid.Row="1" ItemsSource="{Binding Users}" IsVisible="{Binding !PasswordMode}">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate><WrapPanel HorizontalAlignment="Center" /></ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:UserTileViewModel">
+            <Button Classes="vs" Classes.selected="{Binding Selected}" MinWidth="140" Height="44" Margin="3"
+                    Command="{Binding $parent[ItemsControl].((vm:SignInViewModel)DataContext).PickUserCommand}"
+                    CommandParameter="{Binding}">
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Border Classes="toned" ui:Ui.Tone="Info" Width="28" Height="28" CornerRadius="14">
+                  <TextBlock Text="{Binding Initial}" FontWeight="Bold"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <StackPanel Grid.Row="2" Spacing="6" HorizontalAlignment="Center" IsVisible="{Binding !PasswordMode}">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="480"
+                   Name="SignInMessage" Classes.glyph="{Binding IsError}" ui:Ui.Tone="Ng" />
+        <TextBlock Text="{Binding PinDots}" FontSize="{DynamicResource Vs.Font.Counter}" Name="PinDots" HorizontalAlignment="Center" />
+        <UniformGrid Columns="3" Rows="4" HorizontalAlignment="Center">
+          <Button Classes="vs pinkey" Content="1" Command="{Binding DigitCommand}" CommandParameter="1" />
+          <Button Classes="vs pinkey" Content="2" Command="{Binding DigitCommand}" CommandParameter="2" />
+          <Button Classes="vs pinkey" Content="3" Command="{Binding DigitCommand}" CommandParameter="3" />
+          <Button Classes="vs pinkey" Content="4" Command="{Binding DigitCommand}" CommandParameter="4" />
+          <Button Classes="vs pinkey" Content="5" Command="{Binding DigitCommand}" CommandParameter="5" />
+          <Button Classes="vs pinkey" Content="6" Command="{Binding DigitCommand}" CommandParameter="6" />
+          <Button Classes="vs pinkey" Content="7" Command="{Binding DigitCommand}" CommandParameter="7" />
+          <Button Classes="vs pinkey" Content="8" Command="{Binding DigitCommand}" CommandParameter="8" />
+          <Button Classes="vs pinkey" Content="9" Command="{Binding DigitCommand}" CommandParameter="9" />
+          <Button Classes="vs pinkey" Command="{Binding DeleteCommand}">
+            <StackPanel Spacing="2">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Delete}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding DeleteText}" FontSize="{DynamicResource Vs.Font.Small}" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Classes="vs pinkey" Content="0" Command="{Binding DigitCommand}" CommandParameter="0" />
+          <Button Classes="vs pinkey primary" Command="{Binding OkCommand}" Name="PinOk">
+            <StackPanel Spacing="2">
+              <PathIcon Data="{Binding Source={x:Static vm:Icons.Check}, Converter={x:Static ui:IconConverter.Instance}}" />
+              <TextBlock Text="{Binding OkText}" FontSize="{DynamicResource Vs.Font.Small}" HorizontalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </UniformGrid>
+      </StackPanel>
+
+      <!-- Use password: the touch keyboard of the line PC opens for the boxes. -->
+      <StackPanel Grid.Row="2" IsVisible="{Binding PasswordMode}" Width="380" Spacing="6"
+                  HorizontalAlignment="Center">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap"
+                   Name="PasswordMessage" Classes.glyph="{Binding IsError}" ui:Ui.Tone="Ng" />
+        <TextBlock Text="{Binding NameText}" />
+        <TextBox Text="{Binding UserName}" Name="PasswordUser" MinHeight="{DynamicResource Vs.Size.Touch}" />
+        <TextBlock Text="{Binding PasswordText}" />
+        <TextBox Text="{Binding Password}" Name="PasswordBox" PasswordChar="●" RevealPassword="False"
+                 MinHeight="{DynamicResource Vs.Size.Touch}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding OkCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <!-- Support and OEM (AS-04h): today's code for this machine; hidden like the password, never kept -->
+        <TextBlock Text="{Binding CodeText}" />
+        <TextBox Text="{Binding Code}" Name="CodeBox" PasswordChar="●" RevealPassword="False"
+                 MinHeight="{DynamicResource Vs.Size.Touch}">
+          <TextBox.KeyBindings>
+            <KeyBinding Gesture="Enter" Command="{Binding OkCommand}" />
+          </TextBox.KeyBindings>
+        </TextBox>
+        <Button Classes="vs primary" Command="{Binding OkCommand}" Name="PasswordOk" HorizontalAlignment="Right" MinWidth="120">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Check}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{Binding OkText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
+      <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto" Margin="0,6,0,0">
+        <Button Grid.Column="0" Classes="vs" Command="{Binding BackCommand}" MinWidth="100">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{Binding BackText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <Button Grid.Column="1" Classes="vs" Command="{Binding SwitchModeCommand}" HorizontalAlignment="Center"
+                MinWidth="140" Name="SwitchMode">
+          <TextBlock Text="{Binding SwitchText}" VerticalAlignment="Center" />
+        </Button>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

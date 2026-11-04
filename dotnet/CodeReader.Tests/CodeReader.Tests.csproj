@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="../../engine/build/libcodereader.dylib" Condition="Exists('../../engine/build/libcodereader.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libcodereader.dylib" />
+    <None Include="../../engine/build/Release/codereader.dll" Condition="Exists('../../engine/build/Release/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CodeReader/CodeReader.csproj" />
+  </ItemGroup>
+
+</Project>

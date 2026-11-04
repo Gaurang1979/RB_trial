@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- A security advisory on a package (NuGet audit, all packages since .NET 10) warns but never stops the line build: the monthly dependency watch acts on it (DEP-03). -->
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <RootNamespace>StationGuard</RootNamespace>
+    <AssemblyName>StationGuard</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>Keeps a line PC fast and stable: watches memory, CPU and disk, spots leaks, clears them step by step only between parts, and saves NG images with counts without ever slowing the inspection.</Description>
+  </PropertyGroup>
+
+</Project>

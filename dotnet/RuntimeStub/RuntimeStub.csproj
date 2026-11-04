@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <RootNamespace>VisionStudio.Remote.Stub</RootNamespace>
+    <AssemblyName>vs-runtime-stub</AssemblyName>
+    <Version>1.0.0</Version>
+    <Description>A stand-in for the runtime service: serves the runtime contract with made-up inspections on the local endpoint, for building Vision Studio and the dashboard without cameras.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" Version="2.85.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RuntimeContract/RuntimeContract.csproj" />
+  </ItemGroup>
+
+</Project>

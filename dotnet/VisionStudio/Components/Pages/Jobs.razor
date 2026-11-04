@@ -1,0 +1,121 @@
+@page "/jobs"
+@attribute [Authorize(Roles = "Engineer")]
+@inject JobStore Store
+@inject Station S
+@inject NavigationManager Nav
+@inject Microsoft.Extensions.Options.IOptions<StudioOptions> Opt
+
+<PageTitle>@T["jobs.title"]</PageTitle>
+<h1>@T["jobs.title"]</h1>
+
+<div class="row" style="gap: 8px;">
+    <a class="button big primary" href="teach">+ @T["jobs.new"]</a>
+    <button class="button big" type="button" @onclick="ToggleImport">📥 Import .vsrecipe Bundle</button>
+</div>
+@if (_importOpen)
+{
+    <div class="card pad" style="background: #18181b; border: 1px solid #3f3f46; border-radius: 6px; margin: 12px 0;">
+        <h3>Import Portable .vsrecipe Bundle</h3>
+        <p class="muted small">Deploy a recipe (manifest, tools, golden master image, and PLC mappings) exported from another line. Only a bundle signed with the plant key is imported; its taught patterns and reference pictures come with it and are checked before anything is saved.</p>
+        <div class="row">
+            <input class="wide" placeholder="Full path to .vsrecipe bundle file (e.g. /path/to/recipe.vsrecipe)" @bind="_importPath" />
+            <button class="primary" type="button" @onclick="ImportRecipe">✓ Import & Verify</button>
+            <button type="button" @onclick="ToggleImport">Cancel</button>
+        </div>
+    </div>
+}
+@if (Message is not null) { <div class="alert">@Message</div> }
+<table class="tools">
+    <tr><th>@T["jobs.name"]</th><th>@T["jobs.cameras"]</th><th>@T["jobs.tools"]</th><th>@T["jobs.version"]</th><th></th></tr>
+    @foreach (var n in Store.Names())
+    {
+        Job? j;
+        try { j = Store.LoadForEdit(n); }
+        catch (JobLoadException e)
+        {
+            <tr><td><b>@n</b></td><td colspan="3" class="alert">@e.Reason</td>
+                <td><button class="link" @onclick="() => Delete(n)" disabled="@(S.Running && S.Job?.Name == n)">✕</button></td></tr>
+            continue;
+        }
+        if (j is null) continue;
+        <tr>
+            <td><b>@j.Name</b></td>
+            <td>@j.Cameras.Count</td>
+            <td>@string.Join(", ", j.Tools.Select(t => t.Name))</td>
+            <td>v@j.Version · @j.UpdatedAt.ToString("g")</td>
+            <td class="row">
+                <a class="button" href="teach/@Uri.EscapeDataString(j.Name)">✎ @T["jobs.edit"]</a>
+                <button type="button" @onclick="() => Export(j.Name)" title="Export portable .vsrecipe bundle for other lines">📦 Export</button>
+                <button @onclick="() => Use(j.Name)" disabled="@S.Running">▶ @T["jobs.use"]</button>
+                <button class="link" @onclick="() => Delete(j.Name)" disabled="@(S.Running && S.Job?.Name == j.Name)">✕</button>
+            </td>
+        </tr>
+    }
+</table>
+
+@code {
+    private string? Message;
+    private bool _importOpen;
+    private string _importPath = "";
+
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? Auth { get; set; }
+
+    private void ToggleImport() => _importOpen = !_importOpen;
+
+    private static string? ReadKey(string path) =>
+        !string.IsNullOrWhiteSpace(path) && File.Exists(path) ? File.ReadAllText(path) : null;
+
+    private void Export(string name)
+    {
+        try
+        {
+            var pem = ReadKey(Opt.Value.RecipeSigningKeyFile);
+            if (pem is null) { Message = "Export refused: no plant signing key is set up on this PC (Studio:RecipeSigningKeyFile)."; return; }
+            using var key = System.Security.Cryptography.ECDsa.Create();
+            key.ImportFromPem(pem);
+            string path = Store.ExportBundle(name, key);
+            Message = $"✓ Exported '{name}' to portable bundle: {path}";
+        }
+        catch (Exception e)
+        {
+            Message = $"Export failed: {e.Message}";
+        }
+    }
+
+    private async Task ImportRecipe()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_importPath) || !File.Exists(_importPath))
+            {
+                Message = "File not found. Please provide a valid path to a .vsrecipe bundle.";
+                return;
+            }
+            var pem = ReadKey(Opt.Value.RecipePublicKeyFile);
+            if (pem is null) { Message = "Import refused: the plant public key is not installed on this PC (Studio:RecipePublicKeyFile)."; return; }
+            var who = Auth is null ? null : (await Auth).User;
+            string user = who?.FindFirst("full_name")?.Value ?? who?.Identity?.Name ?? "";
+            if (string.IsNullOrWhiteSpace(user)) { Message = "Import refused: sign in first, so the import is logged under your name."; return; }
+            var imported = Store.ImportBundle(_importPath, pem, user);
+            _importOpen = false;
+            _importPath = "";
+            Message = $"✓ Successfully imported recipe '{imported.Name}' (v{imported.Version}) signed with the plant key, by {imported.UpdatedBy}.";
+        }
+        catch (Exception e)
+        {
+            Message = $"Import failed: {e.Message}";
+        }
+    }
+
+    private void Use(string name)
+    {
+        try { S.Load(name); Nav.NavigateTo("batch"); }
+        catch (Exception e) { Message = e.Message; }
+    }
+
+    private void Delete(string name)
+    {
+        Store.Delete(name);
+        Message = T.Format("jobs.deleted", name);
+    }
+}

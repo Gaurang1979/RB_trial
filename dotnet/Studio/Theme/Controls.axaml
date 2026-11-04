@@ -1,0 +1,363 @@
+<!-- Control looks of Vision Studio. Every colour, size and radius is a token from
+     Theme/Tokens.g.axaml (generated from design/tokens/vision-tokens.json); no colour is written here.
+     One compact density for touch, mouse and keyboard (UI-UX-SPEC.md principle 3): every control at
+     least Vs.Size.Touch (32 px), Run toolbar actions Vs.Size.ActionBar (40 px) with icon, label and
+     shortcut, PIN keys Vs.Size.PinKey. No action depends on hover (UI-UX-SPEC.md 7).
+     Vision Studio Next (requirements 17.15 NXT-01..03, 06): hover shows corner brackets and a soft glow
+     in the instrument colour (Vs.Brush.Hud, never a status), pressed moves down 1 px, keyboard focus
+     shows a Hud ring, disabled stays faded and keeps its tooltip, panels have 1 px frames. Fonts: body
+     (Vs.Typeface.Body) everywhere, display for titles and buttons, mono for numbers. A window with the
+     class reduce-motion (Settings/Motion.cs) drops the transitions, the glow and the press nudge. -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Bg}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Body}" />
+    <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Body}" />
+  </Style>
+
+  <!-- Keyboard focus: a 2 px ring in the instrument colour around every focusable control, shown only
+       for keyboard focus (the Fluent theme sets the adorner on the same selector; this one wins). -->
+  <Style Selector=":is(Control)">
+    <Setter Property="FocusAdorner">
+      <FocusAdornerTemplate>
+        <Border BorderBrush="{DynamicResource Vs.Brush.Hud}" BorderThickness="2"
+                CornerRadius="{DynamicResource Vs.Radius.M}" Margin="-3" />
+      </FocusAdornerTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Numbers in the mono face: every digit the same width, so counters never jump. -->
+  <Style Selector="TextBlock.mono">
+    <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Mono}" />
+  </Style>
+
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+  </Style>
+  <Style Selector="TextBlock.title">
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Title}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Display}" />
+  </Style>
+
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.M}" />
+    <Setter Property="Padding" Value="{DynamicResource Vs.Pad.L}" />
+  </Style>
+
+  <Style Selector="Border.bar">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+  </Style>
+
+  <Style Selector="Border.scrim">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Scrim}" />
+  </Style>
+
+  <Style Selector="Border.panel">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.L}" />
+    <Setter Property="Padding" Value="{DynamicResource Vs.Pad.Xl}" />
+    <Setter Property="HorizontalAlignment" Value="Center" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="MaxWidth" Value="900" />
+  </Style>
+
+  <!-- Buttons: one look for every touch button. The template adds the hover glow and two corner
+       brackets around the Fluent content presenter (same name, so the styles below still reach it);
+       none of them takes input. -->
+  <Style Selector="Button.vs">
+    <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="MinWidth" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="Padding" Value="{DynamicResource Vs.Pad.M}" />
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.M}" />
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Label}" />
+    <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Display}" />
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <!-- a control that cannot be used now still says why (UI-UX-SPEC.md 2) -->
+    <Setter Property="ToolTip.ShowOnDisabled" Value="True" />
+    <Setter Property="RenderTransform" Value="none" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Panel>
+          <Border Name="PART_Glow" Classes="hudGlow" IsHitTestVisible="False" Opacity="0" Margin="-3"
+                  BorderThickness="3" BorderBrush="{DynamicResource Vs.Brush.HudDim}"
+                  CornerRadius="{TemplateBinding CornerRadius}" />
+          <ContentPresenter Name="PART_ContentPresenter"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Padding="{TemplateBinding Padding}"
+                            RecognizesAccessKey="True"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          <Path Name="PART_BracketStart" Classes="hudBracket" Data="M0,7 L0,0 L7,0"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-4,-4,0,0" />
+          <Path Name="PART_BracketEnd" Classes="hudBracket" Data="M0,7 L7,7 L7,0"
+                HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-4,-4" />
+        </Panel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+  <Style Selector="Button.vs /template/ Path.hudBracket">
+    <Setter Property="Stroke" Value="{DynamicResource Vs.Brush.Hud}" />
+    <Setter Property="StrokeThickness" Value="2" />
+    <Setter Property="IsHitTestVisible" Value="False" />
+    <Setter Property="Opacity" Value="0" />
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <Style Selector="Button.vs /template/ Border.hudGlow">
+    <Setter Property="Transitions">
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+      </Transitions>
+    </Setter>
+  </Style>
+  <!-- Hover locks on: brackets and glow. Only a look; touch and keyboard reach every action without it. -->
+  <Style Selector="Button.vs:pointerover:not(:disabled) /template/ Path.hudBracket">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.vs:pointerover:not(:disabled) /template/ Border.hudGlow">
+    <Setter Property="Opacity" Value="1" />
+  </Style>
+  <Style Selector="Button.vs:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Hud}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+  </Style>
+  <Style Selector="Button.vs:pressed">
+    <Setter Property="RenderTransform" Value="translateY(1px)" />
+  </Style>
+  <Style Selector="Button.vs:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnAccent}" />
+  </Style>
+  <Style Selector="Button.vs:disabled">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+  <Style Selector="Button.vs.primary">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Accent}" />
+  </Style>
+  <Style Selector="Button.vs.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnAccent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Accent}" />
+  </Style>
+  <Style Selector="Button.vs.selected">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Accent}" />
+    <Setter Property="BorderThickness" Value="3" />
+  </Style>
+  <Style Selector="Button.vs.selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Accent}" />
+    <Setter Property="BorderThickness" Value="3" />
+  </Style>
+  <!-- Not possible now: faded, never hidden; a tap says why (UI-UX-SPEC.md 2). -->
+  <Style Selector="Button.vs.unavailable">
+    <Setter Property="Opacity" Value="0.45" />
+  </Style>
+
+  <!-- Toolbar actions: icon, label and shortcut in one row, 40 px high (UI-UX-SPEC.md 2). -->
+  <Style Selector="Button.action">
+    <Setter Property="Height" Value="{DynamicResource Vs.Size.ActionBar}" />
+    <Setter Property="MinWidth" Value="{DynamicResource Vs.Size.ActionButtonWidth}" />
+    <Setter Property="Padding" Value="10,0" />
+    <Setter Property="Margin" Value="3,0" />
+  </Style>
+  <Style Selector="Button.action PathIcon">
+    <Setter Property="Width" Value="16" />
+    <Setter Property="Height" Value="16" />
+  </Style>
+  <!-- The keyboard shortcut beside a toolbar label. -->
+  <Style Selector="Border.kbd">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.TextMuted}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.S}" />
+    <Setter Property="Padding" Value="3,0" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Opacity" Value="0.75" />
+  </Style>
+  <Style Selector="Border.kbd TextBlock">
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Small}" />
+  </Style>
+  <Style Selector="Border.separator">
+    <Setter Property="Width" Value="1" />
+    <Setter Property="Height" Value="24" />
+    <Setter Property="Margin" Value="6,0" />
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Border}" />
+  </Style>
+
+  <!-- Input boxes at the compact height, text centred in them (UI-UX-SPEC.md principle 3). -->
+  <Style Selector="TextBox">
+    <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="ComboBox">
+    <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+  <Style Selector="NumericUpDown">
+    <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <!-- Compact tabs: headers in the body size, 28 px high, the selected one underlined in the accent colour. -->
+  <Style Selector="TabControl.compact">
+    <Setter Property="Padding" Value="0" />
+  </Style>
+  <Style Selector="TabControl.compact TabItem">
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Label}" />
+    <Setter Property="MinHeight" Value="{DynamicResource Vs.Size.Touch}" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="Margin" Value="0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+  </Style>
+
+  <Style Selector="Button.pinkey">
+    <Setter Property="Width" Value="{DynamicResource Vs.Size.PinKey}" />
+    <Setter Property="Height" Value="{DynamicResource Vs.Size.PinKey}" />
+    <Setter Property="FontSize" Value="{DynamicResource Vs.Font.Title}" />
+    <Setter Property="FontFamily" Value="{DynamicResource Vs.Typeface.Mono}" />
+    <Setter Property="Margin" Value="{DynamicResource Vs.Pad.S}" />
+  </Style>
+
+  <Style Selector="Border.frame">
+    <Setter Property="BorderThickness" Value="{DynamicResource Vs.Thickness.ImageFrame}" />
+    <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.S}" />
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.ImageBg}" />
+  </Style>
+
+  <!-- Status tones: colour and shape always together. -->
+  <Style Selector="Border.toned.tone-neutral">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+  </Style>
+  <Style Selector="Border.frame.tone-neutral">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-neutral">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+  </Style>
+  <Style Selector="Border.toned.tone-ok">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Ok}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Ok}" />
+  </Style>
+  <Style Selector="Border.frame.tone-ok">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Ok}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-ok">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Ok}" />
+  </Style>
+  <Style Selector="Border.toned.tone-ng">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Ng}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Ng}" />
+  </Style>
+  <Style Selector="Border.frame.tone-ng">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Ng}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-ng">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Ng}" />
+  </Style>
+  <Style Selector="Border.toned.tone-warn">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Warn}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Warn}" />
+  </Style>
+  <Style Selector="Border.frame.tone-warn">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Warn}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-warn">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Warn}" />
+  </Style>
+  <Style Selector="Border.toned.tone-duplicate">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Duplicate}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Duplicate}" />
+  </Style>
+  <Style Selector="Border.frame.tone-duplicate">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Duplicate}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-duplicate">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Duplicate}" />
+  </Style>
+  <Style Selector="Border.toned.tone-stopped">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Stopped}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Stopped}" />
+  </Style>
+  <Style Selector="Border.frame.tone-stopped">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Stopped}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-stopped">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Stopped}" />
+  </Style>
+  <Style Selector="Border.toned.tone-info">
+    <Setter Property="Background" Value="{DynamicResource Vs.Brush.Status.Info}" />
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Info}" />
+  </Style>
+  <Style Selector="Border.frame.tone-info">
+    <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Status.Info}" />
+  </Style>
+  <Style Selector=":is(Control).glyph.tone-info">
+    <Setter Property="TextElement.Foreground" Value="{DynamicResource Vs.Brush.Status.Info}" />
+  </Style>
+  <!-- The Fluent theme sets PathIcon's own foreground, so icons on a status colour are set here. -->
+  <Style Selector="Border.toned.tone-neutral PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.Text}" />
+  </Style>
+  <Style Selector="Border.toned.tone-ok PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Ok}" />
+  </Style>
+  <Style Selector="Border.toned.tone-ng PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Ng}" />
+  </Style>
+  <Style Selector="Border.toned.tone-warn PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Warn}" />
+  </Style>
+  <Style Selector="Border.toned.tone-duplicate PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Duplicate}" />
+  </Style>
+  <Style Selector="Border.toned.tone-stopped PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Stopped}" />
+  </Style>
+  <Style Selector="Border.toned.tone-info PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnStatus.Info}" />
+  </Style>
+  <Style Selector="Button.vs.primary PathIcon">
+    <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.OnAccent}" />
+  </Style>
+
+  <!-- Reduce motion (NXT-06): no fades, no glow, no press nudge. The brackets still show the hover at once. -->
+  <Style Selector="Window.reduce-motion Button.vs /template/ Path.hudBracket">
+    <Setter Property="Transitions" Value="{x:Null}" />
+  </Style>
+  <Style Selector="Window.reduce-motion Button.vs /template/ Border.hudGlow">
+    <Setter Property="Transitions" Value="{x:Null}" />
+    <Setter Property="IsVisible" Value="False" />
+  </Style>
+  <Style Selector="Window.reduce-motion Button.vs">
+    <Setter Property="Transitions" Value="{x:Null}" />
+  </Style>
+  <Style Selector="Window.reduce-motion Button.vs:pressed">
+    <Setter Property="RenderTransform" Value="none" />
+  </Style>
+</Styles>

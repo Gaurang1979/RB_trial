@@ -1,0 +1,67 @@
+<!-- "What do I do?" (UI-UX-SPEC.md 4.4), first form: the alarm and its steps, each ticked with Done. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.AlarmHelpView"
+             x:DataType="vm:AlarmHelpViewModel">
+  <UserControl.Styles>
+    <Style Selector="Border.step">
+      <Setter Property="Padding" Value="12,8" />
+      <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.M}" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.step.current">
+      <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Accent}" />
+      <Setter Property="Background" Value="{DynamicResource Vs.Brush.SurfaceRaised}" />
+    </Style>
+    <Style Selector="Border.step.done TextBlock.stepText">
+      <Setter Property="Foreground" Value="{DynamicResource Vs.Brush.TextMuted}" />
+    </Style>
+  </UserControl.Styles>
+  <Border Classes="panel" MinWidth="760" Name="AlarmHelpPanel">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="16">
+      <TextBlock Grid.Row="0" Text="{Binding Title}" Classes="title" />
+      <Border Grid.Row="1" Classes="toned" ui:Ui.Tone="{Binding Tone}" Padding="16,10" CornerRadius="{DynamicResource Vs.Radius.M}">
+        <StackPanel Orientation="Horizontal" Spacing="12">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Bang}, Converter={x:Static ui:IconConverter.Instance}}" Width="28" Height="28" />
+          <TextBlock Text="{Binding Alarm}" FontSize="{DynamicResource Vs.Font.Title}" FontWeight="SemiBold"
+                     TextWrapping="Wrap" MaxWidth="760" VerticalAlignment="Center" />
+        </StackPanel>
+      </Border>
+      <ScrollViewer Grid.Row="2" MaxHeight="420">
+        <ItemsControl ItemsSource="{Binding Steps}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate DataType="vm:HelpStep">
+              <Border Classes="step" Classes.current="{Binding IsCurrent}" Classes.done="{Binding Done}" Margin="0,4">
+                <Grid ColumnDefinitions="40,*,Auto">
+                  <TextBlock Text="{Binding NumberText}" FontSize="{DynamicResource Vs.Font.Title}" FontWeight="Bold"
+                             VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Classes="stepText" Text="{Binding Text}" TextWrapping="Wrap"
+                             FontSize="{DynamicResource Vs.Font.Title}" VerticalAlignment="Center" />
+                  <Button Grid.Column="2" Classes="vs" Classes.selected="{Binding Done}" Margin="12,0,0,0" MinWidth="140"
+                          Command="{Binding $parent[ItemsControl].((vm:AlarmHelpViewModel)DataContext).DoneCommand}"
+                          CommandParameter="{Binding}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <PathIcon Classes="glyph" ui:Ui.Tone="Ok" IsVisible="{Binding Done}"
+                                Data="{Binding Source={x:Static vm:Icons.Check}, Converter={x:Static ui:IconConverter.Instance}}" />
+                      <TextBlock Text="{l:T alarm.help.done}" VerticalAlignment="Center" />
+                    </StackPanel>
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <Button Grid.Row="3" Classes="vs" Command="{Binding BackCommand}" HorizontalAlignment="Left" MinWidth="100">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{l:T common.back}" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+    </Grid>
+  </Border>
+</UserControl>

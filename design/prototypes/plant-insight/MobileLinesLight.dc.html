@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile: my lines (light)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1B4F9C}a:hover{color:#163F7D}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #EEF2F7; color: #0E1A2B; font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden">
+  <header style="padding: 20px 20px 12px; display: flex; align-items: center; justify-content: space-between">
+    <div>
+      <div style="font-size: 13px; color: #4F6178">Shift B · Packing area</div>
+      <h1 style="margin: 2px 0 0; font-size: 24px; font-weight: 700">My lines</h1>
+    </div>
+    <button aria-label="Choose language" style="background: #FFFFFF; color: #0E1A2B; border: 1px solid #C3CEDB; border-radius: 10px; min-width: 48px; height: 48px; font: inherit; font-size: 15px; font-weight: 600">EN</button>
+  </header>
+  <div style="padding: 0 20px">
+    <label style="display: flex; align-items: center; gap: 8px; background: #FFFFFF; border: 1px solid #C3CEDB; border-radius: 12px; padding: 0 14px; height: 48px">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4F6178" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+      <input placeholder="Find a line or scan" aria-label="Find a line" style="flex: 1; background: transparent; border: 0; color: #0E1A2B; font: inherit; font-size: 16px; outline: none; min-width: 0">
+    </label>
+  </div>
+  <div style="flex: 1; overflow: hidden; padding: 14px 20px; display: flex; flex-direction: column; gap: 12px">
+    <sc-for list="{{lines}}" as="l" hint-placeholder-count="5">
+      <a href="MobileLineLight.dc.html" style="display: flex; align-items: center; gap: 14px; text-decoration: none; color: #0E1A2B; background: #FFFFFF; border: 1px solid #D5DEE9; border-radius: 14px; padding: 14px 16px; min-height: 72px; box-sizing: border-box">
+        <span style="flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; background: {{l.color}}; color: #EEF2F7">{{l.icon}}</span>
+        <div style="flex: 1; min-width: 0">
+          <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 600; font-size: 17px">{{l.name}}</span><span style="font-family: 'IBM Plex Mono', monospace; font-size: 15px">{{l.yield}}</span></div>
+          <div style="font-size: 14px; color: #4F6178; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.note}}</div>
+        </div>
+      </a>
+    </sc-for>
+  </div>
+  <nav aria-label="Main" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #FFFFFF; border-top: 1px solid #D5DEE9; padding: 6px 4px 18px">
+    <a href="MobileLinesLight.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #1B4F9C; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect></svg>Lines</a>
+    <a href="MobileAlarm.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #34465C; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1112 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10 21h4"></path></svg>Alarms · 2</a>
+    <a href="MobileReview.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #34465C; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="M8 13l3 3 5-6"></path></svg>Review</a>
+    <a href="MobileAdmin.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; text-decoration: none; color: #34465C; font-size: 12px; padding: 8px 0; min-height: 48px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1-4 4-6 8-6s7 2 8 6"></path></svg>Admin</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const C = { run: '#0B7A3B', warn: '#8A5300', stop: '#C8283A', change: '#0B6FA8' };
+    const I = { run: '✓', warn: '!', stop: '✗', change: '⟳' };
+    const mk = (name, st, yld, note) => ({ name, color: C[st], icon: I[st], yield: yld, note });
+    return {
+      lines: [
+        mk('Line 5', 'stop', '97.8%', 'Stopped · PLC not connected · 12 min'),
+        mk('Line 3', 'warn', '98.1%', 'Slow · image too dark on camera 2'),
+        mk('Line 4', 'run', '99.0%', 'Running · label offset drifting'),
+        mk('Line 1', 'run', '99.6%', 'Running · 312 per min'),
+        mk('Line 2', 'run', '99.4%', 'Running · 298 per min'),
+        mk('Line 8', 'change', '—', 'Changeover · 6 min')
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

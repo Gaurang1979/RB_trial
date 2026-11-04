@@ -1,0 +1,63 @@
+name: RB trial Windows installer
+
+# Builds the whole line PC package on Windows (engine DLLs with OpenCV / zxing-cpp / libdmtx, vs-runtime,
+# vs-studio, teach app), runs the engine and .NET tests, and uploads the installer and zip.
+# Same script as a developer PC: tools/windows/build-package.ps1.
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "Skip the engine and .NET tests (faster rebuild)"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths-ignore: ["trial/**/*.md", "*.md", "docs/**"]
+
+env:
+  VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}\vcpkg-cache
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v4
+        with:
+          path: vcpkg-cache
+          key: vcpkg-x64-windows-static-md-a073c28e-${{ hashFiles('engine/vcpkg.json') }}
+
+      - name: Inno Setup
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force vcpkg-cache | Out-Null
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup -y --no-progress }
+
+      - name: Build package
+        shell: pwsh
+        run: |
+          $a = @('-Yes')
+          if ('${{ inputs.skip_tests }}' -eq 'true') { $a += '-SkipTests' }
+          & tools\windows\build-package.ps1 @a
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload installer
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VisionSystem-RB-trial-win-x64
+          path: |
+            dist/*.exe
+            dist/*.zip
+            dist/*.log
+          if-no-files-found: warn
+          retention-days: 30

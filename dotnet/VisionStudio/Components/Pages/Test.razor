@@ -1,0 +1,215 @@
+@page "/test"
+@attribute [Authorize(Roles = "Engineer")]
+@implements IDisposable
+@inject Station S
+@inject ModelPaths Models
+@inject ImageCache Images
+@inject Microsoft.Extensions.Options.IOptions<StudioOptions> Opts
+@inject IJSRuntime JS
+
+<PageTitle>@T["test.title"]</PageTitle>
+<h1>@T["test.title"]</h1>
+
+@if (S.Job is null)
+{
+    <p>@T["batch.no_job"] <a href="">@T["nav.run"]</a></p>
+}
+else
+{
+    <div class="card form">
+        <p class="muted">@S.Job.Name · @T["test.hint"]</p>
+        @for (int i = 0; i < S.Job.Cameras.Count; i++)
+        {
+            int k = i;
+            if (!S.Job.Tools.Any(t => t.Camera == k && t.Enabled)) continue;
+            <label><span>@S.Job.Cameras[k].Name</span><input class="wide" value="@Folders[k]" @onchange="e => Folders[k] = e.Value?.ToString() ?? string.Empty" /></label>
+        }
+        <div class="row">
+            @if (_run is null)
+            {
+                <button class="big primary" @onclick="RunAll">▶ @T["test.run"]</button>
+            }
+            else
+            {
+                <button class="big stop" @onclick="() => _cancel?.Cancel()">■ @T["run.stop"]</button>
+                <span>@Rows.Count / @Total</span>
+            }
+            <a class="button big" href="batch">✎ @T["nav.batch"]</a>
+        </div>
+        @if (Message is not null) { <div class="alert">@Message</div> }
+    </div>
+
+    @if (Rows.Count > 0)
+    {
+        var times = Rows.Select(r => r.Result.TotalMs).Order().ToList();
+        double P(double q) => times[Math.Min(times.Count - 1, (int)Math.Round(q * (times.Count - 1)))];
+        <div class="stats">
+            <div><b>@Rows.Count(r => r.Result.Pass)</b> OK</div>
+            <div><b>@Rows.Count(r => !r.Result.Pass)</b> NG</div>
+            <div><b>@P(0.5).ToString("0")</b> ms @T["test.median"]</div>
+            <div><b>@P(0.95).ToString("0")</b> ms p95</div>
+            <div><b>@times[^1].ToString("0")</b> ms max</div>
+            <label class="inline"><input type="checkbox" @bind="OnlyNg" /> @T["test.only_ng"]</label>
+        </div>
+        <div class="split">
+            <div class="list">
+                <table class="tools">
+                    @foreach (var r in Rows.Where(r => !OnlyNg || !r.Result.Pass).Take(1000))
+                    {
+                        <tr class="@(r.Result.Pass ? "ok" : "ng") click @(r == Shown ? "on" : "")" @onclick="() => Show(r)">
+                            <td>@(r.Result.Pass ? "✓" : "✗")</td>
+                            <td>@r.CameraName</td>
+                            <td>@Path.GetFileName(r.File)</td>
+                            <td>@(r.Result.FirstProblem ?? string.Join(" | ", r.Result.Tools.Select(t => t.Summary)))</td>
+                            <td class="num">@r.Result.TotalMs.ToString("0")</td>
+                        </tr>
+                    }
+                </table>
+            </div>
+            @if (Shown is not null)
+            {
+                <div class="detail">
+                    <img class="live" src="img/@(Key).jpg?v=@Version" />
+                    <table class="tools">
+                        @foreach (var t in Shown.Result.Tools)
+                        {
+                            <tr class="@ToolNotice.Row(t)"><td>@ToolNotice.Mark(t)</td><td>@t.ToolName</td><td>@t.Summary</td></tr>
+                            @foreach (var d in t.Details) { <tr class="sub"><td></td><td colspan="2">@d</td></tr> }
+                            @if (t.Codes is { } codes)
+                            {
+                                @for (int i = 0; i < codes.Count; i++)
+                                {
+                                    var code = codes[i];
+                                    var tool = t;
+                                    if (code.Quality is null) continue;
+                                    <tr class="sub"><td></td><td colspan="2">
+                                        <button @onclick="() => GradeReport(tool, code)">@T["test.grade_report"] @(codes.Count > 1 ? $"({code.Text})" : "")</button>
+                                    </td></tr>
+                                }
+                            }
+                        }
+                    </table>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    // the job and camera names as run: a report made after another job is loaded still names these
+    private sealed record Row(int Camera, string File, JobResult Result, string Job, string CameraName,
+                              IReadOnlyDictionary<string, CodeGrading> Grading);
+
+    // each code tool's grade and GS1 settings as the test ran (a report made later uses these, not the job as loaded then)
+    private sealed record CodeGrading(int MinGrade, BarcodeReading.Gs1Rules? Gs1, IReadOnlyDictionary<string, string>? Gs1Values);
+
+    private readonly List<Row> Rows = new();
+    private string[] Folders = Array.Empty<string>();
+    private int Total;
+    private bool OnlyNg;
+    private Row? Shown;
+    private int Version;
+    private string? Message;
+    private Task? _run;
+    private CancellationTokenSource? _cancel;
+    private readonly string Key = "test-" + Guid.NewGuid().ToString("N")[..8];
+
+    protected override void OnInitialized()
+    {
+        Folders = S.Job?.Cameras.Select(c => c.TestFolder ?? "").ToArray() ?? Array.Empty<string>();
+    }
+
+    private void RunAll()
+    {
+        if (S.Job is null) return;
+        Message = null;
+        var missing = S.Job.BatchFields().Where(f => S.Batch.Get(f.Key) is null).Select(f => f.Label).ToList();
+        if (missing.Count > 0) { Message = T["batch.missing"] + " " + string.Join(", ", missing); return; }
+        Rows.Clear();
+        Shown = null;
+        var job = S.Job;
+        var batch = S.Batch;
+        var grading = job.Tools.OfType<CodeToolConfig>().GroupBy(t => t.Name).ToDictionary(g => g.Key, g =>
+            new CodeGrading(g.First().MinGrade, g.First().Gs1, g.First().Gs1 is null ? null : CodeTool.FillAiValues(g.First(), batch)));
+        var work = new List<(int Cam, string File)>();
+        for (int i = 0; i < job.Cameras.Count && i < Folders.Length; i++)
+            if (job.Tools.Any(t => t.Camera == i && t.Enabled))
+                work.AddRange(FolderSource.List(Folders[i].Trim().Trim('"')).Select(f => (i, f)));
+        Total = work.Count;
+        if (Total == 0) { Message = T["teach.no_bmp"]; return; }
+        _cancel = new CancellationTokenSource();
+        var token = _cancel.Token;
+        _run = Task.Run(async () =>
+        {
+            try
+            {
+                using var runner = new JobRunner(job, Models);
+                var last = DateTime.UtcNow;
+                foreach (var (cam, file) in work)
+                {
+                    if (token.IsCancellationRequested) break;
+                    GrayImage img;
+                    try { img = GrayImage.Load(file); }
+                    catch { continue; }
+                    var r = runner.Run(cam, img, batch);
+                    lock (Rows) Rows.Add(new Row(cam, file, r, job.Name, job.Cameras[cam].Name, grading));
+                    if ((DateTime.UtcNow - last).TotalMilliseconds > 300) { last = DateTime.UtcNow; await InvokeAsync(StateHasChanged); }
+                }
+            }
+            catch (Exception e) { Message = e.Message; }
+            finally
+            {
+                _run = null;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+    }
+
+    private void Show(Row r)
+    {
+        if (S.Job is null) return;
+        Shown = r;
+        var img = GrayImage.Load(r.File);
+        Images.Put(Key, Render.Draw(img, r.Result.Tools.SelectMany(t => t.Graphics),
+            S.Job.Tools.Where(t => t.Camera == r.Camera && t.Roi is not null).Select(t => t.Roi!)));
+        Version++;
+    }
+
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? Auth { get; set; }
+
+    /// <summary>Writes the grade report of one code of the shown image to the reports folder and opens it.</summary>
+    private async Task GradeReport(ToolResult tool, CodeRead code)
+    {
+        if (Shown is null) return;
+        try
+        {
+            // the image file as graded (read again: a file replaced since the run would show the new one)
+            var img = GrayImage.Load(Shown.File);
+            var who = Auth is null ? null : (await Auth).User;
+            string user = who?.FindFirst("full_name")?.Value ?? who?.Identity?.Name ?? "";
+            var info = new VisionCore.Reports.GradeReportInfo
+            {
+                Job = Shown.Job, Tool = tool.ToolName, Camera = Shown.CameraName, Operator = user, When = DateTime.Now,
+                MinGrade = Shown.Grading.TryGetValue(tool.ToolName, out var g) ? g.MinGrade : -1,
+                Gs1Rules = g?.Gs1,
+                Gs1Values = g?.Gs1Values,
+            };
+            var pdf = VisionCore.Reports.GradeReport.Build(img, code, info);
+            string name = VisionCore.Reports.ReportFiles.Name(Shown.Job, tool.ToolName, DateTime.Now);
+            Directory.CreateDirectory(VisionCore.Reports.ReportFiles.Folder(Opts.Value.DataFolder));
+            await File.WriteAllBytesAsync(Path.Combine(VisionCore.Reports.ReportFiles.Folder(Opts.Value.DataFolder), name), pdf);
+            await JS.InvokeVoidAsync("open", $"reports/{name}", "_blank");
+        }
+        catch (Exception e)
+        {
+            // a damaged or replaced image file, a full disk, a closed browser tab: told, the results stay
+            Message = e.Message;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cancel?.Cancel();
+        Images.Remove(Key);
+    }
+}

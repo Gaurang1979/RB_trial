@@ -1,0 +1,142 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-29T12:00:00Z"
+  },
+  "title": "Plant Insight UI",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "Web \u00b7 Floor map (all lines live)",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "LineView.dc.html": {
+      "x": 1520,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "Web \u00b7 Line view",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "Quality.dc.html": {
+      "x": 3040,
+      "y": 0,
+      "w": 1440,
+      "h": 1060,
+      "title": "Web \u00b7 OEE and SPC",
+      "expand": "fill",
+      "is_interactive": true
+    },
+    "MobileLines.dc.html": {
+      "x": 0,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 My lines",
+      "is_interactive": true
+    },
+    "MobileLine.dc.html": {
+      "x": 470,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 Line",
+      "is_interactive": true
+    },
+    "MobileAlarm.dc.html": {
+      "x": 940,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 Alarm with guided fix",
+      "is_interactive": true
+    },
+    "MobileReview.dc.html": {
+      "x": 1410,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 NG review",
+      "is_interactive": true
+    },
+    "MobileAdmin.dc.html": {
+      "x": 1880,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 Admin",
+      "is_interactive": true
+    },
+    "MobileSettings.dc.html": {
+      "x": 2350,
+      "y": 1480,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 Settings: colour mode and sounds",
+      "is_interactive": true
+    },
+    "MobileLinesLight.dc.html": {
+      "x": 0,
+      "y": 2650,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 My lines (light)",
+      "is_interactive": true
+    },
+    "MobileLineLight.dc.html": {
+      "x": 470,
+      "y": 2650,
+      "w": 390,
+      "h": 844,
+      "title": "Mobile \u00b7 Line (light)",
+      "is_interactive": true
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "LineView.dc.html",
+    "Quality.dc.html",
+    "MobileLines.dc.html",
+    "MobileLine.dc.html",
+    "MobileAlarm.dc.html",
+    "MobileReview.dc.html",
+    "MobileAdmin.dc.html",
+    "MobileSettings.dc.html",
+    "MobileLinesLight.dc.html",
+    "MobileLineLight.dc.html"
+  ],
+  "notes": {
+    "webtitle": {
+      "x": 0,
+      "y": -300,
+      "text": "Web dashboard \u2014 plant server, PC and TV",
+      "kind": "title1",
+      "maxW": 4480
+    },
+    "mobtitle": {
+      "x": 0,
+      "y": 1180,
+      "text": "Mobile app \u2014 operators, supervisors and admins",
+      "kind": "title1",
+      "maxW": 2740
+    },
+    "lighttitle": {
+      "x": 0,
+      "y": 2400,
+      "text": "Light mode \u2014 same screens, same roles",
+      "kind": "title1",
+      "maxW": 860
+    }
+  },
+  "designSystems": []
+}

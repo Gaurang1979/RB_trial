@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>NG review - Sundaram Smart Production Intelligence</title>
+<style>
+:root{--bg:#0b1220;--panel:#111a2e;--line:#1f2b46;--txt:#e5e9f2;--mut:#8fa0c0;--ok:#22c55e;--warn:#f59e0b;--bad:#ef4444;--acc:#38bdf8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 16px;background:#0e1730;border-bottom:1px solid var(--line)}
+.brand{font-weight:700;letter-spacing:.06em;font-size:13px;flex:1}.brand small{display:block;color:var(--mut);font-weight:500;letter-spacing:.02em}
+.tab,button,select,input{background:#16213b;border:1px solid var(--line);color:var(--txt);padding:6px 12px;border-radius:6px;font:inherit}
+button{cursor:pointer}
+main{padding:14px 16px;max-width:1500px;margin:0 auto}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.bar label{color:var(--mut);font-size:12px;display:flex;gap:6px;align-items:center}
+.keys{color:var(--mut);font-size:12px;margin-left:auto}
+kbd{background:#1b2740;border:1px solid var(--line);border-radius:4px;padding:0 5px;font:12px ui-monospace,Menlo,Consolas,monospace}
+.sum{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:12px;color:var(--mut);font-size:12px}
+.sum b{color:var(--txt)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;outline:none}
+.card.sel{border-color:var(--acc);box-shadow:0 0 0 2px #38bdf855}
+.imgs{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.imgs figure{margin:0;flex:1 1 140px;min-width:0}
+.imgs img{width:100%;border-radius:6px;background:#0a1020;display:block;min-height:90px;object-fit:contain}
+.imgs figcaption{font-size:11px;color:var(--mut)}
+.noimg{width:100%;min-height:90px;border:1px dashed var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px;text-align:center;padding:8px}
+.why{font-weight:600;margin-bottom:2px}.meta{color:var(--mut);font-size:12px}
+.badge{display:inline-block;border-radius:4px;font-size:10px;font-weight:700;letter-spacing:.06em;padding:1px 7px;text-transform:uppercase;border:1px solid var(--c);color:var(--c)}
+.acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.acts button{flex:1;font-weight:700;color:#04121f;border:0;white-space:nowrap}
+.b-confirmed{background:var(--bad)}.b-overruled{background:var(--ok)}.b-unsure{background:var(--warn)}
+.acts button.on{outline:2px solid var(--txt)}
+.note{width:100%;margin-top:8px}
+.empty-msg{color:var(--mut);padding:20px}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">SUNDARAM SMART PRODUCTION INTELLIGENCE<small>NG review: confirm a reject, or overrule it as a good part</small></div>
+  <button class="tab" id="loginbtn"></button>
+</header>
+<main>
+  <div class="bar">
+    <label>Line <select id="fline"><option value="">All lines</option></select></label>
+    <label>Reason <select id="freason"><option value="">All reasons</option></select></label>
+    <label>Verdict <select id="fverdict">
+      <option value="pending">Waiting for review</option><option value="confirmed">Confirmed</option><option value="overruled">Overruled</option>
+      <option value="unsure">Unsure</option><option value="all">All</option></select></label>
+    <button id="reload">Refresh</button>
+    <span class="keys"><kbd>&rarr;</kbd> confirm NG &nbsp; <kbd>&larr;</kbd> overrule (good part) &nbsp; <kbd>&uarr;</kbd> unsure &nbsp; <kbd>N</kbd>/<kbd>P</kbd> next/previous</span>
+  </div>
+  <div class="sum" id="sum"></div>
+  <div class="grid" id="grid"><div class="empty-msg">Loading&hellip;</div></div>
+  <p><button id="more" hidden>Load more</button></p>
+</main>
+<script>
+"use strict";
+const P = new URLSearchParams(location.search), KEY = P.get("key");
+function authHeaders(){
+  const t = localStorage.getItem("spi_token");
+  if(t) return {"Authorization": "Bearer " + t};
+  if(KEY) return {"X-API-Key": KEY};
+  return {};
+}
+let HDR = authHeaders();
+function refreshAuth(){ HDR = authHeaders(); }
+function clearSession(){ localStorage.removeItem("spi_token"); localStorage.removeItem("spi_username"); localStorage.removeItem("spi_name"); refreshAuth(); }
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+const VERDICT = {pending:["#8fa0c0","Waiting"], confirmed:["#ef4444","Confirmed NG"], overruled:["#22c55e","Overruled (good part)"], unsure:["#f59e0b","Unsure"]};
+const IMG_STATE = {none:"No image kept for this part", waiting:"Image requested from the line PC, not here yet", missing:"The line PC no longer has the image",
+  expired:"The image was not sent within 7 days", removed:"The image was removed to make room"};
+const PAGE = 24;
+let items = [], sel = 0, urls = [], busy = false;
+
+async function api(path, opt){
+  let r = await fetch(path, {...opt, headers: {...HDR, ...(opt && opt.headers)}});
+  if(r.status === 401 && localStorage.getItem("spi_token")){ clearSession(); refreshHeaderUI(); r = await fetch(path, {...opt, headers: {...HDR, ...(opt && opt.headers)}}); }
+  return r;
+}
+function query(extra){
+  const q = new URLSearchParams({verdict: $("fverdict").value, limit: PAGE, ...extra});
+  const [plant, line] = $("fline").value.split("|");
+  if(line){ q.set("plant", plant); q.set("line", line); }
+  if($("freason").value) q.set("reason", $("freason").value);
+  return q;
+}
+function refreshHeaderUI(){
+  const token = localStorage.getItem("spi_token"), name = localStorage.getItem("spi_name") || localStorage.getItem("spi_username");
+  const lb = $("loginbtn");
+  lb.textContent = token ? `${name} (sign out)` : "Sign in";
+  lb.onclick = token ? doLogout : doLogin;
+}
+async function doLogin(){
+  const username = prompt("Username"); if(!username) return;
+  const password = prompt("Password"); if(!password) return;
+  try{
+    const r = await fetch("/auth/login", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({username, password})});
+    if(!r.ok) throw new Error(r.status === 401 ? "invalid username or password" : `HTTP ${r.status}`);
+    const data = await r.json();
+    localStorage.setItem("spi_token", data.token);
+    localStorage.setItem("spi_username", data.user.username);
+    localStorage.setItem("spi_name", data.user.name || data.user.username);
+    refreshAuth(); refreshHeaderUI();
+    await init();
+  }catch(e){ alert("Sign-in failed: " + e.message); }
+}
+async function doLogout(){
+  try{ await fetch("/auth/logout", {method: "POST", headers: HDR}); }catch(e){}
+  clearSession(); refreshHeaderUI();
+  await init();
+}
+function fmtTime(ms){ return new Date(ms).toLocaleString(); }
+function card(it, i){
+  const [c, label] = VERDICT[it.verdict] || VERDICT.pending;
+  const imgs = it.cameras.length
+    ? it.cameras.map(cam => `<figure><img alt="${esc(cam)}" data-src="/vision/ng/${it.id}/image/${encodeURIComponent(cam)}"><figcaption>${esc(cam)}</figcaption></figure>`).join("")
+    : `<div class="noimg">${esc(IMG_STATE[it.image_state] || it.image_state)}</div>`;
+  const why = it.reasons.map(r => `${esc(r.tool)}: ${esc(r.reason)}`).join("; ");
+  return `<div class="card${i === sel ? " sel" : ""}" data-i="${i}" tabindex="0">
+    <div class="imgs">${imgs}</div>
+    <div class="why">${why}</div>
+    <div class="meta">${esc(it.line)} &middot; ${esc(it.station)}${it.camera ? " &middot; " + esc(it.camera) : ""} &middot; ${esc(fmtTime(it.ts))}</div>
+    <div class="meta">${it.part_id ? "Part " + esc(it.part_id) + " &middot; " : ""}${it.job ? "Job " + esc(it.job) + " &middot; " : ""}<span class="badge" style="--c:${c}">${esc(label)}</span>${it.reviewed_by ? " by " + esc(it.reviewed_by) : ""}</div>
+    ${it.note ? `<div class="meta">Note: ${esc(it.note)}</div>` : ""}
+    <input class="note" maxlength="500" placeholder="Note (optional, max 500 characters)" data-note="${i}">
+    <div class="acts">
+      <button class="b-overruled${it.verdict === "overruled" ? " on" : ""}" data-v="overruled">&larr; Overrule (good)</button>
+      <button class="b-unsure${it.verdict === "unsure" ? " on" : ""}" data-v="unsure">&uarr; Unsure</button>
+      <button class="b-confirmed${it.verdict === "confirmed" ? " on" : ""}" data-v="confirmed">Confirm NG &rarr;</button>
+    </div></div>`;
+}
+function render(){
+  urls.forEach(u => URL.revokeObjectURL(u)); urls = [];
+  $("grid").innerHTML = items.length ? items.map(card).join("") : `<div class="empty-msg">No NG parts for this filter.</div>`;
+  const reasons = new Set(items.flatMap(it => it.reasons.map(r => r.reason)));
+  const cur = $("freason").value;
+  $("freason").innerHTML = `<option value="">All reasons</option>` + [...new Set([...reasons, ...(cur ? [cur] : [])])].sort().map(r => `<option${r === cur ? " selected" : ""}>${esc(r)}</option>`).join("");
+  document.querySelectorAll("img[data-src]").forEach(async im => {
+    try{
+      const r = await api(im.dataset.src);
+      if(r.ok){ const u = URL.createObjectURL(await r.blob()); urls.push(u); im.src = u; }
+    }catch(e){}
+  });
+}
+function select(i){
+  if(!items.length) return;
+  sel = Math.max(0, Math.min(items.length - 1, i));
+  document.querySelectorAll(".card").forEach((c, k) => c.classList.toggle("sel", k === sel));
+  const c = document.querySelector(".card.sel"); if(c) c.scrollIntoView({block: "nearest"});
+}
+async function load(more){
+  const extra = more && items.length ? {before_id: items[items.length - 1].id} : {};
+  const r = await api("/vision/ng?" + query(extra));
+  if(!r.ok){ $("grid").innerHTML = `<div class="empty-msg">${r.status === 401 || r.status === 403 ? "Sign in with an account that can see NG parts." : "Cannot load NG parts (HTTP " + r.status + ")."}</div>`; items = []; $("more").hidden = true; return; }
+  const got = (await r.json()).items;
+  items = more ? items.concat(got) : got;
+  if(!more) sel = 0;
+  $("more").hidden = got.length < PAGE;
+  render();
+}
+async function summary(){
+  const r = await api("/vision/ng/summary"); if(!r.ok){ $("sum").textContent = ""; return; }
+  $("sum").innerHTML = (await r.json()).map(s => `<span><b>${esc(s.line)}</b>: ${s.ng} NG, ${s.pending} waiting, ${s.confirmed} confirmed, ${s.overruled} overruled, ${s.unsure} unsure` +
+    `${s.overrule_rate === null ? "" : ", overrule rate " + (s.overrule_rate * 100).toFixed(1) + "%"}</span>`).join("");
+}
+async function give(i, verdict){
+  const it = items[i]; if(!it || busy) return;
+  busy = true;
+  try{
+    const note = (document.querySelector(`[data-note="${i}"]`) || {}).value || "";
+    const r = await api(`/vision/ng/${it.id}/review`, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({verdict, note})});
+    if(!r.ok){ const e = await r.json().catch(() => ({})); alert(r.status === 403 || r.status === 401 ? "Your account cannot give a verdict on this line (sign in with your own account)." : "Not saved: " + (e.detail || r.status)); return; }
+    const done = await r.json();
+    if($("fverdict").value === "pending" || ($("fverdict").value !== "all" && $("fverdict").value !== done.verdict)){ items.splice(i, 1); sel = Math.max(0, Math.min(i, items.length - 1)); }
+    else { items[i] = done; sel = Math.min(i + 1, items.length - 1); }
+    render(); summary();
+  } finally { busy = false; }
+}
+$("grid").addEventListener("click", ev => {
+  const c = ev.target.closest(".card"); if(!c) return;
+  const i = +c.dataset.i, b = ev.target.closest("[data-v]");
+  if(b) give(i, b.dataset.v); else select(i);
+});
+document.addEventListener("keydown", ev => {
+  if(ev.target.matches("input,select,textarea") || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+  const k = ev.key;
+  if(k === "ArrowRight") give(sel, "confirmed");
+  else if(k === "ArrowLeft") give(sel, "overruled");
+  else if(k === "ArrowUp") give(sel, "unsure");
+  else if(k === "n" || k === "N") select(sel + 1);
+  else if(k === "p" || k === "P") select(sel - 1);
+  else return;
+  ev.preventDefault();
+});
+["fline", "freason", "fverdict"].forEach(id => $(id).onchange = () => load(false));
+$("reload").onclick = () => { $("reload").textContent = "Refresh"; load(false); summary(); };
+$("more").onclick = () => load(true);
+// The live floor (Req 17.3 LV-04): pushed over /vision/ws; while the socket is closed, GET /vision/floor every pollMs,
+// and the socket is tried again after 2, 4, 8 .. at most 60 s.
+function authQuery(){
+  const t = localStorage.getItem("spi_token");
+  if(t) return "&token=" + encodeURIComponent(t);
+  if(KEY) return "&api_key=" + encodeURIComponent(KEY);
+  return "";
+}
+function liveFloor(onFloor, pollMs){
+  let ws = null, live = false, retry = 0, timer = null, gen = 0;
+  setInterval(async () => {
+    if(live || document.hidden) return;
+    const r = await api("/vision/floor");
+    if(r.ok && !live) onFloor(await r.json());
+  }, pollMs);
+  function connect(){
+    const my = ++gen;
+    clearTimeout(timer); live = false;
+    if(ws){ ws.onclose = null; ws.close(); ws = null; }
+    if(!("WebSocket" in window)) return;
+    try{ ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/vision/ws?lang=en${authQuery()}`); }
+    catch(e){ return; }
+    ws.onopen = () => { live = true; retry = 0; };
+    ws.onmessage = m => { const d = JSON.parse(m.data); if(d.type === "floor") onFloor(d.lines); };
+    ws.onclose = () => { if(my !== gen) return; ws = null; live = false; timer = setTimeout(connect, Math.min(60000, 2000 * 2 ** retry++)); };
+  }
+  return {connect, isLive: () => live};
+}
+function fillLines(lines){
+  const html = `<option value="">All lines</option>` + lines.map(l => `<option value="${esc(l.plant)}|${esc(l.line)}">${esc(l.line)}</option>`).join("");
+  if($("fline").innerHTML === html) return;   // unchanged: never reset a list the user has open
+  const cur = $("fline").value;
+  $("fline").innerHTML = html;
+  $("fline").value = cur;
+}
+let ngKey = null;
+function onFloor(lines){
+  fillLines(lines);
+  const key = lines.map(l => `${l.plant}|${l.line}|${l.bad}|${(l.last_ng[0] || {}).result_id ?? ""}`).join(";");
+  if(ngKey !== null && key !== ngKey){ summary(); $("reload").textContent = "Refresh (new NG parts)"; }
+  ngKey = key;
+}
+const floor = liveFloor(onFloor, 15000);
+async function init(){
+  refreshHeaderUI();
+  const r = await api("/vision/floor");
+  if(r.ok) onFloor(await r.json());
+  floor.connect();   // again after a sign-in or sign-out, with the new credential
+  await load(false); summary();
+}
+// An image still being sent by the line PC shows up on its own.
+setInterval(async () => {
+  const waiting = items.filter(it => it.image_state === "waiting");
+  if(!waiting.length || document.hidden) return;
+  let changed = false;
+  for(const it of waiting.slice(0, 10)){
+    const r = await api(`/vision/ng/${it.id}`);
+    if(r.ok){ const n = await r.json(); if(n.image_state !== it.image_state){ const k = items.findIndex(x => x.id === it.id); if(k >= 0){ items[k] = n; changed = true; } } }
+  }
+  if(changed) render();
+}, 15000);
+init();
+</script>
+</body>
+</html>

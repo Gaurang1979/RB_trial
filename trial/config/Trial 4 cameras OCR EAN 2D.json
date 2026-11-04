@@ -1,0 +1,55 @@
+{
+  "SchemaVersion": "0.1",
+  "Name": "Trial 4 cameras OCR EAN 2D",
+  "Number": 1,
+  "Description": "Micro850 trial template: 2 x 2 MP (laser batch code OCV/OCR, 2D code), 2 x 0.3 MP (EAN-13). Re-teach every ROI, exposure and serial in Teach before running.",
+  "Version": 1,
+  "Cameras": [
+    { "Name": "Cam1 2MP batch code", "Driver": "", "Serial": "SET-SERIAL-1", "ExposureUs": 150, "GainDb": 0 },
+    { "Name": "Cam2 2MP 2D code",    "Driver": "", "Serial": "SET-SERIAL-2", "ExposureUs": 150, "GainDb": 0 },
+    { "Name": "Cam3 0.3MP EAN A",    "Driver": "", "Serial": "SET-SERIAL-3", "ExposureUs": 100, "GainDb": 0 },
+    { "Name": "Cam4 0.3MP EAN B",    "Driver": "", "Serial": "SET-SERIAL-4", "ExposureUs": 100, "GainDb": 0 }
+  ],
+  "Tools": [
+    {
+      "kind": "text",
+      "Mode": "Check",
+      "Lines": [ { "Template": "B.NO. {BATCH}" }, { "Template": "EXP {EXP:MM/YY}" } ],
+      "CharHeightPx": 30,
+      "AllowShiftPx": 12,
+      "Name": "Batch code OCV",
+      "Camera": 0,
+      "Roi": { "X": 400, "Y": 300, "Width": 900, "Height": 300 }
+    },
+    {
+      "kind": "code",
+      "Format": "DataMatrix",
+      "ExpectedCount": 1,
+      "Expected": "",
+      "TimeBudgetMs": 60,
+      "Name": "2D code",
+      "Camera": 1,
+      "Roi": { "X": 600, "Y": 300, "Width": 600, "Height": 600 }
+    },
+    {
+      "kind": "code",
+      "Format": "EAN13",
+      "ExpectedCount": 1,
+      "Expected": "",
+      "TimeBudgetMs": 30,
+      "Name": "EAN side A",
+      "Camera": 2,
+      "Roi": { "X": 0, "Y": 0, "Width": 640, "Height": 480 }
+    },
+    {
+      "kind": "code",
+      "Format": "EAN13",
+      "ExpectedCount": 1,
+      "Expected": "",
+      "TimeBudgetMs": 30,
+      "Name": "EAN side B",
+      "Camera": 3,
+      "Roi": { "X": 0, "Y": 0, "Width": 640, "Height": 480 }
+    }
+  ]
+}

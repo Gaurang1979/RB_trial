@@ -1,0 +1,49 @@
+@using System.Globalization
+@* A ring that shows a percentage (green part = good, red part = not good) with the value in the middle. *@
+<svg class="vc-ring" viewBox="0 0 100 100" role="img" aria-label="@_aria" @attributes="Extra">
+    <title>@_aria</title>
+    <circle class="vc-ring-track @(_has ? "" : "vc-nodata")" cx="50" cy="50" r="42" />
+    @if (_has)
+    {
+        <circle class="vc-ring-val" cx="50" cy="50" r="42" pathLength="100" stroke-dasharray="@_dash 100" transform="rotate(-90 50 50)" />
+    }
+    <text class="vc-ring-num" x="50" y="@(_caption.Length > 0 ? 52 : 58)" text-anchor="middle">@_text</text>
+    @if (_caption.Length > 0) { <g><text class="vc-ring-cap" x="50" y="68" text-anchor="middle">@_caption</text></g> }
+</svg>
+
+@code {
+    /// <summary>0 to 100; empty, NaN or infinity shows "–".</summary>
+    [Parameter] public double? Percent { get; set; }
+    /// <summary>Small text under the value, for example "480 / 500".</summary>
+    [Parameter] public string? Caption { get; set; }
+    /// <summary>What the ring shows, for screen readers and the tooltip.</summary>
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public int Decimals { get; set; } = 1;
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? Extra { get; set; }
+
+    private double? _p;
+    private string? _cap, _label;
+    private int _dec = -1;
+    private bool _dirty = true, _has;
+    private string _text = "–", _caption = "", _aria = "", _dash = "0";
+
+    protected override void OnParametersSet()
+    {
+        if (_p == Percent && _cap == Caption && _label == Label && _dec == Decimals && !_dirty) return;
+        (_p, _cap, _label, _dec) = (Percent, Caption, Label, Decimals);
+        _dirty = true;
+        _has = ChartNum.Good(Percent);
+        var p = _has ? Math.Clamp(Percent!.Value, 0, 100) : 0;
+        _text = _has ? p.ToString("F" + Decimals) + "%" : "–";
+        _caption = Caption ?? "";
+        _dash = p.ToString("0.##", CultureInfo.InvariantCulture);
+        _aria = _caption.Length > 0 ? $"{Label}: {_text} ({_caption})" : $"{Label}: {_text}";
+    }
+
+    protected override bool ShouldRender()
+    {
+        var d = _dirty;
+        _dirty = false;
+        return d;
+    }
+}

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\CodeReader\CodeReader.csproj" />
+    <ProjectReference Include="..\HikCamera\HikCamera.csproj" />
+    <ProjectReference Include="..\StationGuard\StationGuard.csproj" />
+    <ProjectReference Include="..\VisionCore\VisionCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.14" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Dashboard</RootNamespace>
+  </PropertyGroup>
+
+  <!-- AI models and the native engine next to the app (build the engine first, see README) -->
+  <ItemGroup>
+    <None Include="../../ml/models/codenet.onnx" Condition="Exists('../../ml/models/codenet.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/codenet.onnx" />
+    <None Include="../../ml/models/enhancer.onnx" Condition="Exists('../../ml/models/enhancer.onnx')" CopyToOutputDirectory="PreserveNewest" Link="models/enhancer.onnx" />
+    <None Include="../../engine/build/libcodereader.dylib" Condition="Exists('../../engine/build/libcodereader.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libcodereader.dylib" />
+    <None Include="../../engine/build/Release/codereader.dll" Condition="Exists('../../engine/build/Release/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+  </ItemGroup>
+
+</Project>

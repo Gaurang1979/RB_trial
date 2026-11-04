@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.MessageView"
+             x:DataType="vm:MessageViewModel">
+  <Border Classes="panel">
+    <StackPanel Spacing="20">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <TextBlock Text="{Binding Body}" TextWrapping="Wrap" MaxWidth="700" FontSize="{DynamicResource Vs.Font.Title}" />
+      <Button Classes="vs action primary" Command="{Binding CloseCommand}" HorizontalAlignment="Right">
+        <TextBlock Text="{l:T common.close}" />
+      </Button>
+    </StackPanel>
+  </Border>
+</UserControl>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile: NG review</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden">
+  <header style="padding: 16px 16px 8px; display: flex; align-items: center; gap: 8px">
+    <a href="MobileLines.dc.html" aria-label="Back" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; color: #E6EDF3">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1">
+      <h1 style="margin: 0; font-size: 22px; font-weight: 700">Check NG parts</h1>
+      <div style="font-size: 13px; color: #9FB0C0">{{left}} left · your answers teach the AI</div>
+    </div>
+  </header>
+  <div style="flex: 1; padding: 8px 20px; display: flex; flex-direction: column; gap: 12px">
+    <div style="flex: 1; background: #16212C; border: 1px solid #22303D; border-radius: 18px; overflow: hidden; display: flex; flex-direction: column">
+      <div style="position: relative; flex: 1; background: #1B2733; display: flex; align-items: center; justify-content: center">
+        <svg width="80%" viewBox="0 0 280 200" role="img" aria-label="{{card.alt}}">
+          <rect x="20" y="20" width="240" height="160" rx="6" fill="#2A3846" stroke="#4A5E72"></rect>
+          <rect x="40" y="40" width="110" height="18" rx="3" fill="#5A7088"></rect>
+          <rect x="{{card.x}}" y="110" width="150" height="40" fill="#3E5266"></rect>
+          <rect x="{{card.bx}}" y="104" width="162" height="52" fill="none" stroke="#FF7B72" stroke-width="3"></rect>
+        </svg>
+        <span style="position: absolute; top: 12px; left: 14px; font-family: 'IBM Plex Mono', monospace; font-size: 26px; font-weight: 600; color: #FF7B72">✗ NG</span>
+      </div>
+      <div style="padding: 14px 16px">
+        <div style="font-weight: 600; font-size: 18px">{{card.reason}}</div>
+        <div style="font-size: 14px; color: #9FB0C0">{{card.where}}</div>
+        <div style="font-size: 14px; color: #C4D0DB; margin-top: 6px">{{card.detail}}</div>
+      </div>
+    </div>
+    <sc-if value="{{last}}" hint-placeholder-val="{{false}}">
+      <div style="font-size: 14px; color: #9FB0C0; text-align: center">{{last}}</div>
+    </sc-if>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 8px 16px 20px">
+    <button onClick="{{overrule}}" style="height: 72px; background: #12301B; color: #7EE08A; border: 1px solid #2B6A3A; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600">✓ Part is good</button>
+    <button onClick="{{unsure}}" style="height: 72px; background: #16212C; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600">? Not sure</button>
+    <button onClick="{{confirm}}" style="height: 72px; background: #3A1D1B; color: #FFB4AE; border: 1px solid #7A2F2A; border-radius: 14px; font: inherit; font-size: 15px; font-weight: 600">✗ Really NG</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { i: 0, last: '' }; }
+  renderVals() {
+    const cards = [
+      { reason: 'Label offset too large', where: 'Line 4 · Camera 2 · 17:41', detail: 'Offset 0.56 mm, limit 0.50 mm', x: 52, bx: 46, alt: 'Carton with the label shifted right, outlined in red' },
+      { reason: 'Date not readable', where: 'Line 9 · Camera 1 · 17:38', detail: 'AI print score 0.41, needs 0.60', x: 40, bx: 34, alt: 'Pouch with a faint date, outlined in red' },
+      { reason: 'Code not found', where: 'Line 4 · Camera 1 · 17:31', detail: 'No code in the expected area', x: 44, bx: 38, alt: 'Carton where the code area is empty, outlined in red' }
+    ];
+    const card = cards[this.state.i % cards.length];
+    const next = (msg) => this.setState({ i: this.state.i + 1, last: msg });
+    return {
+      card,
+      left: 37 - this.state.i,
+      last: this.state.last,
+      overrule: () => next('Saved as a false reject. It goes to the next training round.'),
+      unsure: () => next('Sent to Quality to decide.'),
+      confirm: () => next('Confirmed NG.')
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+@page "/audit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject CaseLog Log
+@inject ProductStore Store
+
+<PageTitle>Audit trail</PageTitle>
+
+<h1>Audit trail</h1>
+
+<section class="panel">
+    <h2>Actions</h2>
+    <table>
+        <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th></tr></thead>
+        <tbody>
+            @foreach (var a in Log.AuditTrail(300))
+            {
+                <tr class="@(a.Action.EndsWith("failed") ? "badrow" : "")">
+                    <td>@a.TimeUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm:ss")</td><td>@a.User</td><td>@a.Action</td><td>@a.Detail</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+<section class="panel">
+    <h2>Product versions</h2>
+    <label>
+        Product
+        <select @bind="code">
+            <option value="">choose...</option>
+            @foreach (var p in Store.List())
+            {
+                <option value="@p.ProductCode">@p.ProductCode</option>
+            }
+        </select>
+    </label>
+    @if (!string.IsNullOrEmpty(code))
+    {
+        var history = Store.History(code);
+        <table>
+            <thead><tr><th>Version</th><th>Saved</th><th>By</th><th>Changes from the previous version</th><th>Signature</th></tr></thead>
+            <tbody>
+                @for (int i = history.Count - 1; i >= 0; i--)
+                {
+                    var v = history[i];
+                    <tr>
+                        <td>v@v.Version</td><td>@v.UpdatedUtc.ToLocalTime().ToString("dd MMM yyyy HH:mm")</td><td>@v.UpdatedBy</td>
+                        <td>@(i == 0 ? "created" : string.Join("; ", Diff(history[i - 1], v)))</td>
+                        <td>@v.ApprovedBy</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@code {
+    private string code = "";
+
+    // field-by-field differences between two versions, from their JSON
+    private static IEnumerable<string> Diff(ProductMaster a, ProductMaster b)
+    {
+        var ja = Flatten(System.Text.Json.JsonSerializer.SerializeToElement(a), "");
+        var jb = Flatten(System.Text.Json.JsonSerializer.SerializeToElement(b), "");
+        string[] skip = { "Version", "UpdatedUtc", "UpdatedBy", "ApprovedBy" };
+        foreach (var k in ja.Keys.Union(jb.Keys).Where(k => !skip.Contains(k)).OrderBy(k => k))
+        {
+            ja.TryGetValue(k, out var va);
+            jb.TryGetValue(k, out var vb);
+            if (va != vb) yield return $"{k}: {va ?? "-"} -> {vb ?? "-"}";
+        }
+    }
+
+    private static Dictionary<string, string> Flatten(System.Text.Json.JsonElement e, string prefix)
+    {
+        var d = new Dictionary<string, string>();
+        if (e.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            foreach (var p in e.EnumerateObject())
+                foreach (var kv in Flatten(p.Value, prefix.Length == 0 ? p.Name : prefix + "." + p.Name))
+                    d[kv.Key] = kv.Value;
+        }
+        else
+        {
+            d[prefix] = e.ToString();
+        }
+        return d;
+    }
+}

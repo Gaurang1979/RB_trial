@@ -1,0 +1,94 @@
+<!-- "Areas and values" (requirement AS-15, UI-UX-SPEC.md 4.19): the top of the right dock, with
+     one row per tool line of the camera shown: the area's number (as on the picture), the tool, what it found and
+     the suggested format, with a box to change the format and "Use this format". Failing and empty rows first, in
+     red; auto find's suggestions not yet accepted last, greyed, with Accept and Not this. The chevron on its header
+     (or Ctrl+Shift+A) folds it to the header. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.AreasPanelView"
+             x:DataType="vm:AreasPanelViewModel">
+  <UserControl.Styles>
+    <Style Selector="ListBoxItem">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="BorderBrush" Value="{DynamicResource Vs.Brush.Border}" />
+      <Setter Property="BorderThickness" Value="0,0,0,1" />
+    </Style>
+    <Style Selector="Border.pending">
+      <Setter Property="Opacity" Value="0.6" />
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="{DynamicResource Vs.Radius.S}" />
+      <Setter Property="MinWidth" Value="22" />
+      <Setter Property="Padding" Value="4,1" />
+      <Setter Property="VerticalAlignment" Value="Top" />
+    </Style>
+  </UserControl.Styles>
+
+  <DockPanel>
+    <Border DockPanel.Dock="Top" Classes="headrow" Padding="2,2,6,2">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="4">
+        <Button Classes="vs tool" Command="{Binding ToggleCommand}" Name="AreasChevron" ToolTip.Tip="{l:T areas.tip.toggle}">
+          <TextBlock Text="{Binding Chevron}" FontWeight="Bold" />
+        </Button>
+        <TextBlock Grid.Column="1" Text="{l:T areas.title}" VerticalAlignment="Center" />
+        <TextBlock Grid.Column="2" Text="{Binding CountText}" VerticalAlignment="Center" Name="AreasCount" />
+      </Grid>
+    </Border>
+    <DockPanel IsVisible="{Binding Open}" MaxHeight="260" Name="AreasBody">
+      <TextBlock DockPanel.Dock="Top" Text="{l:T areas.empty}" Classes="hint" TextWrapping="Wrap" Margin="6"
+                 IsVisible="{Binding IsEmpty}" Name="AreasEmpty" />
+      <ListBox ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" Name="AreaRows" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate DataType="vm:AreaRow">
+            <Border Classes.pending="{Binding Pending}" Padding="6,4">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+                <Border Grid.RowSpan="2" Classes="toned badge" ui:Ui.Tone="{Binding Tone}">
+                  <TextBlock Text="{Binding AreaText}" FontWeight="Bold" HorizontalAlignment="Center" />
+                </Border>
+                <Grid Grid.Column="1" ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding ToolName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Grid.Column="1" Text="{Binding Line}" Classes="hint" Margin="6,0,0,0" />
+                </Grid>
+                <!-- what it found; nothing yet in red -->
+                <TextBlock Grid.Column="1" Grid.Row="1" Text="{Binding Found}" TextWrapping="Wrap" Classes="glyph"
+                           ui:Ui.Tone="{Binding Tone}" IsVisible="{Binding HasFound}" />
+                <TextBlock Grid.Column="1" Grid.Row="1" Text="{l:T areas.no_value}" Classes="glyph"
+                           ui:Ui.Tone="{Binding Tone}" IsVisible="{Binding !HasFound}" />
+                <TextBlock Grid.Column="1" Grid.Row="2" Text="{Binding Note}" Classes="glyph" ui:Ui.Tone="Ng" TextWrapping="Wrap"
+                           IsVisible="{Binding HasNote}" />
+                <TextBlock Grid.Column="1" Grid.Row="3" Text="{Binding SuggestedText}" Classes="hint" TextWrapping="Wrap"
+                           IsVisible="{Binding HasSuggested}" ToolTip.Tip="{l:T areas.suggested}" />
+                <Grid Grid.Column="1" Grid.Row="4" ColumnDefinitions="*,Auto" ColumnSpacing="4" Margin="0,2,0,0" IsVisible="{Binding HasFormat}">
+                  <TextBox Text="{Binding Format}" Watermark="{l:T areas.format}" Name="AreaFormat" />
+                  <Button Grid.Column="1" Classes="vs" Command="{Binding UseCommand}" IsEnabled="{Binding CanUse}"
+                          Name="UseFormat" ToolTip.Tip="{l:T areas.tip.use}">
+                    <TextBlock Text="{l:T areas.use}" />
+                  </Button>
+                </Grid>
+                <StackPanel Grid.Column="1" Grid.Row="4" Orientation="Horizontal" Spacing="4" Margin="0,2,0,0">
+                  <StackPanel.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="Pending" />
+                      <Binding Path="First" />
+                    </MultiBinding>
+                  </StackPanel.IsVisible>
+                  <Button Classes="vs primary" CommandParameter="{Binding}" Name="AcceptArea"
+                          Command="{Binding $parent[UserControl].((vm:AreasPanelViewModel)DataContext).AcceptCommand}">
+                    <TextBlock Text="{l:T areas.accept}" />
+                  </Button>
+                  <Button Classes="vs" CommandParameter="{Binding}" Name="NotThisArea"
+                          Command="{Binding $parent[UserControl].((vm:AreasPanelViewModel)DataContext).NotThisCommand}">
+                    <TextBlock Text="{l:T areas.not_this}" />
+                  </Button>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+  </DockPanel>
+</UserControl>

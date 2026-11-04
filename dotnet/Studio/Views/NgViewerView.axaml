@@ -1,0 +1,183 @@
+<!-- NG image viewer (UI-UX-SPEC.md 4.3): full image with result graphics, zoom, why the part is bad,
+     Previous / Next through the last bad parts; for a supervisor the review (Accept / Confirm NG, the
+     double-check of a part the software found clearly bad) and learning from the reviews (owner, 2026-10-31). -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.NgViewerView"
+             x:DataType="vm:NgViewerViewModel">
+  <Border Classes="card" Margin="{DynamicResource Vs.Pad.M}" Padding="{DynamicResource Vs.Pad.M}">
+    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="12">
+      <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+        <Button Grid.Column="0" Classes="vs" Command="{Binding BackCommand}" Name="NgBackButton" MinWidth="100">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Back}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T common.back}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="20,0,0,0" VerticalAlignment="Center">
+          <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="20" Height="20"
+                    Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+          <TextBlock Text="{Binding Title}" Classes="title" VerticalAlignment="Center" />
+        </StackPanel>
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" ToolTip.Tip="{l:T review.zoom}">
+          <Button Classes="vs" Name="NgZoomOut" Padding="10,0"><TextBlock Text="−" FontWeight="Bold" /></Button>
+          <Button Classes="vs" Name="NgZoomIn" Padding="10,0"><TextBlock Text="+" FontWeight="Bold" /></Button>
+          <Button Classes="vs" Name="NgZoomFit" Padding="8,0">
+            <PathIcon Width="16" Height="16" Data="{Binding Source={x:Static vm:Icons.Fit}, Converter={x:Static ui:IconConverter.Instance}}" />
+          </Button>
+        </StackPanel>
+      </Grid>
+
+      <Grid Grid.Row="1" ColumnDefinitions="*,340">
+        <Border Grid.Column="0" Classes="frame" ui:Ui.Tone="{Binding Tone}" Margin="0,0,12,0" Name="NgImageFrame">
+          <Panel>
+          <ui:ZoomBox Name="NgZoom">
+          <Panel>
+            <Image Source="{Binding Image}" Stretch="Uniform" />
+            <ui:ResultOverlay Name="NgOverlay" Graphics="{Binding Graphics}" ImageWidth="{Binding ImageWidth}"
+                              ImageHeight="{Binding ImageHeight}" TooltipText="{Binding TooltipText}"
+                              TooltipAt="{Binding TooltipAt}" />
+          </Panel>
+          </ui:ZoomBox>
+            <Border Classes="toned" ui:Ui.Tone="Info" VerticalAlignment="Bottom" HorizontalAlignment="Center"
+                    Margin="{DynamicResource Vs.Pad.M}" Padding="12,6" CornerRadius="{DynamicResource Vs.Radius.M}"
+                    IsVisible="{Binding ImageNote, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding ImageNote}" TextWrapping="Wrap" MaxWidth="600" />
+            </Border>
+          </Panel>
+        </Border>
+        <Grid Grid.Column="1" RowDefinitions="*,Auto" RowSpacing="8">
+        <Border Grid.Row="0" Classes="card" Name="NgChecks">
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="{l:T ng.checks}" Classes="muted" Margin="0,0,0,8" />
+            <ScrollViewer>
+              <ItemsControl ItemsSource="{Binding Checks}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:CheckLine">
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,3">
+                      <PathIcon Classes="glyph" ui:Ui.Tone="{Binding Tone}" Width="14" Height="14" VerticalAlignment="Top"
+                                Data="{Binding Icon, Converter={x:Static ui:IconConverter.Instance}}" />
+                      <TextBlock Grid.Column="1" Text="{Binding Text}" TextWrapping="Wrap" Margin="8,0,0,0"
+                                 FontSize="{DynamicResource Vs.Font.Body}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+          </DockPanel>
+        </Border>
+
+        <!-- The supervisor's review of the part shown, and learning from the reviews. -->
+        <Border Grid.Row="1" Classes="card" Name="ReviewPanel" IsVisible="{Binding MayReview}" Padding="10" MaxHeight="520">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="6">
+            <TextBlock Text="{l:T review.title}" FontWeight="SemiBold" />
+            <Grid ColumnDefinitions="*,6,*" IsVisible="{Binding !DoubleCheck}">
+              <Button Classes="vs" Name="ReviewAccept" Command="{Binding AcceptCommand}" IsEnabled="{Binding CanReviewPart}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T review.accept.tip}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Classes="glyph" ui:Ui.Tone="Ok" Width="14" Height="14"
+                            Data="{Binding Source={x:Static vm:Icons.Check}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T review.accept}" />
+                </StackPanel>
+              </Button>
+              <Button Grid.Column="2" Classes="vs" Name="ReviewConfirm" Command="{Binding ConfirmNgCommand}" IsEnabled="{Binding CanReviewPart}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T review.confirm.tip}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Classes="glyph" ui:Ui.Tone="Ng" Width="14" Height="14"
+                            Data="{Binding Source={x:Static vm:Icons.Cross}, Converter={x:Static ui:IconConverter.Instance}}" />
+                  <TextBlock Text="{l:T review.confirm}" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <!-- Double-check: the software found this part clearly bad. The safe choices come first. -->
+            <Border Classes="toned" ui:Ui.Tone="Warn" Padding="8" IsVisible="{Binding DoubleCheck}" Name="DoubleCheckPanel"
+                    CornerRadius="{DynamicResource Vs.Radius.M}">
+              <StackPanel Spacing="4">
+                <TextBlock Text="{l:T review.looks_bad}" TextWrapping="Wrap" FontWeight="SemiBold" IsVisible="{Binding !Unreadable}" />
+                <TextBlock Text="{l:T review.unreadable}" TextWrapping="Wrap" FontWeight="SemiBold" IsVisible="{Binding Unreadable}" />
+                <TextBlock Text="{l:T review.found}" />
+                <ItemsControl ItemsSource="{Binding Faults}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="8,0,0,0" /></DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Classes="vs primary" Name="DoubleCheckBad" Command="{Binding ConfirmNgCommand}" HorizontalAlignment="Stretch">
+                  <TextBlock Text="{l:T review.it_is_bad}" />
+                </Button>
+                <Button Classes="vs" Name="DoubleCheckRecord" Command="{Binding AcceptRecordOnlyCommand}" HorizontalAlignment="Stretch"
+                        ToolTip.Tip="{l:T review.record_only.tip}">
+                  <TextBlock Text="{l:T review.record_only}" />
+                </Button>
+                <Button Classes="vs" Name="DoubleCheckGood" Command="{Binding AcceptCheckedCommand}" HorizontalAlignment="Stretch"
+                        IsVisible="{Binding Unreadable}" ToolTip.Tip="{l:T review.accept_checked.tip}">
+                  <TextBlock Text="{l:T review.accept_checked}" />
+                </Button>
+                <Button Classes="vs" Command="{Binding CancelDoubleCheckCommand}" HorizontalAlignment="Stretch">
+                  <TextBlock Text="{l:T common.back}" />
+                </Button>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="{Binding ReviewText}" TextWrapping="Wrap" Name="ReviewText" Classes="glyph" ui:Ui.Tone="{Binding ReviewTone}"
+                       IsVisible="{Binding ReviewText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Text="{Binding CountsText}" Classes="muted" TextWrapping="Wrap" Name="ReviewCounts" />
+            <Button Classes="vs" Name="LearnButton" Command="{Binding LearnCommand}" IsEnabled="{Binding !ReviewBusy}"
+                    HorizontalAlignment="Stretch" ToolTip.Tip="{l:T review.learn.tip}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <PathIcon Width="14" Height="14" Data="{Binding Source={x:Static vm:Icons.Teach}, Converter={x:Static ui:IconConverter.Instance}}" />
+                <TextBlock Text="{l:T review.learn}" />
+              </StackPanel>
+            </Button>
+            <StackPanel IsVisible="{Binding HasLearning}" Spacing="2" Name="LearnResult">
+              <ItemsControl ItemsSource="{Binding LearnLines}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate DataType="vm:LearnLine">
+                    <TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontWeight="{Binding Looser, Converter={x:Static vm:ReviewConverters.LooserWeight}}" />
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <TextBlock Text="{Binding LearnText}" TextWrapping="Wrap" Classes="muted" />
+              <Button Classes="vs primary" Name="ApplyLearning" Command="{Binding ApplyLearningCommand}" IsVisible="{Binding CanApplyLearning}"
+                      HorizontalAlignment="Stretch" ToolTip.Tip="{l:T review.apply.tip}">
+                <TextBlock Text="{l:T review.apply}" />
+              </Button>
+            </StackPanel>
+          </StackPanel>
+          </ScrollViewer>
+        </Border>
+        </Grid>
+      </Grid>
+
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto">
+        <Button Grid.Column="0" Classes="vs" Name="NgPreviousButton" Command="{Binding PreviousCommand}"
+                Classes.unavailable="{Binding !HasPrevious}" MinWidth="100">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Previous}, Converter={x:Static ui:IconConverter.Instance}}" />
+            <TextBlock Text="{l:T ng.previous}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <TextBlock Text="{Binding PositionText}" VerticalAlignment="Center" FontSize="{DynamicResource Vs.Font.Title}" />
+          <!-- "Was OK" (UI-UX-SPEC.md 4.3, AS-04k): the operator's "I think this part was good", for the supervisor. -->
+          <Button Classes="vs" Name="NgWasOk" Command="{Binding WasOkCommand}" IsVisible="{Binding CanFlagPart}"
+                  IsEnabled="{Binding !FlagBusy}" ToolTip.Tip="{l:T ng.was_ok.tip}">
+            <TextBlock Text="{l:T ng.was_ok}" VerticalAlignment="Center" />
+          </Button>
+          <TextBlock Text="{Binding FlagText}" Name="NgFlagText" Classes="glyph" ui:Ui.Tone="Info" VerticalAlignment="Center"
+                     TextWrapping="Wrap" MaxWidth="360"
+                     IsVisible="{Binding FlagText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+        </StackPanel>
+        <Button Grid.Column="2" Classes="vs" Name="NgNextButton" Command="{Binding NextCommand}"
+                Classes.unavailable="{Binding !HasNext}" MinWidth="100">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="{l:T ng.next}" VerticalAlignment="Center" />
+            <PathIcon Data="{Binding Source={x:Static vm:Icons.Next}, Converter={x:Static ui:IconConverter.Instance}}" />
+          </StackPanel>
+        </Button>
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>

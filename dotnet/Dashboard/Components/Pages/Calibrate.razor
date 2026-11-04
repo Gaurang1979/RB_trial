@@ -1,0 +1,427 @@
+@page "/calibrate"
+@attribute [Authorize(Roles = Roles.Operator + "," + Roles.Engineer + "," + Roles.QA)]
+@rendermode InteractiveServer
+@inject Station Station
+@inject ProductStore Products
+@inject UserStore Users
+@inject CaseLog Log
+@inject NavigationManager Nav
+
+<PageTitle>Auto calibrate</PageTitle>
+
+<h1>Auto calibrate</h1>
+<p class="muted">
+    Run at the start of the day, or after a camera, light or product change. Put a full case under the camera
+    (for a moving line: run a case through while calibrating). The camera takes two pictures 80 ms apart; the
+    calibration proposes exposure, gain, the crop around the case, the trigger delay and the light timing.
+    Nothing changes until you apply it.
+</p>
+
+<section class="panel controls">
+    <label>
+        Product
+        <select @bind="product" @bind:after="LoadProduct">
+            <option value="">choose...</option>
+            @foreach (var p in products)
+            {
+                <option value="@p.ProductCode">@p.ProductCode: @p.Name (@p.ChildFormat x @p.CodesPerCase)</option>
+            }
+        </select>
+    </label>
+    <label>
+        Source
+        <select @bind="source">
+            <option value="@SourceKind.Camera">Camera</option>
+            <option value="@SourceKind.Replay">Saved image</option>
+        </select>
+    </label>
+    @if (source == SourceKind.Replay)
+    {
+        <label>
+            Image
+            <select @bind="replayImage">
+                @foreach (var n in Station.ReplayImages())
+                {
+                    <option value="@n">@n</option>
+                }
+            </select>
+        </label>
+    }
+    <label>
+        Cases are
+        <select @bind="motion">
+            <option value="@CaseMotion.Still">standing still</option>
+            <option value="@CaseMotion.Moving">moving slowly</option>
+        </select>
+    </label>
+</section>
+
+<section class="panel controls">
+    <label>
+        Light switched by
+        <select @bind="light.Control">
+            <option value="@LightControl.CameraStrobe">camera (Line1 strobe)</option>
+            <option value="@LightControl.Plc">PLC</option>
+        </select>
+    </label>
+    <label>On before exposure (us) <input type="number" min="0" @bind="light.PreOnUs" /></label>
+    <label>On after exposure (us) <input type="number" min="0" @bind="light.PostOnUs" /></label>
+    <label>Longest light pulse (us, 0 = no limit) <input type="number" min="0" @bind="light.MaxOnUs" /></label>
+    @if (canCalibrate)
+    {
+        <button disabled="@(string.IsNullOrEmpty(product) || busy)" @onclick="Run">@(busy ? "Calibrating..." : "Auto calibrate")</button>
+        @if (source == SourceKind.Camera)
+        {
+            <button disabled="@(string.IsNullOrEmpty(product) || busy)" @onclick="SaveFrames"
+                    title="Takes 3 frames of the case under the camera, at 1x, 0.6x and 1.6x the calibrated brightness (exposure where the light and motion allow, else gain), and saves them as test frames for the multi-frame reader (data/test-frames).">Save 3 test frames</button>
+        }
+    }
+    else
+    {
+        <span class="muted">Calibrating needs the Operator or Engineer role.</span>
+    }
+</section>
+
+@if (message is not null)
+{
+    <p class="@(messageOk ? "good" : "bad")">@message</p>
+}
+
+@if (!string.IsNullOrEmpty(product) && canCalibrate)
+{
+    var g = grading ?? Station.Grading(product);
+    <section class="panel">
+        <h2>Grading calibration (verifier-style print grades)</h2>
+        <p class="muted">Optional. Without it the print grades are camera-relative (good for trends). With it they are in reflectance % and mm, comparable with a verifier.</p>
+        <p>
+            Flat field: <b>@(g.HasFlatField ? "set" : "not set")</b> ·
+            Reflectance: <b>@(g.HasReflectance ? $"{g.ReflDarkPct:0.#}% / {g.ReflLightPct:0.#}% card" : "not set")</b> ·
+            Scale: <b>@(g.HasScale ? $"{g.Lens!.MmPerPx:0.0000} mm/px{(g.Lens.RmsPx >= 0 ? ", lens corrected" : "")}" : "not set")</b>
+            @if (g.UpdatedUtc is { } t) { <span class="muted"> (@t.ToLocalTime().ToString("yyyy-MM-dd HH:mm"), @g.UpdatedBy)</span> }
+        </p>
+        <div class="row">
+            <button disabled="@busy" @onclick="WhiteCard" title="Lay a plain white card over the whole case top, light on, then press.">1. White card</button>
+            <label>Card dark % <input type="number" step="0.1" min="0" max="100" @bind="reflDark" style="width:5em" /></label>
+            <label>light % <input type="number" step="0.1" min="0" max="100" @bind="reflLight" style="width:5em" /></label>
+            <button disabled="@busy" @onclick="ReflectanceCard" title="A card with one dark and one light patch of certified reflectance (printed on it), filling the middle of the view.">2. Reflectance card</button>
+            <label>Chessboard inner corners <input type="number" min="3" @bind="boardCols" style="width:4em" /> x <input type="number" min="3" @bind="boardRows" style="width:4em" /></label>
+            <label>square mm <input type="number" step="0.1" min="0.5" @bind="squareMm" style="width:5em" /></label>
+            <button disabled="@busy" @onclick="Chessboard" title="A printed chessboard lying flat on the case top. Gives mm per pixel (the X-dimension in mm).">3. Chessboard</button>
+        </div>
+    </section>
+}
+
+@if (view is { } v)
+{
+    var r = v.Result;
+    var cur = v.Current;
+    var pro = r.Proposed;
+    <section class="live">
+        <div class="frame">
+            <img src="data:image/jpeg;base64,@Convert.ToBase64String(v.PreviewJpeg)" alt="calibration picture: read codes green, crop blue" />
+            <div class="muted">@v.Source. <span class="good">Green</span>: read. <span class="bad">Red</span>: not read. Blue: the crop; the dimmed part is not processed. Shown small; the full resolution is processed.</div>
+        </div>
+        <div class="side-panels">
+            <div class="panel">
+                <h2>Checks</h2>
+                @foreach (var c in r.Checks)
+                {
+                    <p class="@(c.Ok ? "" : "warn")"><b>@(c.Ok ? "OK" : "CHECK")</b> @c.Name: @c.Message</p>
+                }
+            </div>
+            @if (v.Print.Count > 0)
+            {
+                <div class="panel">
+                    <h2>Print quality</h2>
+                    <p>
+                        @foreach (var letter in new[] { "A", "B", "C", "D", "F" })
+                        {
+                            int n = v.Print.Count(p => p.Letter == letter);
+                            if (n > 0) { <span class="@(letter is "A" or "B" ? "good" : letter == "C" ? "" : "bad")"><b>@letter</b> @n &nbsp;</span> }
+                        }
+                    </p>
+                    <p class="muted">@(v.Print[0].Calibrated ? "Reflectance-calibrated" : "Camera-relative (set the grading calibration for verifier-style grades)") ·
+                        @(v.Print[0].Linear ? "ISO/IEC 15416" : "ISO/IEC 15415") · worst first</p>
+                    <table>
+                        <thead><tr><th>Code</th><th>Grade</th><th>SC %</th><th>MOD</th><th>X mm</th></tr></thead>
+                        <tbody>
+                            @foreach (var p in v.Print.Take(8))
+                            {
+                                <tr class="@(p.Grade <= 1 ? "warn" : "")">
+                                    <td title="@p.Text">…@(p.Text.Length > 10 ? p.Text[^10..] : p.Text)</td>
+                                    <td><b>@p.Letter</b></td>
+                                    <td>@p.SymbolContrast.ToString("0")</td>
+                                    <td>@p.Modulation.ToString("0.00")</td>
+                                    <td>@(p.XDimMm > 0 ? p.XDimMm.ToString("0.000") : "-")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </section>
+
+    @if (r.Trials.Count > 0)
+    {
+        <section class="panel">
+            <h2>Search</h2>
+            <p class="muted">
+                @(r.ProbeFrames > 0 ? $"{r.ProbeFrames} short probe frame{(r.ProbeFrames == 1 ? "" : "s")} set the start; " : "")
+                then each setting was read in full. A setting with more than 2% of the code pixels at the sensor maximum is ruled out, however well it reads.
+            </p>
+            <table>
+                <thead><tr><th></th><th>Exposure</th><th>Gain</th><th>Codes</th><th>Labels</th><th>Clipped</th><th>Result</th></tr></thead>
+                <tbody>
+                    @foreach (var trial in r.Trials)
+                    {
+                        <tr class="@(trial.Usable ? "" : "warn")">
+                            <td>@trial.Stage</td>
+                            <td>@trial.ExposureUs.ToString("0") us</td>
+                            <td>@trial.GainDb.ToString("0.0") dB</td>
+                            <td>@trial.CodesRead</td>
+                            <td>@trial.LabelBrightness.ToString("0")</td>
+                            <td>@trial.CodeSaturation.ToString("P1")</td>
+                            <td>@trial.Verdict</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </section>
+    }
+
+    <section class="panel">
+        <h2>Settings</h2>
+        <table>
+            <thead><tr><th></th><th>Now</th><th>Proposed</th></tr></thead>
+            <tbody>
+                <tr><td>Exposure</td><td>@cur.ExposureUs.ToString("0") us</td><td>@pro.ExposureUs.ToString("0") us</td></tr>
+                <tr><td>Gain</td><td>@cur.GainDb.ToString("0.0") dB</td><td>@pro.GainDb.ToString("0.0") dB</td></tr>
+                <tr><td>Trigger delay</td><td>@cur.TriggerDelayUs.ToString("0") us</td><td>@pro.TriggerDelayUs.ToString("0") us</td></tr>
+                <tr><td>Crop</td><td>@Roi(cur.Roi)</td><td>@Roi(pro.Roi)</td></tr>
+                <tr><td>Cases</td><td>@Motion(cur)</td><td>@Motion(pro)</td></tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel">
+        <h2>Light timing (from the trigger)</h2>
+        @{
+            var t = r.Light;
+            double end = Math.Max(t.LightOffAtUs, t.ExposureEndUs) * 1.15 + 1;
+            string X(double us) => (95 + us / end * 580).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+        }
+        <svg viewBox="0 0 700 150" class="timing" role="img" aria-label="light and exposure timing">
+            <text x="0" y="30">Trigger</text>
+            <line x1="@X(0)" y1="18" x2="@X(0)" y2="38" class="trig" />
+            <text x="0" y="75">Light</text>
+            <rect x="@X(t.LightOnAtUs)" y="60" width="@((t.LightOnForUs / end * 580).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))" height="20" class="light" />
+            <text x="0" y="120">Exposure</text>
+            <rect x="@X(t.TriggerDelayUs)" y="105" width="@((t.ExposureUs / end * 580).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture))" height="20" class="expo" />
+            <text x="@X(t.LightOnAtUs)" y="55" class="small">on @((t.LightOnAtUs / 1000).ToString("0.###")) ms</text>
+            <text x="@X(t.LightOffAtUs)" y="95" class="small" text-anchor="end">off @((t.LightOffAtUs / 1000).ToString("0.###")) ms</text>
+        </svg>
+        @if (light.Control == LightControl.Plc)
+        {
+            <p>For the PLC program:</p>
+            <ol>
+                @foreach (var step in t.PlcSteps(framesPerCase))
+                {
+                    <li>@step</li>
+                }
+            </ol>
+        }
+        else
+        {
+            <p class="muted">
+                The camera's Line1 output switches the light: on @t.LightOnAtUs.ToString("0") us after the trigger,
+                for @t.LightOnForUs.ToString("0") us (pre-delay @light.PreOnUs.ToString("0") us). Applied to the camera when the line starts.
+            </p>
+        }
+    </section>
+
+    @if (canCalibrate)
+    {
+        <section class="panel">
+            @if (locked)
+            {
+                <fieldset>
+                    <legend>QA e-signature (locked product)</legend>
+                    @if (!isQa)
+                    {
+                        <p class="warn">This product is locked: applying a calibration needs a user with the QA role.</p>
+                    }
+                    else
+                    {
+                        <label>Reason <input @bind="signReason" size="40" /></label>
+                        <label>Password <input type="password" @bind="signPassword" autocomplete="current-password" /></label>
+                    }
+                </fieldset>
+            }
+            <button disabled="@(busy || (locked && !isQa))" @onclick="Apply">Apply to @v.Product</button>
+            <span class="muted">Saved as a new product version; the change is in the audit trail.</span>
+        </section>
+    }
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+    [SupplyParameterFromQuery(Name = "product")] private string? QueryProduct { get; set; }
+
+    private IReadOnlyList<ProductMaster> products = Array.Empty<ProductMaster>();
+    private string product = "";
+    private SourceKind source = SourceKind.Camera;
+    private string? replayImage;
+    private CaseMotion motion = CaseMotion.Still;
+    private LightSettings light = new();
+    private int framesPerCase = 1;
+    private CalibrationView? view;
+    private string? message;
+    private bool messageOk, busy, canCalibrate, isQa, locked;
+    private GradingCalibration? grading;
+    private float reflDark = 5f, reflLight = 85f, squareMm = 10f;
+    private int boardCols = 9, boardRows = 6;
+    private string user = "", signReason = "", signPassword = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        products = Products.List();
+        replayImage = Station.ReplayImages().FirstOrDefault();
+        source = Station.Snapshot().Source; // the source the line last ran from
+        if (!string.IsNullOrEmpty(QueryProduct) && products.Any(p => p.ProductCode == QueryProduct))
+        {
+            product = QueryProduct;
+            LoadProduct();
+        }
+        if (Auth is not null)
+        {
+            var u = (await Auth).User;
+            user = u.Identity?.Name ?? "";
+            canCalibrate = u.IsInRole(Roles.Operator) || u.IsInRole(Roles.Engineer);
+            isQa = u.IsInRole(Roles.QA);
+        }
+    }
+
+    // the product's stored motion and light settings are the starting point
+    private void LoadProduct()
+    {
+        view = null;
+        grading = null;
+        var p = products.FirstOrDefault(x => x.ProductCode == product);
+        if (p is null) return;
+        motion = p.ChildCamera.Motion;
+        light = p.ChildCamera.Light.Clone();
+        framesPerCase = p.ChildCamera.FramesPerCase;
+    }
+
+    private async Task Run()
+    {
+        message = null;
+        busy = true;
+        try
+        {
+            var src = source;
+            var img = src == SourceKind.Replay && replayImage is not null ? Station.ReplayImagePath(replayImage) : null;
+            var m = motion;
+            var l = light.Clone();
+            view = await Task.Run(() => Station.Calibrate(product, src, user, m, l, img));
+            locked = Products.Get(product)?.Mode == LearningMode.Locked;
+        }
+        catch (Exception e)
+        {
+            view = null;
+            message = e.Message;
+            messageOk = false;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    // the grading calibration steps: one frame each, from the camera or the chosen saved image
+    private async Task Grade(Func<GradingCalibration> step, string done)
+    {
+        message = null;
+        busy = true;
+        try
+        {
+            grading = await Task.Run(step);
+            message = done;
+            messageOk = true;
+        }
+        catch (Exception e)
+        {
+            message = e.Message;
+            messageOk = false;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private Task WhiteCard() => Grade(() => Station.CalibrateWhiteCard(product, source, replayImage, user), "White card saved: the flat field is set.");
+    private Task ReflectanceCard() => Grade(() => Station.CalibrateReflectance(product, source, replayImage, reflDark, reflLight, user), "Reflectance card measured.");
+    private Task Chessboard() => Grade(() => Station.CalibrateChessboard(product, source, replayImage, boardCols, boardRows, squareMm, user), "Scale measured from the chessboard.");
+
+    private async Task SaveFrames()
+    {
+        message = null;
+        busy = true;
+        try
+        {
+            int n = Math.Max(3, Products.Get(product)?.ChildCamera.FramesPerCase ?? 3);
+            var dir = await Task.Run(() => Station.SaveTestFrames(product, n, user));
+            message = $"{n} test frames saved in {dir}";
+            messageOk = true;
+        }
+        catch (Exception e)
+        {
+            message = e.Message;
+            messageOk = false;
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void Apply()
+    {
+        if (view is null) return;
+        message = null;
+        try
+        {
+            string? approvedBy = null;
+            if (locked)
+            {
+                if (!isQa) throw new InvalidOperationException("QA role needed");
+                if (string.IsNullOrWhiteSpace(signReason)) throw new InvalidOperationException("give a reason for the signature");
+                if (Users.Verify(user, signPassword) is null)
+                {
+                    Log.Audit(user, "signature-failed", view.Product);
+                    throw new InvalidOperationException("password does not match: not signed");
+                }
+                approvedBy = $"{user} {DateTime.Now:yyyy-MM-dd HH:mm}: {signReason}";
+            }
+            var saved = Station.ApplyCalibration(view.Product, view.Result.Proposed, user, approvedBy);
+            message = $"Applied: {saved.ProductCode} version {saved.Version}. Start the line from the Live page.";
+            messageOk = true;
+        }
+        catch (Exception e)
+        {
+            message = e.Message;
+            messageOk = false;
+        }
+        finally
+        {
+            signPassword = "";
+        }
+    }
+
+    private static string Roi(RoiSettings? r) => r is null ? "whole image" : $"{r.Width} x {r.Height} at ({r.X}, {r.Y})";
+
+    private static string Motion(CameraSettings c) =>
+        c.Motion == CaseMotion.Still ? "still" : c.SpeedPxPerMs > 0 ? $"moving, {c.SpeedPxPerMs * 1000:0} px/s" : "moving (speed not measured)";
+}

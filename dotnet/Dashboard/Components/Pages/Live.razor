@@ -1,0 +1,321 @@
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@implements IDisposable
+@inject Station Station
+@inject ProductStore Products
+@inject Microsoft.Extensions.Options.IOptions<StationOptions> Options
+
+<PageTitle>Live</PageTitle>
+
+<h1>Live</h1>
+
+<section class="panel controls">
+    @if (snap.Running)
+    {
+        <div>
+            Running <b>@snap.Product</b> (@snap.Source) since @snap.StartedUtc?.ToLocalTime().ToString("HH:mm"), started by @snap.StartedBy.
+            AI locator @(snap.ModelLoaded ? "on" : "off"), enhancer @(snap.EnhancerLoaded ? "on" : "off").
+        </div>
+        @if (canOperate)
+        {
+            <button class="danger" @onclick="Stop">Stop</button>
+        }
+    }
+    else
+    {
+        <label>
+            Product
+            <select @bind="product">
+                <option value="">choose...</option>
+                @foreach (var p in products)
+                {
+                    <option value="@p.ProductCode">@p.ProductCode: @p.Name (@p.ChildFormat x @p.CodesPerCase)</option>
+                }
+            </select>
+        </label>
+        <label>
+            Source
+            <select @bind="source">
+                <option value="@SourceKind.Camera">Camera</option>
+                <option value="@SourceKind.Replay">Replay saved images</option>
+            </select>
+        </label>
+        @if (source == SourceKind.Replay)
+        {
+            <label>Folder <input @bind="replayFolder" placeholder="folder with .bmp images" size="40" /></label>
+        }
+        @if (canOperate)
+        {
+            <button disabled="@string.IsNullOrEmpty(product)" @onclick="Start">Start</button>
+            <a class="button secondary" href="calibrate?product=@Uri.EscapeDataString(product)">Auto calibrate</a>
+            @if (products.FirstOrDefault(p => p.ProductCode == product) is { } chosen)
+            {
+                var cal = chosen.ChildCamera.CalibratedUtc;
+                <span class="@(cal?.ToLocalTime().Date == DateTime.Today ? "muted" : "warn")">
+                    @(cal is null ? "Never calibrated" : cal.Value.ToLocalTime().Date == DateTime.Today ? $"Calibrated today {cal.Value.ToLocalTime():HH:mm}" : $"Last calibrated {cal.Value.ToLocalTime():dd MMM HH:mm}: calibrate before starting")
+                </span>
+            }
+        }
+        else
+        {
+            <span class="muted">Starting the line needs the Operator role.</span>
+        }
+    }
+    @if (error is not null)
+    {
+        <p class="bad">@error</p>
+    }
+    @if (snap.Error is not null)
+    {
+        <p class="bad">Station: @snap.Error</p>
+    }
+    @if (snap.Health?.Warning is { } warning)
+    {
+        <p class="bad">PC: @warning</p>
+    }
+</section>
+
+@if (snap.Last is { } last)
+{
+    var st = last.Result.Stats;
+    <section class="kpis">
+        <div class="kpi @(last.Ok ? "ok" : "reject")">
+            <div class="big">@(last.Ok ? "OK" : "REJECT")</div>
+            <div class="muted">case @last.Id, @last.TimeUtc.ToLocalTime().ToString("HH:mm:ss")</div>
+            @if (last.Duplicates is { Any: true } d)
+            {
+                <div class="dup-text">DUPLICATE: @(d.Children.Count > 0 ? $"{d.Children.Count} child code{(d.Children.Count == 1 ? "" : "s")}" : "")@(d.Children.Count > 0 && d.Parent ? ", " : "")@(d.Parent ? "case code" : "")</div>
+            }
+        </div>
+        <div class="kpi">
+            <div class="big">@st.Codes / @st.Expected</div>
+            <div class="muted">codes read@(last.Result.Misses.Count > 0 ? $", {last.Result.Misses.Count} unread regions" : "")</div>
+        </div>
+        <div class="kpi @(st.TotalMs > 200 ? "warnbg" : "")">
+            <div class="big">@st.TotalMs.ToString("F0") ms</div>
+            <div class="muted">decode time</div>
+        </div>
+        <div class="kpi @(st.LabelBrightness < 100 ? "warnbg" : "")">
+            <div class="big">@st.LabelBrightness.ToString("F0")</div>
+            <div class="muted">label brightness (target 150-200)</div>
+        </div>
+        <div class="kpi">
+            <div class="big">@snap.OkCases / @snap.Cases</div>
+            <div class="muted">cases OK this run, read rate @snap.ReadRate.ToString("P1")</div>
+        </div>
+        <div class="kpi @(last.Duplicates?.Parent == true ? "dupbg" : "")">
+            <div class="big small">@(last.ParentCode is null ? "-" : Printable(last.ParentCode))</div>
+            <div class="muted">parent code@(last.Duplicates?.Parent == true ? ": DUPLICATE" : "")</div>
+        </div>
+    </section>
+
+    <section class="live">
+        <div class="frame">
+            @* one img element: the browser keeps showing the old picture until the new one loads *@
+            <div class="frame-img">
+                <img src="api/station/@(snap.PreviewSearching ? "found" : "preview").jpg?v=@snap.PreviewVersion"
+                     alt="@(snap.PreviewSearching ? "new case: codes found, decoding" : "last case: read codes in green, unread regions in red")" />
+                @* hover a red box: why it did not read, with the numbers *@
+                @if (!snap.PreviewSearching && last.ImageWidth > 0 && last.ImageHeight > 0)
+                {
+                    foreach (var miss in last.Result.MissInfo)
+                    {
+                        <div class="miss-spot" title="@miss.Tooltip"
+                             style="@Spot(miss.Box, last.ImageWidth, last.ImageHeight)"></div>
+                    }
+                }
+            </div>
+            @if (snap.PreviewSearching)
+            {
+                <div class="muted"><span class="found-text">Yellow</span>: codes found, decoding...</div>
+            }
+            else
+            {
+                <div class="muted">@last.Source. <span class="good">Green</span>: read. <span class="dup-text">Orange</span>: duplicate. <span class="bad">Red</span>: found but did not read, tagged with why (hover for the numbers).</div>
+            }
+        </div>
+        <div class="side-panels">
+            @if (snap.Zones is { } zones && Enumerable.Range(0, 16).Any(z => zones.MissRate(z) is not null))
+            {
+                <div class="panel">
+                    <h2>Where codes fail</h2>
+                    <p class="muted">The image in 4 x 4 zones: share of code regions not read since the start. Each zone learns its own fixes.</p>
+                    <div class="zones">
+                        @for (int z = 0; z < 16; z++)
+                        {
+                            var rate = zones.MissRate(z);
+                            <div class="zone @(rate is null ? "none" : rate >= 0.2 ? "bad" : rate >= 0.05 ? "warn" : "ok")"
+                                 title="@(zones.Read[z] + zones.Unread[z]) regions, @zones.Unread[z] not read">
+                                @(rate is null ? "" : rate.Value.ToString("P0"))
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+            @if (snap.MissReasons is { Count: > 0 } reasons)
+            {
+                <div class="panel">
+                    <h2>Why codes did not read</h2>
+                    <p class="muted">Unread regions of @snap.MissReasonCases short case@(snap.MissReasonCases == 1 ? "" : "s") since @snap.StartedUtc?.ToLocalTime().ToString("HH:mm"), by cause. Regions that are not codes (glass, label edges) count too: look at the top causes.</p>
+                    <table class="reasons">
+                        <tbody>
+                            @foreach (var (reason, count) in reasons)
+                            {
+                                <tr title="@MissDiagnosis.FixOf(reason)">
+                                    <td><span class="reason-tag">@MissDiagnosis.TagOf(reason)</span></td>
+                                    <td class="num">@count</td>
+                                    <td class="muted">@MissDiagnosis.FixOf(reason)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            <div class="panel">
+                <h2>Advice</h2>
+                @if (snap.Advice.Count == 0)
+                {
+                    <p class="muted">Nothing to fix.</p>
+                }
+                @foreach (var a in snap.Advice)
+                {
+                    <p class="advice">
+                        <b>@a.Code</b>: @a.Message
+                        @if (a.SuggestedExposureUs is { } e)
+                        {
+                            <br /><span>Suggested exposure: @e.ToString("F0") us</span>
+                        }
+                    </p>
+                }
+            </div>
+            <div class="panel codes">
+                <h2>Codes (@last.Result.Codes.Count)</h2>
+                <table>
+                    <thead><tr><th>GTIN</th><th>Batch</th><th>Serial</th><th>Read by</th></tr></thead>
+                    <tbody>
+                        @foreach (var c in last.Result.Codes.OrderByDescending(IsDup).Take(100))
+                        {
+                            <tr title="@Printable(c.Text)" class="@(IsDup(c) ? "duprow" : "")">
+                                @if (c.Gs1 is { } g)
+                                {
+                                    <td>@g.Gtin@(g.CheckDigitValid ? "" : " (bad check digit)")</td><td>@g.Batch</td><td>@g.Serial</td>
+                                }
+                                else
+                                {
+                                    <td colspan="3">@Printable(c.Text)</td>
+                                }
+                                <td>@c.Step</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+}
+else if (snap.Running)
+{
+    <p class="muted">Waiting for the first case...</p>
+}
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private StationSnapshot snap = default!;
+    private IReadOnlyList<ProductMaster> products = Array.Empty<ProductMaster>();
+    private string product = "";
+    private SourceKind source = SourceKind.Camera;
+    private string? replayFolder;
+    private string? error;
+    private bool canOperate;
+    private string user = "";
+    private readonly CancellationTokenSource cts = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        snap = Station.Snapshot();
+        products = Products.List();
+        replayFolder = Options.Value.ReplayFolder;
+        if (Auth is not null)
+        {
+            var u = (await Auth).User;
+            canOperate = u.IsInRole(Roles.Operator);
+            user = u.Identity?.Name ?? "";
+        }
+        // subscribed here, not in the loop: Dispose may run before the loop starts
+        Station.Changed += OnStationChanged;
+        _ = RefreshLoop(cts.Token);
+    }
+
+    private readonly SemaphoreSlim changed = new(0, 1);
+    private DateTime lastDraw;
+
+    private void OnStationChanged()
+    {
+        // runs on the station's thread: never let a closing page throw into it
+        try { changed.Release(); }
+        catch (Exception e) when (e is SemaphoreFullException or ObjectDisposedException) { }
+    }
+
+    // redraws when the station changes (yellow found boxes, then green / red), at most 10 times a
+    // second whatever the line speed, and at least every second; the latest picture always shows
+    private async Task RefreshLoop(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await changed.WaitAsync(TimeSpan.FromSeconds(1), token);
+                var wait = TimeSpan.FromMilliseconds(100) - (DateTime.UtcNow - lastDraw);
+                if (wait > TimeSpan.Zero) await Task.Delay(wait, token);
+                lastDraw = DateTime.UtcNow;
+                var s = Station.Snapshot();
+                if (s.PreviewVersion == snap.PreviewVersion && s.Running == snap.Running && s.Error == snap.Error &&
+                    s.Health?.Warning == snap.Health?.Warning) continue;
+                snap = s;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (Exception e) when (e is OperationCanceledException or ObjectDisposedException)
+        {
+        }
+    }
+
+    private void Start()
+    {
+        error = null;
+        try
+        {
+            Station.Start(product, source, user, source == SourceKind.Replay ? replayFolder : null);
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+        }
+        snap = Station.Snapshot();
+    }
+
+    private void Stop()
+    {
+        Station.Stop(user);
+        snap = Station.Snapshot();
+    }
+
+    // duplicates are listed first and in orange
+    private bool IsDup(DecodedCode c) => snap.Last?.Duplicates?.Children.Contains(c.Text) == true;
+
+    private static string Printable(string s) => s.Replace("\u001D", "<GS>");
+
+    // a miss box as a share of the image, for the hover spot over the picture
+    private static string Spot(Region b, int w, int h) => string.Create(System.Globalization.CultureInfo.InvariantCulture,
+        $"left:{100.0 * b.X / w:F2}%;top:{100.0 * b.Y / h:F2}%;width:{100.0 * b.Width / w:F2}%;height:{100.0 * b.Height / h:F2}%");
+
+    public void Dispose()
+    {
+        Station.Changed -= OnStationChanged;
+        cts.Cancel();
+        cts.Dispose();
+        changed.Dispose();
+    }
+}

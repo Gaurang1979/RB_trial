@@ -1,0 +1,6 @@
+snapshot,physical_footprint,malloc_zone_total,malloc_allocated_live
+3,338.7M,154.2M,44.8M
+10,330.0M,166.8M,45.7M
+17,450.9M,186.0M,73.3M
+24,465.0M,179.3M,55.4M
+end,375.7M,179.3M,49.1M

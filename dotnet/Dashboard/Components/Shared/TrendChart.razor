@@ -1,0 +1,53 @@
+@* Read rate per hour as bars (left axis, %), median decode time as a line (right axis, ms). *@
+
+@if (Rows.Count == 0)
+{
+    <p class="muted">No cases in this period.</p>
+}
+else
+{
+    double maxMs = Math.Max(BudgetMs * 1.5, Rows.Max(r => r.MedianMs));
+    double bw = (W - L - R) / (double)Rows.Count;
+    <svg viewBox="0 0 @W @H" class="chart" role="img" aria-label="Read rate and decode time per hour">
+        @for (int g = 0; g <= 4; g++)
+        {
+            double y = T + (H - T - B) * g / 4.0;
+            <line x1="@L" x2="@(W - R)" y1="@F(y)" y2="@F(y)" class="grid" />
+            @Label(L - 6, y + 4, $"{100 - g * 25}%", "end")
+            @Label(W - R + 6, y + 4, $"{maxMs * (4 - g) / 4:F0} ms", "start")
+        }
+        @{ double by = Y(BudgetMs / maxMs); }
+        <line x1="@L" x2="@(W - R)" y1="@F(by)" y2="@F(by)" class="budget" />
+        @for (int i = 0; i < Rows.Count; i++)
+        {
+            var r = Rows[i];
+            double rate = r.Expected > 0 ? (double)r.Read / r.Expected : 1;
+            double x = L + i * bw;
+            <rect x="@F(x + bw * 0.15)" y="@F(Y(rate))" width="@F(bw * 0.7)" height="@F(H - B - Y(rate))" class="@(rate >= 0.995 ? "bar" : "bar low")">
+                <title>@r.HourUtc.ToLocalTime().ToString("dd MMM HH:00"): @rate.ToString("P1") of codes, @r.Complete/@r.Cases cases complete, median @r.MedianMs.ToString("F0") ms</title>
+            </rect>
+            @if (Rows.Count <= 24 || i % (Rows.Count / 12 + 1) == 0)
+            {
+                @Label(x + bw / 2, H - B + 16, r.HourUtc.ToLocalTime().ToString("HH:mm"), "middle")
+            }
+        }
+        <polyline class="line" points="@string.Join(" ", Rows.Select((r, i) => $"{F(L + i * bw + bw / 2)},{F(Y(r.MedianMs / maxMs))}"))" />
+        @for (int i = 0; i < Rows.Count; i++)
+        {
+            <circle cx="@F(L + i * bw + bw / 2)" cy="@F(Y(Rows[i].MedianMs / maxMs))" r="4" class="dot" />
+        }
+    </svg>
+    <p class="muted">Bars: share of expected codes read per hour (green = all). Line: median decode time; dashed: @BudgetMs ms budget.</p>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<TrendRow> Rows { get; set; } = Array.Empty<TrendRow>();
+    [Parameter] public int BudgetMs { get; set; } = 200;
+    private const int W = 900, H = 300, L = 48, R = 64, T = 12, B = 28;
+    private static double Y(double frac) => T + (H - T - B) * (1 - Math.Clamp(frac, 0, 1));
+    private static string F(double v) => v.ToString("F1", System.Globalization.CultureInfo.InvariantCulture);
+
+    // SVG <text> written as markup: Razor reserves <text> inside code blocks
+    private static MarkupString Label(double x, double y, string s, string anchor) =>
+        new($"<text x=\"{F(x)}\" y=\"{F(y)}\" text-anchor=\"{anchor}\" class=\"axis\">{System.Net.WebUtility.HtmlEncode(s)}</text>");
+}

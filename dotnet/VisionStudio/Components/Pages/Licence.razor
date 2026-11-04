@@ -1,0 +1,117 @@
+@page "/licence"
+@attribute [Authorize]
+@using VisionCore.Licensing
+@inject LicenceService L
+
+<PageTitle>@T["lic.title"]</PageTitle>
+<div class="runbar"><h1>@T["lic.title"]</h1></div>
+
+@{
+    var st = L.Status;
+    var p = st.Payload;
+    var unlicensed = L.Unlicensed();
+}
+
+<div class="card">
+    <div class="verdict @(L.Licensed && unlicensed.Count == 0 ? "ok" : L.Licensed ? "idle" : "ng")" style="font-size:26px">
+        @T["lic.state_" + st.State.ToString().ToLowerInvariant()]
+    </div>
+    <p>@st.Detail</p>
+    @if (!L.Required) { <p class="muted">@T["lic.not_required"]</p> }
+    <table class="tools">
+        <tr><td>@T["lic.customer"]</td><td>@(p?.Customer ?? "–")</td></tr>
+        <tr><td>@T["lic.key"]</td><td>@(L.Settings.LicenceKey.Length > 0 ? L.Settings.LicenceKey : "–")</td></tr>
+        <tr><td>@T["lic.installation"]</td><td><code>@L.Installation</code> <span class="muted">@T["lic.installation_hint"]</span></td></tr>
+        <tr><td>@T["lic.valid_until"]</td><td>@(p?.ValidUntil?.ToLocalTime().ToString("dd-MM-yyyy") ?? (p is null ? "–" : T["lic.no_end"]))</td></tr>
+        <tr><td>@T["lic.tools"]</td><td>@(p is null ? "–" : p.Tools.Count == 0 ? T["lic.all_tools"] : string.Join(", ", p.Tools))</td></tr>
+        <tr><td>@T["lic.cameras"]</td><td>@(p is { MaxCameras: > 0 } ? p.MaxCameras.ToString() : "–")</td></tr>
+        <tr><td>@T["lic.last_check"]</td><td>@(st.LastCheckUtc?.ToLocalTime().ToString("dd-MM-yyyy HH:mm") ?? "–")
+            @if (L.Settings.LastAttemptFailed && L.Settings.LastError is { } err) { <span class="bad"> · @err</span> }</td></tr>
+        <tr><td>@T["lic.next_check"]</td><td>@(st.NextCheckUtc?.ToLocalTime().ToString("dd-MM-yyyy HH:mm") ?? "–")</td></tr>
+    </table>
+    <div class="row">
+        <button class="big primary" disabled="@Busy" @onclick="Check">↻ @T["lic.check_now"]</button>
+        @if (Message is not null) { <span class="@(MessageOk ? "good" : "bad")">@Message</span> }
+    </div>
+</div>
+
+<div class="card">
+    <h3>@T["lic.devices"]</h3>
+    @if (unlicensed.Count > 0)
+    {
+        <div class="alert">@T.Format("lic.unlicensed_count", unlicensed.Count)</div>
+    }
+    <table class="tools">
+        <tr><th></th><th>@T["lic.kind"]</th><th>@T["lic.serial"]</th><th>@T["lic.item"]</th><th>@T["lic.state"]</th></tr>
+        @foreach (var d in L.Devices())
+        {
+            var v = st.Device(d.Serial);
+            var bad = unlicensed.FirstOrDefault(u => u.Device == d);
+            <tr class="@(v?.Ok == true ? "ok" : "ng")">
+                <td>@(v?.Ok == true ? "✓" : "✗")</td>
+                <td>@T["lic.kind_" + d.Kind]</td>
+                <td><code>@d.Serial</code></td>
+                <td>@(v?.Item ?? "–")</td>
+                <td>@(v?.Ok == true ? T["lic.device_ok"] : T["lic.device_unlicensed"] + ": " + bad.Reason)</td>
+            </tr>
+        }
+    </table>
+    <p class="muted">@T["lic.devices_hint"]</p>
+</div>
+
+<AuthorizeView Roles="Engineer,QA">
+    <div class="card form">
+        <h3>@T["lic.settings"]</h3>
+        <label><span>@T["lic.server"]</span><input class="wide" placeholder="https://licence.example.com" @bind="Server" /></label>
+        <label><span>@T["lic.key"]</span><input class="wide" @bind="Key" /></label>
+        <h4>@T["lic.manual"]</h4>
+        <p class="muted small">@T["lic.manual_hint"]</p>
+        @foreach (var m in Manual)
+        {
+            <label>
+                <select value="@m.Kind" @onchange="@(e => m.Kind = e.Value?.ToString() ?? "plc")">
+                    @foreach (var k in Kinds) { <option value="@k">@T["lic.kind_" + k]</option> }
+                </select>
+                <input @bind="m.Serial" placeholder="@T["lic.serial"]" />
+                <button class="link" @onclick="() => Manual.Remove(m)">✕</button>
+            </label>
+        }
+        <div class="row"><button @onclick="@(() => Manual.Add(new Row()))">+ @T["lic.add_device"]</button></div>
+        <div class="row"><button class="primary" @onclick="Save">✓ @T["lic.save"]</button></div>
+    </div>
+</AuthorizeView>
+
+@code {
+    private static readonly string[] Kinds = { "plc", "printer", "ipc", "other" };
+    private sealed class Row { public string Kind { get; set; } = "plc"; public string Serial { get; set; } = ""; }
+
+    private string Server = "", Key = "";
+    private List<Row> Manual = new();
+    private bool Busy, MessageOk;
+    private string? Message;
+
+    protected override void OnInitialized()
+    {
+        var f = L.Settings;
+        Server = f.ServerUrl;
+        Key = f.LicenceKey;
+        Manual = f.ManualDevices.Select(d => new Row { Kind = d.Kind, Serial = d.Serial }).ToList();
+    }
+
+    private async Task Save()
+    {
+        L.Save(Server, Key, Manual.Select(m => new DeviceReport(m.Kind, m.Serial)).ToList());
+        await Check();
+    }
+
+    private async Task Check()
+    {
+        Busy = true;
+        Message = null;
+        StateHasChanged();
+        var err = await L.CheckAsync();
+        Busy = false;
+        MessageOk = err is null;
+        Message = err ?? T["lic.checked"];
+    }
+}

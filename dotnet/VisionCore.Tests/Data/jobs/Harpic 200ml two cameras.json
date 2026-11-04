@@ -1,0 +1,65 @@
+{
+  "SchemaVersion": "0.1",
+  "Name": "Harpic 200ml two cameras",
+  "Number": 7,
+  "Description": "Current layout: two cameras, Find the part, Read code with GS1, Check text and Read text",
+  "Version": 4,
+  "UpdatedAt": "2026-10-31T08:30:00+05:30",
+  "UpdatedBy": "engineer",
+  "Cameras": [
+    { "Name": "Top", "Driver": "hik", "Serial": "DA1234567", "ExposureUs": 1800, "GainDb": 3 },
+    { "Name": "Side", "Driver": "hik", "Serial": "DA7654321", "ExposureUs": 2500, "GainDb": 0 }
+  ],
+  "Tools": [
+    {
+      "kind": "locate",
+      "SearchArea": { "X": 0, "Y": 0, "Width": 1280, "Height": 960 },
+      "MaxAngleDeg": 20,
+      "MinScore": 0.7,
+      "PatternFile": "Harpic 200ml two cameras/Find label.v4.bmp",
+      "OriginX": 20,
+      "OriginY": 18,
+      "Name": "Find label",
+      "Camera": 0,
+      "Roi": { "X": 10, "Y": 10, "Width": 40, "Height": 36 }
+    },
+    {
+      "kind": "code",
+      "Format": "DataMatrix",
+      "ExpectedCount": 1,
+      "Expected": "",
+      "TimeBudgetMs": 150,
+      "MinGrade": 2,
+      "GradeEvery": 10,
+      "Gs1": { "Required": [ "01", "10", "17", "21" ], "ExpiryNotPast": true },
+      "Gs1Values": { "01": "{GTIN}", "10": "{BATCH}" },
+      "Name": "GS1 DataMatrix",
+      "Camera": 0,
+      "Roi": { "X": 200, "Y": 100, "Width": 300, "Height": 300 }
+    },
+    {
+      "kind": "text",
+      "Mode": "Check",
+      "Lines": [
+        { "Template": "MRP {MRP}" },
+        { "Source": "Plc", "SourceName": "UserIn1" }
+      ],
+      "CharHeightPx": 30,
+      "AllowShiftPx": 12,
+      "Name": "Price",
+      "Camera": 1,
+      "Roi": { "X": 100, "Y": 500, "Width": 800, "Height": 200 }
+    },
+    {
+      "kind": "text",
+      "Mode": "Read",
+      "Lines": [
+        { "Entry": "Format", "Template": "EXP {EXP:MM/YY}" }
+      ],
+      "Name": "Expiry",
+      "Camera": 1,
+      "Roi": { "X": 100, "Y": 720, "Width": 800, "Height": 120 },
+      "Enabled": false
+    }
+  ]
+}

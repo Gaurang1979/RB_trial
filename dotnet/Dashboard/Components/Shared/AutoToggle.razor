@@ -1,0 +1,17 @@
+@* Auto / Manual switch for one reader setting of a product. *@
+
+<label class="auto">
+    <input type="checkbox" checked="@Product.Reader.AutoKnobs.Contains(Knob)" @onchange="Changed" />
+    Auto
+</label>
+
+@code {
+    [Parameter, EditorRequired] public ProductMaster Product { get; set; } = default!;
+    [Parameter, EditorRequired] public string Knob { get; set; } = "";
+
+    private void Changed(ChangeEventArgs e)
+    {
+        Product.Reader.AutoKnobs.Remove(Knob);
+        if (e.Value is true) Product.Reader.AutoKnobs.Add(Knob);
+    }
+}

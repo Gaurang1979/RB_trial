@@ -1,0 +1,352 @@
+@using VisionCore.Plc
+@* Wiring diagram of the line I/O, drawn from the chosen PLC profile. Health colours the instruments when
+   the PLC sends diagnostics. Sizes in SVG units; the page scales it to the available width. *@
+
+@{
+    const int Row = 40, Top = 110, LeftW = 330, PlcX = 400, PlcW = 230, RightX = 700, RightW = 330, W = 1060;
+    var inputs = Profile.InputTerminals;
+    var outputs = Profile.OutputTerminals;
+    var drive = Line.Drive;
+    bool hasVfd = Profile.Terminals.ContainsKey(Instrument.Vfd) && drive == LineSettings.DriveKind.VfdRs485;
+    var byTerm = Profile.Terminals.ToDictionary(kv => kv.Value, kv => kv.Key);
+    bool relay = Profile.OutputType.StartsWith("relay");
+    const int Shift = 120;          // the power section above moves the I/O drawing down
+    const int MotorH = 360;
+    int rows = Math.Max(inputs.Count, outputs.Count);
+    int plcH = rows * Row + 50;
+    int netY = Top + plcH + 60;
+    int H0 = netY + (hasVfd ? 260 : 150);
+    int H = Shift + H0 + MotorH;
+    int my = Shift + H0 + 10;      // top of the motor power circuit
+    string T(Instrument i) => Profile.Terminals.GetValueOrDefault(i) ?? "–";
+}
+
+<svg class="wiring" viewBox="0 0 @W @H" role="img" aria-label="Wiring diagram for @Profile.Title">
+    <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#555" /></marker>
+    </defs>
+    <text x="20" y="28" class="t1">Wiring: @Profile.Title — @Profile.Inputs inputs, @Profile.Outputs outputs (@Profile.OutputType)</text>
+    <text x="20" y="48" class="t3">@Profile.Notes</text>
+
+    @* incoming supply: busbars, 2P MCB to the SMPS, 3P MCCB to the motor circuit *@
+    @{ var bus = new (string Name, string Css)[] { ("L1", "bL1"), ("L2", "bL2"), ("L3", "bL3"), ("N", "bN"), ("E", "bE") }; }
+    @for (int b = 0; b < bus.Length; b++)
+    {
+        int by = 64 + b * 12;
+        <g>
+            <line x1="40" y1="@by" x2="@(W - 40)" y2="@by" class="@bus[b].Css" />
+            <text x="20" y="@(by + 4)" class="t3">@bus[b].Name</text>
+            <text x="@(W - 20)" y="@(by + 4)" class="t3 r">@bus[b].Name</text>
+        </g>
+    }
+    <line x1="70" y1="64" x2="70" y2="122" class="bL1" /><line x1="90" y1="100" x2="90" y2="122" class="bN" />
+    <circle cx="70" cy="64" r="3" class="dot" /><circle cx="90" cy="100" r="3" class="dot" />
+    <rect x="58" y="122" width="44" height="40" rx="4" class="box" />
+    <text x="80" y="140" class="t3 c">2P MCB</text><text x="80" y="154" class="t3 c">6 A</text>
+    <line x1="70" y1="162" x2="70" y2="@(Shift + 62)" class="bL1" /><line x1="90" y1="162" x2="90" y2="@(Shift + 62)" class="bN" />
+    <text x="108" y="176" class="t3">230 V AC L / N → SMPS</text>
+    <line x1="860" y1="64" x2="860" y2="122" class="bL1" /><line x1="880" y1="76" x2="880" y2="122" class="bL2" /><line x1="900" y1="88" x2="900" y2="122" class="bL3" />
+    <circle cx="860" cy="64" r="3" class="dot" /><circle cx="880" cy="76" r="3" class="dot" /><circle cx="900" cy="88" r="3" class="dot" />
+    <rect x="845" y="122" width="70" height="40" rx="4" class="box" />
+    <text x="880" y="140" class="t3 c">3P MCCB</text><text x="880" y="154" class="t3 c">motor circuit ↓</text>
+    <text x="925" y="140" class="t3">to @(drive switch { LineSettings.DriveKind.VfdRs485 or LineSettings.DriveKind.VfdTerminal => "the VFD R / S / T", _ => "KM1" })</text>
+    <text x="925" y="154" class="t3">(drawn at the bottom)</text>
+    <text x="300" y="176" class="t3 green">Earth (E): SMPS FG, PLC FG / panel, VFD E, motor body, encoder shield (PLC end), PC and switch</text>
+
+    <g transform="translate(0,@Shift)">
+
+    @* 24 V supply rails *@
+    <rect x="20" y="62" width="150" height="34" rx="6" class="box" />
+    <text x="95" y="78" class="t2 c">24 V DC SMPS</text>
+    <text x="95" y="91" class="t3 c">230 V AC in, fused</text>
+    <line x1="170" y1="70" x2="@(W - 20)" y2="70" class="p24" />
+    <line x1="170" y1="90" x2="@(W - 20)" y2="90" class="p0" />
+    <text x="@(W - 24)" y="66" class="t3 r red">+24 V</text>
+    <text x="@(W - 24)" y="104" class="t3 r blue">0 V</text>
+
+    @* PLC *@
+    <rect x="@PlcX" y="@Top" width="@PlcW" height="@plcH" rx="8" class="plc" />
+    <text x="@(PlcX + PlcW / 2)" y="@(Top + 24)" class="t1 c">@Profile.Make @Profile.Model</text>
+    <text x="@(PlcX + PlcW / 2)" y="@(Top + 42)" class="t3 c">@Profile.Software</text>
+    <line x1="@(PlcX + 20)" y1="90" x2="@(PlcX + 20)" y2="@Top" class="p0" />
+    <text x="@(PlcX + 14)" y="@(Top - 6)" class="t3 r">S/S → 0 V (PNP sensors)</text>
+    <line x1="@(PlcX + PlcW - 20)" y1="90" x2="@(PlcX + PlcW - 20)" y2="@Top" class="p0" />
+    <text x="@(PlcX + PlcW - 14)" y="@(Top - 6)" class="t3">@(relay ? "relay commons C0, C1 … → +24 V; load between Y and 0 V" : "output COM → 0 V")</text>
+
+    @for (int i = 0; i < inputs.Count; i++)
+    {
+        var term = inputs[i];
+        int y = Top + 60 + i * Row;
+        bool used = byTerm.TryGetValue(term, out var inst) && !(inst is Instrument.Camera2Sensor && !Line.SensorUsed(2) || inst is Instrument.Camera3Sensor && !Line.SensorUsed(3));
+        var info = used ? LineProfiles.Info(inst) : null;
+        var h = used ? HealthOf(inst) : null;
+        <g>
+        <text x="@(PlcX + 10)" y="@(y + 4)" class="t2">@term</text>
+        <circle cx="@PlcX" cy="@y" r="4" class="pin" />
+        @if (info is not null)
+        {
+            <g>
+                <rect x="20" y="@(y - 16)" width="@LeftW" height="32" rx="6" class="box @Css(h)" />
+                <text x="30" y="@(y - 2)" class="t2">@info.Name @(h?.Signal == true ? "●" : "")</text>
+                <text x="30" y="@(y + 11)" class="t3">@info.Wiring</text>
+                @if (info.Kind == InstrumentKind.CounterInput)
+                {
+                    <g><text x="@(20 + LeftW - 8)" y="@(y + 11)" class="t3 amber r">high-speed counter input</text></g>
+                }
+                <line x1="@(20 + LeftW)" y1="@y" x2="@PlcX" y2="@y" class="sig" marker-end="url(#arr)" />
+            </g>
+        }
+        else
+        {
+            <g><text x="@(PlcX - 8)" y="@(y + 4)" class="t3 r muted">spare</text></g>
+        }
+        </g>
+    }
+
+    @for (int i = 0; i < outputs.Count; i++)
+    {
+        var term = outputs[i];
+        int y = Top + 60 + i * Row;
+        bool used = byTerm.TryGetValue(term, out var inst) && LineHealth.UsedBy(inst, drive);
+        var info = used ? LineProfiles.Info(inst) : null;
+        var h = used ? HealthOf(inst) : null;
+        <g>
+        <text x="@(PlcX + PlcW - 10)" y="@(y + 4)" class="t2 r">@term</text>
+        <circle cx="@(PlcX + PlcW)" cy="@y" r="4" class="pin" />
+        @if (info is not null)
+        {
+            <g>
+                <rect x="@RightX" y="@(y - 16)" width="@RightW" height="32" rx="6" class="box @Css(h)" />
+                <text x="@(RightX + 10)" y="@(y - 2)" class="t2">@info.Name @(h?.Signal == true ? "●" : "")</text>
+                <text x="@(RightX + 10)" y="@(y + 11)" class="t3">@info.Wiring</text>
+                <line x1="@(PlcX + PlcW)" y1="@y" x2="@RightX" y2="@y" class="sig" marker-end="url(#arr)" />
+                <line x1="@(RightX + RightW - 12)" y1="70" x2="@(RightX + RightW - 12)" y2="@(y - 16)" class="p24 thin" />
+            </g>
+        }
+        else
+        {
+            <g><text x="@(PlcX + PlcW + 8)" y="@(y + 4)" class="t3 muted">spare</text></g>
+        }
+        </g>
+    }
+
+    @* Ethernet *@
+    <line x1="@(PlcX + PlcW / 2)" y1="@(Top + plcH)" x2="@(PlcX + PlcW / 2)" y2="@netY" class="eth" />
+    <text x="@(PlcX + PlcW / 2 + 8)" y="@(Top + plcH + 24)" class="t3">Ethernet: Modbus TCP client → vision PC :502</text>
+    <rect x="@(PlcX - 20)" y="@netY" width="@(PlcW + 40)" height="40" rx="6" class="box" />
+    <text x="@(PlcX + PlcW / 2)" y="@(netY + 25)" class="t2 c">Ethernet switch (industrial)</text>
+    <line x1="@(PlcX - 20)" y1="@(netY + 20)" x2="250" y2="@(netY + 20)" class="eth" />
+    <rect x="40" y="@(netY)" width="210" height="60" rx="6" class="box" />
+    <text x="145" y="@(netY + 24)" class="t2 c">Vision PC</text>
+    <text x="145" y="@(netY + 42)" class="t3 c">Vision Studio, Modbus server :@Port</text>
+    @for (int c = 0; c < Math.Max(1, Cameras); c++)
+    {
+        int cx = RightX + c * 110;
+        <g>
+        <line x1="@(PlcX + PlcW + 20)" y1="@(netY + 20)" x2="@(cx + 50)" y2="@(netY + 20)" class="eth" />
+        <line x1="@(cx + 50)" y1="@(netY + 20)" x2="@(cx + 50)" y2="@(netY + 70)" class="eth" />
+        <rect x="@cx" y="@(netY + 70)" width="100" height="44" rx="6" class="box" />
+        <text x="@(cx + 50)" y="@(netY + 90)" class="t2 c">Camera @(c + 1)</text>
+        <text x="@(cx + 50)" y="@(netY + 106)" class="t3 c">GigE (PoE) / USB3</text>
+        </g>
+    }
+    @if (hasVfd)
+    {
+        int vy = netY + 130;
+        <g>
+        <line x1="@(PlcX + 30)" y1="@(Top + plcH)" x2="@(PlcX + 30)" y2="@(vy + 22)" class="rs485" />
+        <line x1="@(PlcX + 30)" y1="@(vy + 22)" x2="250" y2="@(vy + 22)" class="rs485" />
+        <text x="@(PlcX + 36)" y="@(Top + plcH + 40)" class="t3">@Profile.Terminals[Instrument.Vfd] RS-485 (Modbus RTU)</text>
+        <rect x="40" y="@vy" width="210" height="64" rx="6" class="box @Css(HealthOf(Instrument.Vfd))" />
+        <text x="145" y="@(vy + 22)" class="t2 c">Conveyor drive (Delta VFD)</text>
+        <text x="145" y="@(vy + 38)" class="t3 c">SG+ / SG-: run, stop, speed, status</text>
+        <text x="145" y="@(vy + 54)" class="t3 c">RA-RC fault relay → @(Profile.Terminals.GetValueOrDefault(Instrument.VfdFault) ?? "–")</text>
+        <line x1="250" y1="@(vy + 44)" x2="320" y2="@(vy + 44)" class="sig" marker-end="url(#arr)" />
+        <circle cx="345" cy="@(vy + 44)" r="22" class="box" />
+        <text x="345" y="@(vy + 49)" class="t2 c">M</text>
+        <text x="345" y="@(vy + 82)" class="t3 c">conveyor motor + encoder</text>
+        <text x="40" y="@(vy + 82)" class="t3">E-stop: wire into the drive's stop / STO circuit as well</text>
+        </g>
+    }
+    </g>
+
+    @* motor power circuit for the chosen drive type *@
+    <rect x="20" y="@my" width="@(W - 40)" height="@(MotorH - 30)" rx="8" class="panel" />
+    <text x="36" y="@(my + 22)" class="t2"><tspan font-weight="600">Conveyor motor circuit:</tspan> @DriveName(drive)</text>
+    @{
+        int px = 860, top = my + 40;    // the three phases come down from the 3P MCCB
+        string[] ph = { "bL1", "bL2", "bL3" };
+    }
+    @if (drive is LineSettings.DriveKind.VfdRs485 or LineSettings.DriveKind.VfdTerminal)
+    {
+        <g>
+            @for (int k = 0; k < 3; k++) { <line x1="@(px + 20 * k)" y1="@top" x2="@(px + 20 * k)" y2="@(top + 40)" class="@ph[k]" /> }
+            <rect x="840" y="@(top + 40)" width="100" height="70" rx="6" class="box @Css(HealthOf(Instrument.VfdFault))" />
+            <text x="890" y="@(top + 58)" class="t3 c">R  S  T</text>
+            <text x="890" y="@(top + 78)" class="t2 c">Delta VFD</text>
+            <text x="890" y="@(top + 104)" class="t3 c">U  V  W</text>
+            @for (int k = 0; k < 3; k++) { <line x1="@(px + 20 * k)" y1="@(top + 110)" x2="@(px + 20 * k)" y2="@(top + 170)" class="mot" /> }
+            <circle cx="880" cy="@(top + 198)" r="28" class="box" />
+            <text x="880" y="@(top + 203)" class="t2 c">M 3~</text>
+            @Notes(top, drive == LineSettings.DriveKind.VfdRs485
+                ? $"Run, stop, speed and status over RS-485: {T(Instrument.Vfd)} → SG+ / SG−; speed from the Line page."
+                : $"Run: {T(Instrument.MotorRun)} → interposing relay → VFD FWD–DCM; speed set on the drive.",
+                $"Fault relay → {T(Instrument.VfdFault)}: " + (Line.DriveFaultNc ? "RB–RC (NC, on = healthy)." : "RA–RC (NO, closes on a fault)."),
+                $"Start {T(Instrument.StartButton)} (NO 3–4), Stop {T(Instrument.StopButton)} (NC 1–2): +24 V through the contact.",
+                "Motor cable shielded, clamped at both ends; away from sensor cables.",
+                "E-stop also into the drive's stop / STO circuit (the PLC alone",
+                "is not a safety function).")
+        </g>
+    }
+    else
+    {
+        bool sd = drive == LineSettings.DriveKind.StarDelta;
+        int bot = top + 200;            // motor terminal row
+        <g>
+            @for (int k = 0; k < 3; k++) { <line x1="@(px + 20 * k)" y1="@top" x2="@(px + 20 * k)" y2="@(top + 40)" class="@ph[k]" /> }
+            @Contactor(830, top + 40, "KM1", "main", Instrument.MotorRun)
+            @for (int k = 0; k < 3; k++) { <line x1="@(px + 20 * k)" y1="@(top + 90)" x2="@(px + 20 * k)" y2="@(top + 104)" class="mot" /> }
+            <rect x="830" y="@(top + 104)" width="100" height="36" rx="4" class="box @Css(HealthOf(Instrument.VfdFault))" />
+            <text x="880" y="@(top + 119)" class="t3 c">overload relay</text>
+            <text x="880" y="@(top + 133)" class="t3 c">@(Line.DriveFaultNc ? "95–96" : "97–98") → @T(Instrument.VfdFault)</text>
+            @for (int k = 0; k < 3; k++) { <line x1="@(px + 20 * k)" y1="@(top + 140)" x2="@(px + 20 * k)" y2="@(bot - 30)" class="mot" /> }
+            <rect x="830" y="@(bot - 30)" width="190" height="56" rx="26" class="box" />
+            <text x="925" y="@(bot + 4)" class="t2 c">M 3~</text>
+            <text x="842" y="@(bot - 16)" class="t3">@(sd ? "U1 V1 W1" : "U  V  W")</text>
+            @if (sd)
+            {
+                <g>
+                <text x="1008" y="@(bot - 16)" class="t3 r">W2 U2 V2</text>
+                @Contactor(690, top + 40, "KM2", "delta", Instrument.MotorDelta)
+                @Contactor(560, top + 40, "KM3", "star", Instrument.MotorStar)
+                @for (int k = 0; k < 3; k++)
+                {
+                    int tap = top + 8 + 8 * k, kx = 710 + 20 * k, sx = 580 + 20 * k, mx = 965 + 15 * k, wy = bot + 42 + 7 * k;
+                    <g>
+                    <circle cx="@(px + 20 * k)" cy="@tap" r="2.5" class="dot" />
+                    <line x1="@(px + 20 * k)" y1="@tap" x2="@kx" y2="@tap" class="@ph[k] thin2" />
+                    <line x1="@kx" y1="@tap" x2="@kx" y2="@(top + 40)" class="@ph[k] thin2" />
+                    <line x1="@kx" y1="@(top + 90)" x2="@kx" y2="@wy" class="mot" />
+                    <line x1="@sx" y1="@(top + 90)" x2="@sx" y2="@wy" class="mot" />
+                    <line x1="@sx" y1="@wy" x2="@mx" y2="@wy" class="mot" />
+                    <line x1="@mx" y1="@wy" x2="@mx" y2="@(bot + 26)" class="mot" />
+                    <circle cx="@kx" cy="@wy" r="2.5" class="dot" />
+                    </g>
+                }
+                <line x1="580" y1="@(top + 30)" x2="620" y2="@(top + 30)" class="mot" />
+                @for (int k = 0; k < 3; k++) { <line x1="@(580 + 20 * k)" y1="@(top + 30)" x2="@(580 + 20 * k)" y2="@(top + 40)" class="mot" /> }
+                <text x="600" y="@(top + 24)" class="t3 c">star point</text>
+                </g>
+            }
+            @Notes(top,
+                $"Start {T(Instrument.StartButton)} (NO 3–4), Stop {T(Instrument.StopButton)} (NC 1–2): +24 V through the contact.",
+                "Overload relay " + (Line.DriveFaultNc ? "NC 95–96 (on = healthy, broken wire trips)" : "NO 97–98 (closes on a trip)") + $" → {T(Instrument.VfdFault)}.",
+                "Set it to the motor's rated current" + (sd ? " × 0.58 (it sits in KM1's line)." : " (nameplate)."),
+                $"Coils: A1 from interposing relays (24 V coil, flyback diode) on {T(Instrument.MotorRun)}" + (sd ? $" / {T(Instrument.MotorDelta)} / {T(Instrument.MotorStar)};" : ";"),
+                "A2 to N (230 V coils) or 0 V (24 V coils). The E-stop also opens the coil supply.",
+                sd ? "Star time with KM1 + KM3, both open for the changeover gap, then KM1 + KM2." : "",
+                sd ? "KM2 and KM3 interlocked by each other's NC auxiliary contact too." : "")
+            @Control(top + 140, sd)
+        </g>
+    }
+
+    <text x="20" y="@(H - 12)" class="t3">Camera trigger: the PLC sets Trigger over Ethernet and the vision PC fires the cameras by software (no trigger wire to the camera). Solenoids and relays need a flyback diode; keep sensor cables apart from motor cables.</text>
+</svg>
+
+@code {
+    [Parameter, EditorRequired] public PlcProfile Profile { get; set; } = default!;
+    [Parameter] public IReadOnlyList<InstrumentHealth>? Health { get; set; }
+    [Parameter] public int Cameras { get; set; } = 1;
+    [Parameter] public LineSettings Line { get; set; } = new();
+    [Parameter] public int Port { get; set; } = 502;
+
+    private InstrumentHealth? HealthOf(Instrument i) => Health?.FirstOrDefault(h => h.Id == i);
+
+    private static string DriveName(LineSettings.DriveKind d) => d switch
+    {
+        LineSettings.DriveKind.VfdRs485 => "Delta VFD, run / speed over RS-485",
+        LineSettings.DriveKind.VfdTerminal => "VFD, run by a PLC output (FWD terminal)",
+        LineSettings.DriveKind.DirectOnLine => "direct-on-line contactor KM1 + overload relay",
+        _ => "star-delta: KM1 main, KM3 star, KM2 delta + overload relay",
+    };
+
+    private static RenderFragment Notes(int top, params string[] lines) => __builder =>
+    {
+        int y = top + 10;
+        foreach (var l in lines.Where(l => l.Length > 0))
+        {
+            <g><text x="40" y="@y" class="t3">@l</text></g>
+            y += 17;
+        }
+    };
+
+    /// <summary>Control wiring as in a usual panel: buttons and the overload contact to PLC inputs,
+    /// interposing relays from PLC outputs to the contactor coils.</summary>
+    private RenderFragment Control(int y, bool starDelta) => __builder =>
+    {
+        string T(Instrument i) => Profile.Terminals.GetValueOrDefault(i) ?? "–";
+        var ins = new (string Name, string Contact, string Css, Instrument To)[]
+        {
+            ("STOP", "NC 1–2", "pbStop", Instrument.StopButton), ("START", "NO 3–4", "pbStart", Instrument.StartButton),
+            ("OL", Line.DriveFaultNc ? "NC 95–96" : "NO 97–98", "pbOl", Instrument.VfdFault),
+        };
+        var outs = new List<(string Relay, Instrument From, string Coil)> { ("CR1", Instrument.MotorRun, "KM1") };
+        if (starDelta) { outs.Add(("CR2", Instrument.MotorDelta, "KM2")); outs.Add(("CR3", Instrument.MotorStar, "KM3")); }
+        <g>
+            <text x="40" y="@(y + 2)" class="t3"><tspan font-weight="600">Control wiring</tspan></text>
+            <line x1="40" y1="@(y + 14)" x2="250" y2="@(y + 14)" class="p24" />
+            <text x="254" y="@(y + 18)" class="t3 red">+24 V</text>
+            @for (int i = 0; i < ins.Length; i++)
+            {
+                int x = 70 + i * 62;
+                var (name, contact, css, to) = ins[i];
+                <g>
+                    <line x1="@(x + 20)" y1="@(y + 14)" x2="@(x + 20)" y2="@(y + 26)" class="sig" />
+                    <rect x="@x" y="@(y + 26)" width="40" height="26" rx="13" class="@css" />
+                    <text x="@(x + 20)" y="@(y + 43)" class="t3 c wtxt">@name</text>
+                    <text x="@(x + 20)" y="@(y + 64)" class="t3 c">@contact</text>
+                    <line x1="@(x + 20)" y1="@(y + 68)" x2="@(x + 20)" y2="@(y + 84)" class="sig" marker-end="url(#arr)" />
+                    <text x="@(x + 20)" y="@(y + 96)" class="t2 c">@T(to)</text>
+                </g>
+            }
+            <line x1="305" y1="@(y + 14)" x2="555" y2="@(y + 14)" class="bL1" />
+            <text x="305" y="@(y + 10)" class="t3">L (fused) or +24 V for the coils</text>
+            @for (int i = 0; i < outs.Count; i++)
+            {
+                int x = 315 + i * 82;
+                var (rly, from, coil) = outs[i];
+                <g>
+                    <text x="@(x + 34)" y="@(y + 32)" class="t3">@rly ← @T(from)</text>
+                    <line x1="@(x + 30)" y1="@(y + 14)" x2="@(x + 30)" y2="@(y + 40)" class="sig" />
+                    <rect x="@(x + 2)" y="@(y + 40)" width="56" height="18" rx="3" class="box" />
+                    <text x="@(x + 30)" y="@(y + 53)" class="t3 c">@rly NO</text>
+                    <line x1="@(x + 30)" y1="@(y + 58)" x2="@(x + 30)" y2="@(y + 70)" class="sig" />
+                    <rect x="@(x - 4)" y="@(y + 70)" width="68" height="22" rx="3" class="box @Css(HealthOf(from))" />
+                    <text x="@(x + 30)" y="@(y + 85)" class="t3 c">@coil A1–A2</text>
+                    <line x1="@(x + 30)" y1="@(y + 92)" x2="@(x + 30)" y2="@(y + 104)" class="bN" />
+                </g>
+            }
+            <line x1="315" y1="@(y + 104)" x2="@(315 + outs.Count * 82)" y2="@(y + 104)" class="bN" />
+            <text x="@(320 + outs.Count * 82)" y="@(y + 108)" class="t3">N / 0 V</text>
+        </g>
+    };
+
+    private RenderFragment Contactor(int x, int y, string name, string role, Instrument output) => __builder =>
+    {
+        var h = HealthOf(output);
+        <g>
+            <rect x="@x" y="@y" width="100" height="50" rx="4" class="box @Css(h)" />
+            <text x="@(x + 50)" y="@(y + 20)" class="t2 c">@name @(h?.Signal == true ? "●" : "")</text>
+            <text x="@(x + 50)" y="@(y + 36)" class="t3 c">@role ← @(Profile.Terminals.GetValueOrDefault(output) ?? "–")</text>
+        </g>
+    };
+
+    private static string Css(InstrumentHealth? h) => h?.Health switch
+    {
+        VisionCore.Plc.Health.Ok => "hok",
+        VisionCore.Plc.Health.Sometimes => "hwarn",
+        VisionCore.Plc.Health.Fault => "hbad",
+        VisionCore.Plc.Health.Bypassed => "hbyp",
+        _ => "",
+    };
+}

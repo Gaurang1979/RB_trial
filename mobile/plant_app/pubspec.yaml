@@ -1,0 +1,23 @@
+name: plant_app
+description: "Plant Insight: live plant lines for operators, supervisors and admins; one app for Vision and, later, Production Measurement."
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.9.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plant_core:
+    path: ../plant_core
+  http: ^1.6.0
+  flutter_secure_storage: ^11.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

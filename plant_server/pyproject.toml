@@ -1,0 +1,14 @@
+[project]
+name = "spi-simulator"
+version = "0.1.0"
+description = "Sundaram Smart Production Intelligence - factory/edge simulator (Milestone 1)"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# A Starlette deprecation (as once for httpx in starlette.testclient) fails the tests instead of scrolling past.
+filterwarnings = ["error::starlette.exceptions.StarletteDeprecationWarning"]

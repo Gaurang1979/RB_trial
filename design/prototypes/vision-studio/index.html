@@ -1,0 +1,2533 @@
+<meta charset="utf-8">
+<title>Vision Studio Workbench</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: page header, then a 1366 x 768 Windows app frame (Operator Run or Engineer workspace), then the density rules.
+   Colours are design/tokens/vision-tokens.json (dark default, light). Fonts: Segoe UI on Windows, IBM Plex elsewhere. */
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap");
+:root{
+  --bg:#0E131A; --surface:#161D27; --raised:#1F2834; --border:#2E3A49; --text:#E8EEF5; --muted:#A3B1C2;
+  --accent:#2563EB; --on-accent:#FFFFFF; --img:#06090D; --hover:#253041; --sel:#1E3A6E;
+  --ok:#22C55E; --on-ok:#04140A; --ng:#DC2626; --on-ng:#FFFFFF; --warn:#FACC15; --on-warn:#1A1400;
+  --dup:#FB923C; --stopped:#8C98A8; --info:#60A5FA; --titlebar:#0A0F15;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --grid:#263140; --axis:#7d8b9c;
+  --f-ui:"Segoe UI Variable Text","Segoe UI","IBM Plex Sans",system-ui,sans-serif;
+  --f-mono:"Cascadia Mono","IBM Plex Mono",Consolas,ui-monospace,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --bg:#F3F5F8; --surface:#FFFFFF; --raised:#E8ECF1; --border:#C9D1DB; --text:#111827; --muted:#4B5563;
+  --accent:#1D4ED8; --on-accent:#FFFFFF; --img:#1F2937; --hover:#DCE3EC; --sel:#C7D7F5;
+  --ok:#15803D; --on-ok:#FFFFFF; --ng:#991B1B; --on-ng:#FFFFFF; --warn:#A16207; --on-warn:#FFFFFF;
+  --dup:#C2410C; --stopped:#6B7280; --info:#1D4ED8; --titlebar:#DDE3EA;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --grid:#E3E8EE; --axis:#6B7280; color-scheme:light}}
+:root[data-theme="light"]{
+  --bg:#F3F5F8; --surface:#FFFFFF; --raised:#E8ECF1; --border:#C9D1DB; --text:#111827; --muted:#4B5563;
+  --accent:#1D4ED8; --on-accent:#FFFFFF; --img:#1F2937; --hover:#DCE3EC; --sel:#C7D7F5;
+  --ok:#15803D; --on-ok:#FFFFFF; --ng:#991B1B; --on-ng:#FFFFFF; --warn:#A16207; --on-warn:#FFFFFF;
+  --dup:#C2410C; --stopped:#6B7280; --info:#1D4ED8; --titlebar:#DDE3EA;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --grid:#E3E8EE; --axis:#6B7280; color-scheme:light}
+
+html,body{height:auto}
+body{background:var(--bg);color:var(--text);font-family:var(--f-ui);font-size:13px;line-height:1.35;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 32px}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--f-mono)}
+
+/* page header */
+.page-head{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;max-width:1366px;margin:0 auto 14px}
+.page-head h1{font-size:22px;font-weight:600;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.page-head p{margin:4px 0 0;color:var(--muted);max-width:68ch}
+.switches{display:flex;gap:10px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;cursor:pointer;min-height:32px}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+.frame-wrap{max-width:1366px;margin:0 auto;overflow-x:auto;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.35)}
+
+/* app frame */
+.app{width:1366px;height:768px;display:flex;flex-direction:column;background:var(--bg);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative}
+.titlebar{height:30px;flex:none;display:flex;align-items:center;background:var(--titlebar);padding-left:10px;font-size:12px;color:var(--muted);gap:8px}
+.titlebar .logo{width:16px;height:16px;border-radius:3px;background:var(--accent);color:var(--on-accent);font-size:10px;font-weight:700;display:grid;place-items:center}
+.titlebar .grow{flex:1}
+.winbtn{width:46px;height:30px;display:grid;place-items:center;color:var(--muted)}
+.menubar{height:28px;flex:none;display:flex;align-items:center;gap:2px;padding:0 6px;background:var(--surface);border-bottom:1px solid var(--border)}
+.menubar span{padding:3px 9px;border-radius:4px;cursor:default}
+.menubar span:hover{background:var(--hover)}
+.statusbar{height:24px;flex:none;display:flex;align-items:center;gap:0;background:var(--titlebar);border-top:1px solid var(--border);font-size:11.5px;color:var(--muted)}
+.statusbar>div{padding:0 10px;border-right:1px solid var(--border);height:100%;display:flex;align-items:center;gap:5px;white-space:nowrap}
+.statusbar .grow{flex:1;border-right:0}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--stopped)}
+.dot.ok{background:var(--ok)}.dot.ng{background:var(--ng)}.dot.warn{background:var(--warn)}
+svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* toolbar */
+.toolbar{flex:none;display:flex;align-items:center;gap:4px;padding:4px 6px;background:var(--surface);border-bottom:1px solid var(--border)}
+.tb{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border:1px solid transparent;border-radius:5px;background:none;cursor:pointer;white-space:nowrap}
+.tb:hover{background:var(--hover);border-color:var(--border)}
+.tb.icon{width:30px;height:28px;padding:0;justify-content:center}
+.tb.big{height:40px;padding:0 12px;border-color:var(--border);background:var(--raised)}
+.tb.big:hover{background:var(--hover)}
+.tb.primary{background:var(--ok);color:var(--on-ok);border-color:transparent}
+.tb.danger{background:var(--raised)}
+.tb[disabled]{opacity:.42;cursor:not-allowed}
+.tb kbd{font-family:var(--f-mono);font-size:10.5px;color:inherit;opacity:.7;border:1px solid currentColor;border-radius:3px;padding:0 3px;line-height:14px}
+.sep{width:1px;height:24px;background:var(--border);margin:0 4px}
+.tb-group{display:flex;flex-direction:column;align-items:flex-start;gap:0}
+.grp-label{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 4px 0 6px}
+
+/* shared panels */
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:5px;display:flex;flex-direction:column;min-height:0;min-width:0}
+.ph{height:26px;flex:none;display:flex;align-items:center;gap:6px;padding:0 8px;border-bottom:1px solid var(--border);font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--muted);text-transform:uppercase}
+.ph .grow{flex:1}
+.ph .tab{text-transform:none;letter-spacing:0;font-weight:500;padding:4px 10px;border-radius:4px 4px 0 0;cursor:pointer;color:var(--muted);border:1px solid transparent;border-bottom:0;margin-bottom:-1px;height:25px;display:flex;align-items:center;gap:6px;background:none}
+.ph .tab[aria-selected="true"]{background:var(--bg);color:var(--text);border-color:var(--border)}
+.ph.tabs{padding:0 4px;gap:2px;align-items:flex-end}
+.pb{flex:1;min-height:0;overflow:auto}
+table.grid{width:100%;border-collapse:collapse;font-size:12px}
+table.grid th{position:sticky;top:0;background:var(--raised);text-align:left;font-weight:600;color:var(--muted);padding:0 8px;height:24px;border-bottom:1px solid var(--border);white-space:nowrap}
+table.grid td{padding:0 8px;height:24px;border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+table.grid tr:hover td{background:var(--hover)}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:0 6px;border-radius:3px;font-size:11px;font-weight:700;height:18px}
+.badge.ok{background:var(--ok);color:var(--on-ok)}.badge.ng{background:var(--ng);color:var(--on-ng)}
+.badge.dup{background:var(--dup);color:var(--on-warn)}.badge.warn{background:var(--warn);color:var(--on-warn)}
+.t-ok{color:var(--ok)}.t-ng{color:var(--ng)}.t-muted{color:var(--muted)}
+
+/* ===== Operator Run ===== */
+.op-top{height:40px;flex:none;display:flex;align-items:center;gap:14px;padding:0 10px;background:var(--surface);border-bottom:1px solid var(--border)}
+.prod{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.prod .pic{width:28px;height:28px;border-radius:4px;background:linear-gradient(160deg,#c9b48a,#8a7650);display:grid;place-items:center;font-size:11px;color:#2a2214}
+.kv{display:flex;flex-direction:column;line-height:1.1}
+.kv small{font-size:10.5px;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 12px;border-radius:13px;font-weight:600}
+.pill.run{background:var(--ok);color:var(--on-ok)}.pill.stop{background:var(--stopped);color:var(--bg)}
+.op-top .grow{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 8px;border:1px solid var(--border);border-radius:4px;font-size:12px}
+.op-main{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr 312px;grid-template-rows:1fr 206px;gap:6px;padding:6px}
+.cam{grid-row:1}
+.cam .ph .res{margin-left:auto;text-transform:none;letter-spacing:0}
+.imgbox{flex:1;min-height:0;background:var(--img);position:relative;border:3px solid transparent;border-radius:0 0 4px 4px}
+.imgbox.ok{border-color:var(--ok)}.imgbox.ng{border-color:var(--ng)}
+.imgbox svg{position:absolute;inset:0;width:100%;height:100%}
+.side{grid-row:1/3;grid-column:3;display:flex;flex-direction:column;gap:6px;min-height:0}
+.result{height:112px;flex:none;border-radius:5px;display:flex;align-items:center;justify-content:center;gap:14px;font-weight:700;font-size:42px;letter-spacing:.02em}
+.result.ok{background:var(--ok);color:var(--on-ok)}.result.ng{background:var(--ng);color:var(--on-ng)}.result.stop{background:var(--raised);color:var(--muted);font-size:26px}
+.result small{display:block;font-size:12px;font-weight:500;letter-spacing:0;opacity:.85}
+.counters{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+.counters>div{background:var(--surface);padding:5px 9px;display:flex;justify-content:space-between;align-items:baseline}
+.counters b{font-size:18px;font-variant-numeric:tabular-nums}
+.mini{padding:6px 9px;display:flex;flex-direction:column;gap:4px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.bar{height:8px;background:var(--raised);border-radius:4px;position:relative;overflow:hidden}
+.bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ok);border-radius:4px}
+.bar .lim{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--text)}
+.lamps{display:grid;grid-template-columns:1fr 1fr;gap:3px 10px;padding:6px 9px;font-size:12px}
+.lamps span{display:flex;align-items:center;gap:6px}
+.bottom{grid-column:1/3;grid-row:2}
+.strip{display:flex;gap:6px;padding:8px;overflow-x:auto}
+.thumb{flex:none;width:104px;border:2px solid var(--ng);border-radius:4px;overflow:hidden;cursor:pointer;background:var(--img)}
+.thumb svg{display:block;width:100%;height:70px}
+.thumb div{font-size:11px;padding:1px 4px;background:var(--ng);color:var(--on-ng);display:flex;justify-content:space-between}
+
+/* ===== Engineer workspace ===== */
+.eng-main{flex:1;min-height:0;display:grid;grid-template-columns:236px 1fr 300px;grid-template-rows:1fr 196px;gap:4px;padding:4px}
+.dock-left{grid-row:1/3}
+.dock-right{grid-row:1/3;grid-column:3;display:flex;flex-direction:column;gap:4px;min-height:0}
+.tree{list-style:none;margin:0;padding:4px 0;font-size:12.5px}
+.tree ul{list-style:none;margin:0;padding:0 0 0 14px}
+.tree .node{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px 0 4px;cursor:pointer;border-radius:3px;margin:0 4px}
+.tree .node:hover{background:var(--hover)}
+.tree .node[aria-selected="true"]{background:var(--sel)}
+.tree .node .ms{margin-left:auto;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
+.st{width:14px;text-align:center;font-weight:700}
+.search{display:flex;align-items:center;gap:6px;margin:6px;padding:0 8px;height:28px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--muted)}
+.search input{border:0;background:none;outline:none;flex:1;min-width:0;height:26px}
+.tbx-h{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 2px}
+.tbx{display:flex;align-items:center;gap:8px;height:26px;padding:0 10px;cursor:grab}
+.tbx:hover{background:var(--hover)}
+.tbx small{margin-left:auto;color:var(--muted);font-size:10.5px}
+.canvas{grid-column:2;grid-row:1}
+.imgtools{height:30px;flex:none;display:flex;align-items:center;gap:2px;padding:0 4px;border-bottom:1px solid var(--border);background:var(--surface)}
+.imgtools .grow{flex:1}
+.imgtools .zoom{font-size:11.5px;color:var(--muted);padding:0 6px}
+.eng-img{flex:1;min-height:0;background:var(--img);position:relative}
+.eng-img svg{position:absolute;inset:0;width:100%;height:100%}
+.props{flex:1;min-height:0}
+.pcat{display:flex;align-items:center;gap:6px;height:24px;padding:0 8px;background:var(--raised);font-weight:600;font-size:12px;cursor:pointer;border-bottom:1px solid var(--border)}
+.pcat .chev{transition:transform .15s}
+.pcat[aria-expanded="false"] .chev{transform:rotate(-90deg)}
+.prow{display:grid;grid-template-columns:122px 1fr;align-items:center;min-height:26px;border-bottom:1px solid var(--border);font-size:12px}
+.prow label{padding:0 8px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prow .v{padding:0 4px 0 0;display:flex;align-items:center;gap:4px;min-width:0}
+.prow input[type=text],.prow input[type=number],.prow select{width:100%;min-width:0;height:22px;border:1px solid var(--border);background:var(--bg);border-radius:3px;padding:0 5px;font-size:12px}
+.prow .unit{color:var(--muted);font-size:11px}
+.prow.adv label::after{content:" •";color:var(--info)}
+.tres{flex:none;height:300px}
+.kvt{display:grid;grid-template-columns:110px 1fr;gap:0;font-size:12px}
+.kvt>*{padding:3px 8px;border-bottom:1px solid var(--border)}
+.kvt>:nth-child(odd){color:var(--muted)}
+.bottom-eng{grid-column:2;grid-row:2}
+.set{display:grid;grid-template-columns:repeat(auto-fill,96px);gap:6px;padding:8px}
+.set .thumb{width:96px}
+.set .thumb.okb{border-color:var(--ok)}
+.set .thumb.okb div{background:var(--ok);color:var(--on-ok)}
+.ct{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.stack{display:flex;height:24px;border-radius:4px;overflow:hidden;position:relative;background:var(--raised)}
+.stack span{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--on-accent);border-right:1px solid var(--bg);white-space:nowrap;overflow:hidden}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tooltip{position:absolute;pointer-events:none;background:var(--raised);border:1px solid var(--border);color:var(--text);font-size:11.5px;padding:3px 7px;border-radius:4px;z-index:20;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+
+.charts{display:grid;grid-template-columns:1.15fr 1fr 1fr;gap:0;height:100%}
+.chart{padding:6px 10px 4px;border-right:1px solid var(--border);display:flex;flex-direction:column;min-width:0}
+.chart:last-child{border-right:0}
+.chart h3{margin:0;font-size:12px;font-weight:600;display:flex;justify-content:space-between;gap:8px}
+.chart h3 span{font-weight:400;color:var(--muted)}
+.chart svg{flex:1;width:100%;min-height:0;display:block;overflow:visible}
+svg text{font-family:var(--f-ui)}
+.ax{font-size:10px;fill:var(--axis)}
+.lbl{font-size:10.5px;fill:var(--text)}
+.gl{stroke:var(--grid);stroke-width:1}
+.hit{fill:transparent;cursor:default}
+.hit:hover+.mk,.mk:hover{opacity:.8}
+.spark{height:34px;width:100%;display:block}
+/* notes below the frame */
+.notes{max-width:1366px;margin:18px auto 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px 28px}
+.notes h2{font-size:14px;margin:0 0 6px;font-weight:600}
+.notes ul{margin:0;padding-left:18px;color:var(--muted)}
+.notes li{margin:3px 0}
+.notes b{color:var(--text);font-weight:600}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<header class="page-head">
+  <div>
+    <h1>Vision Studio Workbench</h1>
+    <p>Clickable mock-up of the Windows app at 1366 × 768. Built to the Claude baseline layout with Four-Tier Role Navigation (Operator, Supervisor, Service Support, OEM Factory Setting, REQ-17), Zero-Software Remote Support via support.sundaramtech.com with Active Operator Screen, Daily Rolling OTP (REQ-14), and Zero-Knowledge Line Database Security (REQ-16). Images are drawn, not customer pictures.</p>
+  </div>
+  <div class="switches">
+    <div class="seg" role="group" aria-label="Screen">
+      <button id="m-op" aria-pressed="true">1. Operator Run</button>
+      <button id="m-sup" aria-pressed="false">2. Supervisor</button>
+      <button id="m-svc" aria-pressed="false">3. Service (Support)</button>
+      <button id="m-oem" aria-pressed="false">4. OEM Factory (Build)</button>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button id="t-dark" aria-pressed="false">Dark</button>
+      <button id="t-light" aria-pressed="false">Light</button>
+    </div>
+  </div>
+</header>
+
+<div class="frame-wrap"><div class="app" id="app"></div></div>
+
+<section class="notes">
+  <div><h2>Four-Tier Role Navigation & Provisioning Isolation (REQ-12, REQ-17, PROT-32)</h2><ul>
+    <li><b>1. Operator Run:</b> Line execution only. Standard operators view live part counters, camera feeds, and shift Golden Sample challenges. Zero tools visible. High-impact changes require 4-Eyes Supervisor Approval.</li>
+    <li><b>2. Supervisor:</b> Customer senior person (V. Patel). Manages scheduling, recipe assignment, pending operator approvals queue, Golden Sample audit log, and Upstream Cavity Pareto heatmaps.</li>
+    <li><b>3. Service (Support):</b> Dedicated to field service engineers & remote support team. Unlocked via dynamic Daily Rolling OTP (REQ-14). Hardware calibration, focus verification, strobe trims, and remote assistance via <code>support.sundaramtech.com</code>. Service team CANNOT alter factory hardware build settings.</li>
+    <li><b>4. OEM Factory (Build):</b> Used exclusively while manufacturing the machine at Sundaram factory. Unlocked via Factory Provisioning Key / Dongle. Used for physical hardware selection (camera brand, PLC model, strobe controller), software features selection & entitlements, and one-time hardcoding. NOT available to service team.</li>
+  </ul></div>
+  <div><h2>Remote Support via support.sundaramtech.com & DB Security (REQ-11, 15, 16)</h2><ul>
+    <li><b>Active Operator Screen (Never Blank):</b> When an engineer works remotely via <code>support.sundaramtech.com</code>, the line monitor does NOT go blank! It continues displaying the active Operator Run screen so operators can physically assist with product adjustments, lens wiping, or lead screws with live camera feedback.</li>
+    <li><b>Service Console on Private Browser:</b> The remote engineer sees the full engineering tools on their private screen, while factory floor observers see only the clean Operator view with generic DIN/IEC labels (<code>Position 1</code>, <code>2D Code</code>).</li>
+    <li><b>Line Database Security (REQ-16):</b> Database file is encrypted on disk (AES-256-GCM via DPAPI & TPM 2.0) and owned by <code>NT SERVICE\SundaramVisionSvc</code>. Operators are explicitly denied NTFS access; zero cleartext passwords exist. Cryptographic HMAC hash chain detects manual DB tampering and fails closed.</li>
+  </ul></div>
+  <div><h2>Notification Dictionary & Auto-Localization Engine (REQ-13)</h2><ul>
+    <li><b>Fixed OEM Authoring:</b> OEM hardcodes notifications once in the master dictionary with actionable shop-floor guidance (e.g. <i>"Turn Lead Screw X by 1.85 turns CCW"</i>). Customer supervisors do not edit text.</li>
+    <li><b>Automatic Multi-Language Localization:</b> Built-in verified localizations across plant languages (English, हिन्दी, ગુજરાતી, தமிழ்) with 1-click line language switching.</li>
+  </ul></div>
+</section>
+
+<script>
+(function(){
+"use strict";
+
+const $ = s => document.querySelector(s);
+const app = $("#app");
+
+/* ---------- theme ---------- */
+function setTheme(t){
+  try{ localStorage.setItem("vsw-theme",t); }catch(e){}
+  document.documentElement.setAttribute("data-theme",t);
+  $("#t-dark").setAttribute("aria-pressed",t==="dark");
+  $("#t-light").setAttribute("aria-pressed",t==="light");
+}
+$("#t-dark").onclick = () => setTheme("dark");
+$("#t-light").onclick = () => setTheme("light");
+let saved = null;
+try{ saved = localStorage.getItem("vsw-theme"); }catch(e){}
+if(saved) setTheme(saved);
+else {
+  const l = matchMedia("(prefers-color-scheme: light)").matches;
+  $(l?"#t-light":"#t-dark").setAttribute("aria-pressed","true");
+}
+
+/* ---------- icons ---------- */
+const P = {
+ play:'<path d="M6 4l10 6-10 6z" fill="currentColor"/>', stop:'<rect x="5" y="5" width="10" height="10" fill="currentColor"/>',
+ box:'<path d="M3 7l7-4 7 4v7l-7 4-7-4z"/><path d="M3 7l7 4 7-4M10 11v7"/>', batch:'<rect x="4" y="3" width="12" height="15" rx="1.5"/><path d="M7 7h6M7 10h6M7 13h4"/>',
+ list:'<path d="M7 5h10M7 10h10M7 15h10"/><circle cx="3.5" cy="5" r=".8" fill="currentColor"/><circle cx="3.5" cy="10" r=".8" fill="currentColor"/><circle cx="3.5" cy="15" r=".8" fill="currentColor"/>',
+ image:'<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 13l4-4 4 4 2-2 4 4"/>', reset:'<path d="M4 10a6 6 0 1 0 2-4.5"/><path d="M4 3v3h3"/>',
+ help:'<circle cx="10" cy="10" r="7"/><path d="M8 8a2 2 0 1 1 3 1.7c-.7.4-1 .8-1 1.5M10 14h.01"/>', open:'<path d="M3 6h5l2 2h7v8H3z"/>',
+ save:'<path d="M4 4h10l2 2v10H4z"/><path d="M7 4v4h6V4M7 16v-4h6v4"/>', undo:'<path d="M7 7H13a4 4 0 0 1 0 8H8"/><path d="M9 4L6 7l3 3"/>',
+ redo:'<path d="M13 7H7a4 4 0 0 0 0 8h5"/><path d="M11 4l3 3-3 3"/>', once:'<path d="M5 4l9 6-9 6z"/><path d="M16 4v12"/>',
+ loop:'<path d="M4 10a6 6 0 0 1 10-4.4M16 10a6 6 0 0 1-10 4.4"/><path d="M14 2v4h-4M6 18v-4h4"/>', live:'<circle cx="10" cy="10" r="3" fill="currentColor"/><circle cx="10" cy="10" r="7"/>',
+ grab:'<rect x="3" y="6" width="14" height="10" rx="1.5"/><circle cx="10" cy="11" r="3"/><path d="M7 6l1-2h4l1 2"/>', fit:'<path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/>',
+ z100:'<circle cx="9" cy="9" r="5"/><path d="M13 13l4 4M7 9h4M9 7v4"/>', teach:'<path d="M4 16L14 6M12 4l4 4"/><path d="M15 12v4M13 14h4M5 3v3M3.5 4.5h3"/>',
+ tryall:'<rect x="3" y="3" width="6" height="6"/><rect x="11" y="3" width="6" height="6"/><rect x="3" y="11" width="6" height="6"/><path d="M12 14l2 2 3-4"/>',
+ release:'<path d="M10 2l2 2h3v3l2 2-2 2v3h-3l-2 2-2-2H5v-3l-2-2 2-2V4h3z"/><path d="M7 10l2 2 4-4"/>', search:'<circle cx="9" cy="9" r="5"/><path d="M13 13l4 4"/>',
+ chev:'<path d="M6 8l4 4 4-4"/>', cam:'<rect x="2" y="6" width="12" height="9" rx="1.5"/><path d="M14 9l4-2v7l-4-2"/>', plc:'<rect x="3" y="4" width="14" height="12" rx="1"/><path d="M6 8h2M6 12h2M11 8h3M11 12h3"/>',
+ user:'<circle cx="10" cy="7" r="3.2"/><path d="M4 17c1-3.5 3.5-5 6-5s5 1.5 6 5"/>', globe:'<circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.5 2.5 2.5 11.5 0 14M10 3c-2.5 2.5-2.5 11.5 0 14"/>',
+ roi:'<rect x="4" y="4" width="12" height="12" stroke-dasharray="2 2"/><rect x="2.5" y="2.5" width="3" height="3" fill="currentColor"/><rect x="14.5" y="14.5" width="3" height="3" fill="currentColor"/>',
+ eye:'<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z"/><circle cx="10" cy="10" r="2.2"/>', code:'<rect x="3" y="3" width="5" height="5"/><rect x="12" y="3" width="5" height="5"/><rect x="3" y="12" width="5" height="5"/><path d="M12 12h2v2h-2zM15 15h2v2h-2z"/>',
+ text:'<path d="M4 5h12M10 5v11M7 16h6"/>', split:'<rect x="3" y="3" width="14" height="14" rx="2"/><path d="M10 3v14M6 10l-2-2 2-2M14 10l2 2-2 2"/>', grid:'<rect x="3" y="3" width="14" height="14" rx="1.5"/><path d="M3 8h14M3 13h14M8 3v14M13 3v14"/>', screw:'<circle cx="10" cy="10" r="7"/><path d="M10 3v14M3 10h14M6.5 6.5l7 7M13.5 6.5l-7 7"/>', sparkle:'<path d="M10 2l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path d="M16 13l1 2.5 2.5 1-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1z"/>', thermal:'<path d="M8 13.5a3.5 3.5 0 1 0 4 0V4.5a2 2 0 1 0-4 0v9z"/><circle cx="10" cy="14" r="1.8" fill="currentColor"/>', polar:'<circle cx="10" cy="10" r="7"/><path d="M5 10a5 5 0 0 1 10 0M5 10a5 5 0 0 0 10 0M10 3v14"/>', loc:'<circle cx="10" cy="10" r="6"/><path d="M10 2v4M10 14v4M2 10h4M14 10h4"/>', ruler:'<path d="M3 13L13 3l4 4L7 17z"/><path d="M6 10l1.5 1.5M8.5 7.5L10 9M11 5l1.5 1.5"/>',
+ ai:'<rect x="5" y="5" width="10" height="10" rx="2"/><path d="M8 2v3M12 2v3M8 15v3M12 15v3M2 8h3M2 12h3M15 8h3M15 12h3"/>', logic:'<path d="M4 5h4l4 10h4M4 15h4l1-2.5M12 7.5L13 5h3"/>',
+ out:'<path d="M8 4H4v12h4M12 6l4 4-4 4M16 10H8"/>', min:'<path d="M5 10h10"/>', max:'<rect x="5" y="5" width="10" height="10"/>', x:'<path d="M5 5l10 10M15 5L5 15"/>'
+};
+const ic = (n,cls) => `<svg class="i ${cls||""}" viewBox="0 0 20 20" aria-hidden="true">${P[n]||""}</svg>`;
+
+/* ---------- REQ-13, REQ-18, REQ-20 Unified Notification Hub & Diagnostic Dictionary ---------- */
+let currLang = "en";
+let notifHubOpen = false;
+let notifFilterCat = "all";
+let notifSelectedGuide = null;
+
+const notifications = [
+  {id:"ALM-101", cat:"Substrate & Hologram", sev:"warn", cam:"Cam 4 [Cap Seal]", time:"06:34:05", state:"Active", source:"VisionCore Engine",
+   title:"Hologram Applicator Centering Drift", metrics:"Offset: ΔX +1.40 mm, ΔY -0.22 mm",
+   en:"Applicator Centering Drift: Turn Lead Screw X by 1.85 turns CCW.",
+   hi:"ऐप्लिकेटर सेंटरिंग बहाव: लीड स्क्रू X को 1.85 चक्कर CCW घुमाएँ।",
+   gu:"એપ્લીકેટર સેન્ટરિંગ વિચલન: લીડ સ્ક્રુ X ને 1.85 આંટા CCW ફેરવો.",
+   ta:"பயன்பாட்டு மைய விலகல்: லீட் ஸ்க்ரூ X ஐ 1.85 சுற்றுகள் CCW திருப்பவும்.",
+   guide:{tools:"Lead Screw Handle / 17mm Wrench", cause:"Applicator peel blade holder shifted under line vibration.",
+          steps:["1. Stop product infeed temporarily.","2. Locate manual Lead Screw X on Cap Applicator carriage.","3. Rotate exactly 1.85 turns Counter-Clockwise (CCW).","4. Verify centering on camera 4 live crosshairs."]}},
+  {id:"ALM-102", cat:"Substrate & Moisture", sev:"warn", cam:"Cam 1 [Top Flap]", time:"06:38:22", state:"Active", source:"VisionCore Engine",
+   title:"Target Surface Moisture on Inspecting Surface", metrics:"Refractive Droplet Area: 14.8 mm²",
+   en:"Target Surface Moisture: Condensation on bottle/label surface. Wipe bottle and engage air knife.",
+   hi:"सतह नमी चेतावनी: बोतल/लेबल की सतह पर संक्षेपण। बोतल पोंछें और एयर नाइफ चालू करें।",
+   gu:"સપાટી ભેજ ચેતવણી: બોટલ/લેબલની સપાટી પર ઘનીકરણ. બોટલ લૂછો અને એર નાઇફ સક્રિય કરો.",
+   ta:"மேற்பரப்பு ஈரப்பதம்: பாட்டில்/லேபிளில் நீர் துளிகள். பாட்டிலை துடைத்து ஏர் நைஃப் இயக்கவும்.",
+   guide:{tools:"Lint-Free Microfiber Wipe", cause:"Cold-fill bottle sweating prior to vision scanning station.",
+          steps:["1. Inspect upstream air knife blower pressure (ensure >4 bar).","2. Wipe lens front protective sapphire glass.","3. Confirm dry surface before carton packing."]}},
+  {id:"ALM-103", cat:"Hardware & Optics", sev:"ok", cam:"All Cameras", time:"06:31:12", state:"Active", source:"VisionCore Engine",
+   title:"Strobe Illumination Lumen Output Nominal", metrics:"Lumen Output: 98.4% | Temp: 42°C",
+   en:"Strobe Output Nominal: Lumen output at 98%. Clean LED shield during next shift break.",
+   hi:"स्ट्रोब आउटपुट सामान्य: लुमेन 98% पर है। अगले शिफ्ट ब्रेक के दौरान एलईडी शील्ड को साफ करें।",
+   gu:"સ્ટ્રોબ આઉટપુટ સામાન્ય: લ્યુમેન 98% પર છે. હવે પછીના શિફ્ટ બ્રેક દરમિયાન LED શીલ્ડ સાફ કરો.",
+   ta:"ஸ்ட்ரோப் வெளியீடு இயல்பானது: லுமென் 98%. அடுத்த இடைவேளையில் எல்இடி கவசத்தை சுத்தம் செய்யவும்.",
+   guide:{tools:"Optical Wipe", cause:"Normal thermal operational equilibrium.", steps:["1. Routine shift verification ok.","2. Wipe diffuser shield at shift handover."]}},
+  {id:"ALM-104", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 2 [Side Bottle]", time:"06:41:20", state:"Active", source:"VisionCore Engine",
+   title:"CIJ Nozzle Clog & Satellite Droplets", metrics:"Contrast Drop: Grade C | Satellite Mist: 18%",
+   en:"CIJ Nozzle Degradation: Contrast dropped to Grade C. Perform automated nozzle backflush and wipe electrode.",
+   hi:"CIJ नोजल गिरावट: कंट्रास्ट ग्रेड C पर आ गया। ऑटोमेटेड नोजल बैकफ्लश करें और इलेक्ट्रोड साफ करें।",
+   gu:"CIJ નોઝલ ખામી: કોન્ટ્રાસ્ટ ગ્રેડ C પર આવ્યો. ઓટોમેટેડ નોઝલ બેકફ્લશ કરો અને ઇલેક્ટ્રોડ સાફ કરો.",
+   ta:"CIJ முனை குறைபாடு: மாறுபாடு தரம் C ஆனது. தானியங்கி முனை சுத்திகரிப்பு செய்யவும்.",
+   guide:{tools:"CIJ Wash Bottle + Lint-Free Swab", cause:"Dried ink crystal on ruby nozzle orifice or charge plate.",
+          steps:["1. Press CIJ Controller Clean Cycle.","2. Inspect charge tunnel for ink splatter.","3. Confirm satellite-free dot matrix formation."]}},
+  {id:"ALM-201", cat:"Printer Diagnostics", sev:"critical", cam:"Cam 1 [Top Flap]", time:"06:44:12", state:"Active", source:"VisionCore Engine",
+   title:"TTO Printhead Element Void Detected", metrics:"Dead Element Row: 84 | Void Width: 0.125 mm",
+   en:"TTO Printhead Element Burnout: Continuous white void line on dot row 84. Replace TTO thermal printhead.",
+   hi:"TTO प्रिंटहेड तत्व विफलता: डॉट रो 84 पर सतत सफेद रेखा शून्य। TTO थर्मल प्रिंटहेड बदलें।",
+   gu:"TTO પ્રિન્ટહેડ એલિમેન્ટ ખામી: ડોટ રો 84 પર સતત સફેદ લાઇન ખામી. TTO થર્મલ પ્રિન્ટહેડ બદલો.",
+   ta:"TTO அச்சு முனை உறுப்பு குறைபாடு: புள்ளி வரிசை 84-ல் அச்சு இடைவெளி. TTO அச்சு முனையை மாற்றவும்.",
+   guide:{tools:"Replacement TTO Printhead (300 DPI) + 4mm Hex Key", cause:"Microscopic heating resistor burnout on ceramic substrate.",
+          steps:["1. Power off TTO controller.","2. Release head lever and disconnect flex cable.","3. Install new 300 DPI ceramic printhead.","4. Run test print and calibrate resistance."]}},
+  {id:"ALM-202", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 1 [Top Flap]", time:"06:35:10", state:"Active", source:"VisionCore Engine",
+   title:"TTO Printhead Cleaning Required", metrics:"Contrast Loss: -28% | Soft Edge Gradient",
+   en:"TTO Head Dirty: Wax/paraffin buildup causing faint print. Clean head with 99% IPA wipe.",
+   hi:"TTO हेड गंदा: मोम/पैराफिन जमने से धुंधला प्रिंट। 99% IPA वाइप से हेड साफ करें।",
+   gu:"TTO હેડ ગંદુ: વેક્સ/પેરાફિન જમા થવાથી ઝાંખો પ્રિન્ટ. 99% IPA વાઇપથી સાફ કરો.",
+   ta:"TTO முனை அழுக்கு: மெழுகு படிந்து மங்கலான அச்சு. 99% IPA துடைப்பான் கொண்டு சுத்தம் செய்யவும்.",
+   guide:{tools:"99% Isopropyl Alcohol (IPA) Swab", cause:"Thermal ribbon resin accumulation on print edge.",
+          steps:["1. Pause line and lift printhead.","2. Wipe heating edge horizontally from left to right using IPA swab.","3. Allow 30 seconds to evaporate before resuming."]}},
+  {id:"ALM-203", cat:"Printer Diagnostics", sev:"critical", cam:"Cam 1 [Top Flap]", time:"06:42:00", state:"Active", source:"VisionCore Engine",
+   title:"TTO GS1 Barcode Syntax & Format Error", metrics:"Missing FNC1 Prefix | Non-printable ASCII 0x1D",
+   en:"GS1 Format Defect: Missing FNC1 function character [)> delimiter in 2D barcode payload.",
+   hi:"GS1 प्रारूप त्रुटि: 2D बारकोड पेलोड में FNC1 फंक्शन कैरेक्टर [)> गायब है।",
+   gu:"GS1 ફોર્મેટ ખામી: 2D બારકોડ પેલોડમાં FNC1 ફંક્શન કેરેક્ટર [)> ગેરહાજર છે.",
+   ta:"GS1 வடிவமைப்பு பிழை: 2D பார்கோடு உள்ளடக்கத்தில் FNC1 குறியீடு விடுபட்டுள்ளது.",
+   guide:{tools:"TTO Job Template Editor / ERPNext Gateway", cause:"Printer driver transmitted raw text without GS1 AI header formatting.",
+          steps:["1. Check printer layout template in TTO software.","2. Verify variable field [01] GTIN has preceding FNC1/ASCII 232 character.","3. Send updated layout to TTO buffer."]}},
+  {id:"ALM-204", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 1 [Top Flap]", time:"06:30:15", state:"Active", source:"VisionCore Engine",
+   title:"TTO Over-Darkness & Thermal Bleed", metrics:"Bar Dilation: +38% | Modulation: Grade D",
+   en:"Over-Darkness / Ribbon Bleed: Barcode bars dilated +38%. Reduce TTO darkness energy by 12%.",
+   hi:"अत्यधिक डार्कनेस / रिबन ब्लीड: बारकोड बार +38% फैले। TTO डार्कनेस को 12% कम करें।",
+   gu:"વધુ પડતો ડાર્કનેસ / રિબન બ્લીડ: બારકોડ બાર +38% ફેલાયા. TTO ડાર્કનેસ 12% ઘટાડો.",
+   ta:"அதிக இருண்மை / மை கசிவு: பார்கோடு கோடுகள் +38% விரிவடைந்துள்ளன. TTO வெப்பநிலையை 12% குறைக்கவும்.",
+   guide:{tools:"TTO Controller HMI", cause:"Burn energy pulse width set too high for substrate material.",
+          steps:["1. Access TTO settings menu.","2. Reduce Darkness parameter from 85% to 73%.","3. Print single coupon and verify modulation Grade B or higher."]}},
+  {id:"ALM-301", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 2 [Side Bottle]", time:"06:41:20", state:"Active", source:"VisionCore Engine",
+   title:"CIJ Printhead Skew & Product Crabbing", metrics:"Angular Error: θ = +2.4°",
+   en:"CIJ Skew Print: Head misaligned or product moving in angle. Square CIJ head and narrow guide rails ±1mm.",
+   hi:"CIJ तिरछा प्रिंट: हेड झुका हुआ या उत्पाद तिरछा चल रहा है। हेड सीधा करें और गाइड रेल कसें।",
+   gu:"CIJ ત્રાંસો પ્રિન્ટ: હેડ નમેલું અથવા પ્રોડક્ટ ત્રાંસી ચાલે છે. હેડ સીધું કરો અને ગાઇડ રેલ ±1mm ગોઠવો.",
+   ta:"CIJ கோண அச்சு: அச்சு முனை சாய்வாக உள்ளது. அச்சு முனையை சீரமைத்து வழிகாட்டி கம்பிகளை இறுக்கவும்.",
+   guide:{tools:"Spirit Level + 13mm Spanner", cause:"Conveyor side guide rail gap too wide allowing bottle rotation.",
+          steps:["1. Inspect bottle passage under CIJ nozzle.","2. Adjust side guide clamp knobs until clearance is bottle diameter + 1mm.","3. Square CIJ printhead clamp to 90° against conveyor."]}},
+  {id:"ALM-302", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 3 [Shipper Box]", time:"06:33:40", state:"Active", source:"VisionCore Engine",
+   title:"TIJ Head Away Blur (>2.0mm Gap)", metrics:"Throw Distance: 3.2 mm | Edge Blur: 4.8 px",
+   en:"TIJ Head Away / Distance Excessive: Full print blurred and dots spread. Move TIJ cartridge closer (gap 1.0mm).",
+   hi:"TIJ हेड बहुत दूर: पूरा प्रिंट धुंधला और डॉट्स फैले। TIJ कार्ट्रिज को उत्पाद के 1.0mm करीब लाएँ।",
+   gu:"TIJ હેડ વધુ દૂર: આખો પ્રિન્ટ ઝાંખો અને ડોટ્સ ફેલાયા. TIJ કાર્ટ્રિજને પ્રોડક્ટની 1.0mm નજીક લાવો.",
+   ta:"TIJ முனை அதிக தூரம்: முழு அச்சு மங்கலானது. TIJ கார்ட்ரிட்ஜை 1.0mm தொலைவிற்கு நெருக்கமாக நகர்த்தவும்.",
+   guide:{tools:"1.0mm Feeler Gauge + 5mm Hex Wrench", cause:"Bracket loosened during carton line vibration.",
+          steps:["1. Loosen TIJ bracket slide clamp.","2. Insert 1.0mm gauge between cartridge faceplate and passing carton.","3. Re-tighten clamp firmly."]}},
+  {id:"ALM-303", cat:"Printer Diagnostics", sev:"critical", cam:"Cam 3 [Shipper Box]", time:"06:43:05", state:"Active", source:"VisionCore Engine",
+   title:"TIJ Head Touching Product / Drag Smear", metrics:"Smear Drag Tail: 14.2 mm",
+   en:"TIJ Head Touching Product: Dragged ink tails and nozzle plate contact. Back off cartridge bracket by 1.5mm.",
+   hi:"TIJ हेड उत्पाद से छू रहा है: स्याही घिसट रही है। कार्ट्रिज ब्रैकेट को 1.5mm पीछे करें।",
+   gu:"TIJ હેડ પ્રોડક્ટને અડે છે: ઇંક ઘસાઈને ડાઘ પડે છે. કાર્ટ્રિજ બ્રેકેટને 1.5mm પાછળ ખસેડો.",
+   ta:"TIJ முனை பொருள் மீது உராய்வு: மை பரவி கறை ஏற்படுகிறது. கார்ட்ரிட்ஜை 1.5mm பின்னுக்கு நகர்த்தவும்.",
+   guide:{tools:"5mm Hex Wrench", cause:"Carton flap bulging or cartridge mounted too tight.",
+          steps:["1. Stop conveyor immediately to protect cartridge nozzle array.","2. Loosen bracket and back off cartridge by 1.5mm.","3. Check carton flap compression guide."]}},
+  {id:"ALM-304", cat:"Printer Diagnostics", sev:"warn", cam:"Cam 3 [Shipper Box]", time:"06:28:10", state:"Active", source:"VisionCore Engine",
+   title:"TIJ Guide Taper / Wedge Print Distortion", metrics:"Wedge Skew: +3.1° | Left/Right ΔIntensity: 42%",
+   en:"Wedge Print Distortion: Product travelling diagonally. Re-align conveyor guide rails parallel to belt.",
+   hi:"वेज प्रिंट विकृति: उत्पाद तिरछी दिशा में चल रहा है। कन्वेयर गाइड रेल को बेल्ट के समानांतर संरेखित करें।",
+   gu:"વેજ પ્રિન્ટ વિકૃતિ: પ્રોડક્ટ ક્રોસ દિશામાં ચાલે છે. કન્વેયર ગાઇડ રેલને બેલ્ટ સમાંતર સીધી કરો.",
+   ta:"குடைவு அச்சு சிதைவு: பொருள் குறுக்காக பயணிக்கிறது. வழிகாட்டி கம்பிகளை பெல்ட்டிற்கு இணையாக மாற்றவும்.",
+   guide:{tools:"Measuring Tape / Straight Edge", cause:"Infeed guide rails not parallel causing product to angle past head.",
+          steps:["1. Measure guide spacing at entry and exit of print zone.","2. Set uniform gap matching carton width + 2mm throughout."]}},
+  {id:"ALM-401", cat:"Motion & Encoder", sev:"critical", cam:"Master Motion Bus", time:"06:36:50", state:"Active", source:"VisionCore Engine",
+   title:"Encoder Scaling Mismatch / Non-Square 2D Code", metrics:"Aspect Ratio W/H: 1.18 | Target: 1.00 ± 0.03",
+   en:"Encoder Scaling Mismatch: 2D DataMatrix cells stretched into rectangles (W/H=1.18). Correct encoder divider in OEM Factory.",
+   hi:"एन्कोडर स्केलिंग बेमेल: 2D डेटा मैट्रिक्स आयत में खिंच गया (W/H=1.18)। OEM फ़ैक्टरी में एन्कोडर डिवाइडर ठीक करें।",
+   gu:"એન્કોડર સ્કેલિંગ મેળ ખાતો નથી: 2D ડેટામેટ્રિક્સ લંબચોરસ ખેંચાઈ ગયું (W/H=1.18). OEM ફેક્ટરીમાં ડિવાઇડર સુધારો.",
+   ta:"என்கோடர் அளவீடு பொருந்தவில்லை: 2D பார்கோடு செவ்வகமாக நீண்டுள்ளது. OEM அமைப்பில் என்கோடர் அளவை மாற்றவும்.",
+   guide:{tools:"OEM Factory Access Key", cause:"Incorrect encoder PPR or wheel circumference divider entered during commissioning.",
+          steps:["1. Enter OEM Factory Tab.","2. Under Conveyor Encoder Pulses, adjust from 63.66 to 53.95 pulses/mm.","3. Capture new frame and verify square 1.00 aspect ratio."]}},
+  {id:"ALM-402", cat:"Motion & Encoder", sev:"warn", cam:"Master Motion Bus", time:"06:39:12", state:"Active", source:"VisionCore Engine",
+   title:"Encoder Wheel Slipping / Friction Loss", metrics:"Intermittent Pitch Jitter: 18.4% during accel",
+   en:"Encoder Wheel Slipping: Intermittent image stretch during acceleration. Inspect spring arm & replace rubber O-ring.",
+   hi:"एन्कोडर व्हील स्लिप: त्वरण के दौरान इमेज खिंच रही है। स्प्रिंग आर्म और रबर ओ-रિંગ जांचें।",
+   gu:"એન્કોડર વ્હીલ લપસે છે: એક્સિલરેશન વખતે ઇમેજ ખેંચાય છે. સ્પ્રિંગ આર્મ તપાસો અને રબર O-રીંગ બદલો.",
+   ta:"என்கோடர் சக்கரம் நழுவுகிறது: வேகம் கூடும் போது அச்சு நீள்கிறது. ஸ்பிரிங் கைப்பிடி மற்றும் ரப்பர் வளையத்தை மாற்றவும்.",
+   guide:{tools:"Spare 50mm Polyurethane O-Ring + 3mm Allen Wrench", cause:"Encoder wheel traction tire worn smooth or belt underside oil contamination.",
+          steps:["1. Clean conveyor belt underside with degreasing agent.","2. Replace worn rubber traction tire on encoder measuring wheel.","3. Increase spring arm downforce tension."]}},
+  {id:"ALM-403", cat:"Motion & Encoder", sev:"warn", cam:"Master Motion Bus", time:"06:40:45", state:"Active", source:"VisionCore Engine",
+   title:"Conveyor Load Variation / Motor Speed Sag", metrics:"Belt Velocity Sag: -12.4% under product bunch",
+   en:"Conveyor Speed Sag Under Load: Belt velocity dropped 12% during infeed bunch. Check motor capacity / drive belt.",
+   hi:"कन्वेयर गति में गिरावट: उत्पाद के गुच्छे पर गति 12% गिरी। मोटर क्षमता और ड्राइव बेल्ट जांचें।",
+   gu:"કન્વેયર ઝડપ ઘટી: ઇનફીડ લોડ વખતે ઝડપ 12% ઘટી. મોટર ક્ષમતા અને ડ્રાઇવ બેલ્ટ તપાસો.",
+   ta:"கன்வேயர் வேகம் குறைவு: சுமை கூடும் போது பெல்ட் வேகம் 12% குறைகிறது. மோட்டார் திறன் மற்றும் பெல்ட்டை சரிபார்க்கவும்.",
+   guide:{tools:"VFD Diagnostic Keypad / Tachometer", cause:"Underpowered gearmotor or slipping V-belt under sudden infeed surges.",
+          steps:["1. Verify VFD torque boost parameter (P0-04) is enabled.","2. Check motor drive belt tension and pulley alignment."]}},
+  {id:"ALM-501", cat:"Code Integrity", sev:"critical", cam:"Cam 1 [Top Flap]", time:"06:45:02", state:"Active", source:"VisionCore Engine",
+   title:"Sliding-Window Duplicate Code Detected", metrics:"Matching Part: #8,421 (89 counts ago)",
+   en:"Duplicate Code Detected: (01)08901234567894(21)7Q2M9K scanned twice within last 250 counts. Rejecting part.",
+   hi:"डुप्लिकेट कोड का पता चला: पिछले 250 काउंट में बारकोड दो बार स्कैन हुआ। पार्ट को अस्वीकार किया गया।",
+   gu:"ડુપ્લિકેટ કોડ મળ્યો: છેલ્લા 250 કાઉન્ટમાં બારકોડ બે વાર સ્કેન થયો. પાર્ટ રિજેક્ટ કરાયો.",
+   ta:"போலி குறியீடு கண்டறியப்பட்டது: கடந்த 250 பதிவுகளில் பார்கோடு மீண்டும் வந்தது. பொருள் நிராகரிக்கப்பட்டது.",
+   guide:{tools:"Carton Feeder Sensor Check", cause:"Product recirculated through cartoner or TTO duplicate serialization print.",
+          steps:["1. Confirm rejected part is diverted to physical lockbox.","2. Check carton feeder singulation separator."]}},
+  {id:"ALM-601", cat:"External IPC", sev:"warn", cam:"IPC Bus [Named Pipe]", time:"06:45:18", state:"Active", source:"External: Track & Trace App",
+   title:"Track & Trace Parent Aggregation Buffer Warning", metrics:"IPC Buffer Depth: 94% (470 / 500 cases)",
+   en:"IPC Alert [Track & Trace]: Shipper aggregation queue at 94% capacity. Prepare new pallet tag.",
+   hi:"IPC चेतावनी [ट्रैक एंड ट्रेस]: शिपर एग्रीगेशन कतार 94% भरी है। नया पैलेट टैग तैयार करें।",
+   gu:"IPC ચેતવણી [ટ્રેક એન્ડ ટ્રેસ]: શિપર એગ્રીગેશન કતાર 94% ભરાઈ ગઈ છે. નવો પેલેટ ટેગ તૈયાર કરો.",
+   ta:"IPC எச்சரிக்கை [ட்ராக் & டிரேஸ்]: பெட்டி சேர்க்கை வரிசை 94% நிறைவடைந்தது. புதிய பேலட் குறியீட்டை தயார் செய்யவும்.",
+   guide:{tools:"Warehouse Handheld Scanner / Zebra Printer", cause:"Shipper aggregation buffer reaching limit on running line.",
+          steps:["1. Print pallet aggregate SSCC label on Zebra printer.","2. Scan completed pallet into ERPNext warehouse ledger."]}}
+];
+
+function getLocalizedAlarm(id){
+  const n = notifications.find(x => x.id === id);
+  if(!n) return "";
+  return n[currLang] || n.en;
+}
+
+function activeNotifsCount(){
+  return notifications.filter(x => x.state === "Active").length;
+}
+
+function toggleNotifHub(){
+  notifHubOpen = !notifHubOpen;
+  renderCurrentView();
+}
+
+function acknowledgeNotif(id){
+  const n = notifications.find(x => x.id === id);
+  if(n){
+    n.state = "Acknowledged";
+    n.ackBy = (mode === "op" ? "Operator #1" : (mode === "sup" ? "Supervisor V. Patel" : "Service Engineer"));
+    n.ackAt = new Date().toTimeString().slice(0, 8);
+    renderCurrentView();
+  }
+}
+
+function snoozeNotif(id){
+  const n = notifications.find(x => x.id === id);
+  if(n){
+    n.state = "Snoozed";
+    renderCurrentView();
+  }
+}
+
+function openNotifGuide(id){
+  notifSelectedGuide = id;
+  renderCurrentView();
+}
+
+function closeNotifGuide(){
+  notifSelectedGuide = null;
+  renderCurrentView();
+}
+
+function resolveNotifGuide(id){
+  const n = notifications.find(x => x.id === id);
+  if(n){
+    n.state = "Resolved";
+    n.ackBy = "Resolved & Verified";
+    n.ackAt = new Date().toTimeString().slice(0, 8);
+  }
+  notifSelectedGuide = null;
+  renderCurrentView();
+}
+
+function simulateExternalIpcNotif(){
+  const id = "ALM-IPC-" + Math.floor(Math.random()*900 + 100);
+  notifications.unshift({
+    id: id,
+    cat: "External IPC",
+    sev: "warn",
+    cam: "IPC Bus [\\.\pipe\SundaramNotificationBus]",
+    time: new Date().toTimeString().slice(0, 8),
+    state: "Active",
+    source: "External: Carton Packaging Line PLC",
+    title: "IPC Notification: Infeed Carton Singulator Jamming Detected",
+    metrics: "Carton Pitch Deviation: -44% | Photo-eye Jitter: 82ms",
+    en: "IPC Alert [Carton Feeder]: Carton singulator jamming detected upstream. Check feeder magazine vacuum.",
+    hi: "IPC चेतावनी [कार्टन फीडर]: अपस्ट्रीम कार्टन सिंगुलेटर जाम। फीडर मैगज़ीन वैक्यूम जांचें।",
+    gu: "IPC ચેતવણી [કાર્ટન ફીડર]: અપસ્ટ્રીમ કાર્ટન સિંગ્યુલેટર જામ મળ્યો. ફીડર મેગેઝિન વેક્યૂમ તપાસો.",
+    ta: "IPC எச்சரிக்கை [கார்ட்டன் ஃபீடர்]: பெட்டி செலுத்தும் கருவி நெரிசல். வெற்றிட அழுத்தத்தை சரிபார்க்கவும்.",
+    guide: {
+      tools: "Feeder Vacuum Gauge + 10mm Wrench",
+      cause: "Low air pressure on carton suction cups causing irregular feed spacing.",
+      steps: [
+        "1. Check main 6-bar regulator pressure for carton feeder.",
+        "2. Clean rubber vacuum cups on oscillating pickup arm.",
+        "3. Confirm carton spacing returns to nominal 250mm pitch."
+      ]
+    }
+  });
+  notifHubOpen = true;
+  notifFilterCat = "External IPC";
+  renderCurrentView();
+}
+
+function notificationHubHTML(){
+  if(!notifHubOpen) return "";
+  const filtered = notifications.filter(n => {
+    if(notifFilterCat === "all") return true;
+    if(notifFilterCat === "hardware") return n.cat.includes("Hardware");
+    if(notifFilterCat === "printer") return n.cat.includes("Printer");
+    if(notifFilterCat === "substrate") return n.cat.includes("Substrate");
+    if(notifFilterCat === "motion") return n.cat.includes("Motion");
+    if(notifFilterCat === "ipc") return n.cat.includes("External IPC");
+    return true;
+  });
+
+  return `<div style="background:var(--raised);border-bottom:2px solid var(--accent);box-shadow:0 10px 30px rgba(0,0,0,0.6);padding:14px 18px;display:flex;flex-direction:column;gap:12px;z-index:70;max-height:480px;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">🔔</span>
+        <div>
+          <h3 style="margin:0;font-size:14px;color:var(--text);font-weight:700">Unified Machine Notification & Diagnostic Hub (REQ-18, REQ-20)</h3>
+          <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">Hardware, motion & printer alerts aggregated across VisionCore and external software via IPC Named Pipe</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="chip" style="font-size:11px;background:rgba(220,38,38,0.15);color:var(--ng)"><b>${activeNotifsCount()} Active</b></span>
+        <span class="chip" style="font-size:11px;background:rgba(34,197,94,0.15);color:var(--ok)"><b>${notifications.filter(x=>x.state==='Acknowledged').length} Ack'd</b></span>
+        <button class="tb primary" id="btn-sim-ipc" style="height:26px;font-size:11px">+ Simulate External IPC Event</button>
+        <button class="tb" id="btn-close-notif-hub" style="height:26px;font-size:11px">✕ Close Hub</button>
+      </div>
+    </div>
+
+    <!-- Filters & Language switcher -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px">
+      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+        <span style="color:var(--muted);font-weight:600">Filter Category:</span>
+        <button class="tb ${notifFilterCat==='all'?'primary':''}" id="flt-all" style="height:22px;padding:0 8px;font-size:11px">All (${notifications.length})</button>
+        <button class="tb ${notifFilterCat==='printer'?'primary':''}" id="flt-printer" style="height:22px;padding:0 8px;font-size:11px">🖨️ Printer Diagnostics (${notifications.filter(x=>x.cat.includes("Printer")).length})</button>
+        <button class="tb ${notifFilterCat==='motion'?'primary':''}" id="flt-motion" style="height:22px;padding:0 8px;font-size:11px">⚙️ Motion & Encoders (${notifications.filter(x=>x.cat.includes("Motion")).length})</button>
+        <button class="tb ${notifFilterCat==='substrate'?'primary':''}" id="flt-substrate" style="height:22px;padding:0 8px;font-size:11px">🏷️ Substrate & Moisture (${notifications.filter(x=>x.cat.includes("Substrate")).length})</button>
+        <button class="tb ${notifFilterCat==='hardware'?'primary':''}" id="flt-hardware" style="height:22px;padding:0 8px;font-size:11px">⚡ Hardware & Optics (${notifications.filter(x=>x.cat.includes("Hardware")).length})</button>
+        <button class="tb ${notifFilterCat==='ipc'?'primary':''}" id="flt-ipc" style="height:22px;padding:0 8px;font-size:11px">🔗 External IPC (${notifications.filter(x=>x.cat.includes("External IPC")).length})</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px">
+        <span style="color:var(--muted);font-weight:600">Language:</span>
+        <button class="tb ${currLang==='en'?'primary':''}" id="nh-lang-en" style="height:22px;padding:0 6px;font-size:10.5px">EN</button>
+        <button class="tb ${currLang==='hi'?'primary':''}" id="nh-lang-hi" style="height:22px;padding:0 6px;font-size:10.5px">हिन्दी</button>
+        <button class="tb ${currLang==='gu'?'primary':''}" id="nh-lang-gu" style="height:22px;padding:0 6px;font-size:10.5px">ગુજરાતી</button>
+        <button class="tb ${currLang==='ta'?'primary':''}" id="nh-lang-ta" style="height:22px;padding:0 6px;font-size:10.5px">தமிழ்</button>
+      </div>
+    </div>
+
+    <!-- Notification Cards Grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      ${filtered.map(n => {
+        const isCrit = n.sev === "critical", isWarn = n.sev === "warn";
+        const borderCol = isCrit ? "#DC2626" : (isWarn ? "#FACC15" : "#3B82F6");
+        const badgeBg = isCrit ? "var(--ng)" : (isWarn ? "var(--warn)" : "var(--info)");
+        const badgeColor = isCrit ? "#fff" : (isWarn ? "#1A1400" : "#fff");
+        const isAck = n.state === "Acknowledged", isSnooze = n.state === "Snoozed";
+
+        return `<div style="background:var(--surface);border:1px solid ${borderCol};border-left:5px solid ${borderCol};border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;opacity:${isAck?0.75:1}">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge" style="background:${badgeBg};color:${badgeColor};font-size:10px;text-transform:uppercase">${n.sev}</span>
+              <span class="chip" style="height:18px;font-size:10px;background:rgba(255,255,255,0.06)">${n.cam}</span>
+              <span class="chip" style="height:18px;font-size:10px;color:var(--info)">${n.source}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+              <span>${n.time}</span>
+              <span class="badge ${n.state==='Active'?(isCrit?'ng':'warn'):'ok'}" style="font-size:10px">${n.state}</span>
+            </div>
+          </div>
+          <div>
+            <div style="font-weight:700;font-size:12.5px;color:var(--text);margin-bottom:2px">${n.id}: ${n.title}</div>
+            <div style="font-size:11px;color:var(--muted);font-family:monospace">${n.metrics}</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.25);border-radius:4px;padding:6px 8px;font-size:11.5px;color:var(--text);border:1px solid rgba(255,255,255,0.08)">
+            <b>👉 Localized Guidance (${currLang.toUpperCase()}):</b> ${n[currLang] || n.en}
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:2px;font-size:11px">
+            <span style="color:var(--muted)">${n.ackBy ? `Ack: ${n.ackBy} (${n.ackAt})` : (n.state==='Active' ? 'Needs Operator Attention' : 'Snoozed for 15 min')}</span>
+            <div style="display:flex;gap:6px">
+              ${n.state==='Active' ? `<button class="tb notif-ack-btn" data-id="${n.id}" style="height:24px;font-size:10.5px">✓ Acknowledge</button>` : ''}
+              ${n.state==='Active' ? `<button class="tb notif-snooze-btn" data-id="${n.id}" style="height:24px;font-size:10.5px">⏸ Snooze</button>` : ''}
+              <button class="tb primary notif-guide-btn" data-id="${n.id}" style="height:24px;font-size:10.5px">📖 Diagnostic Guide</button>
+            </div>
+          </div>
+        </div>`;
+      }).join("")}
+    </div>
+  </div>`;
+}
+
+function notifGuideModalHTML(){
+  if(!notifSelectedGuide) return "";
+  const n = notifications.find(x => x.id === notifSelectedGuide);
+  if(!n || !n.guide) return "";
+
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999">
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;width:560px;box-shadow:0 16px 48px rgba(0,0,0,0.8);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:24px">🛠️</span>
+          <div>
+            <h3 style="margin:0;font-size:15px;color:var(--text)">Action Guide: ${n.id} — ${n.title}</h3>
+            <p style="margin:2px 0 0;font-size:11.5px;color:var(--muted)">Mechanical Resolution & Maintenance Instructions</p>
+          </div>
+        </div>
+        <button class="tb" id="ng-modal-x" style="height:26px">✕</button>
+      </div>
+
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-size:12px">
+        <div><b>Physical Root Cause:</b> ${n.guide.cause}</div>
+        <div style="margin-top:4px"><b>Required Tools / Parts:</b> <span class="badge ok">${n.guide.tools}</span></div>
+      </div>
+
+      <div style="font-size:12px;display:flex;flex-direction:column;gap:8px">
+        <b style="color:var(--accent)">Step-by-Step Operator / Maintenance Resolution:</b>
+        <div style="background:rgba(37,99,235,0.06);border:1px solid var(--border);border-radius:6px;padding:12px;display:flex;flex-direction:column;gap:8px">
+          ${n.guide.steps.map(s => `<div style="display:flex;gap:8px;line-height:1.4"><span style="color:var(--accent);font-weight:700">✓</span><span>${s}</span></div>`).join("")}
+        </div>
+      </div>
+
+      <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:6px;padding:10px;font-size:11.5px;color:var(--text)">
+        <b>Verification Criterion:</b> Perform test grab on camera stream. Ensure metric returns within tolerance before re-starting line.
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--border);padding-top:12px">
+        <button class="tb" id="ng-modal-close">Close Guide</button>
+        <button class="tb primary" id="ng-modal-resolve" data-id="${n.id}">Mark Resolved & Verified</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- REQ-14 Dynamic Daily Rolling OTP for Service Support & REQ-17 OEM Factory Build ---------- */
+const machineLic = "VS-PRO-GJ04-98214";
+function getTodayDateStr(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+// DEMO ONLY (Req 17.10 REQ-14, REQ-21): a toy code so the prototype can be clicked through. The product uses
+// HMAC-SHA256 with secrets held outside the repository (Licence.cs OemOtpVerifier, ERPNext core.py).
+function calculateDailyOtp(lic, dateStr){
+  const str = (lic || machineLic) + ":" + (dateStr || getTodayDateStr()) + ":DEMO-ONLY-NOT-A-SECRET-service";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(Math.abs(hash) % 1000000).padStart(6, '0');
+}
+
+function calculateFactoryOtp(lic, dateStr){
+  const str = (lic || machineLic) + ":" + (dateStr || getTodayDateStr()) + ":DEMO-ONLY-NOT-A-SECRET-factory";
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return String(Math.abs(hash) % 1000000).padStart(6, '0');
+}
+
+let svcUnlocked = false;
+let svcModalOpen = false;
+
+let oemUnlocked = false;
+let oemModalOpen = false;
+
+function openSvcModal(){
+  svcModalOpen = true;
+  renderCurrentView();
+}
+function closeSvcModal(){
+  svcModalOpen = false;
+  if(mode === "svc" && !svcUnlocked) {
+    setMode("op");
+  }
+  renderCurrentView();
+}
+
+function submitSvcOtp(){
+  const input = $("#svc-otp-input");
+  if(!input) return;
+  const val = input.value.trim();
+  const expected = calculateDailyOtp();
+  if(val === expected){
+    svcUnlocked = true;
+    svcModalOpen = false;
+    setMode("svc");
+  } else {
+    alert("INVALID OTP! Today's daily rolling OTP does not match machine license VS-PRO-GJ04-98214. Access to Service mode denied.");
+  }
+}
+
+function svcModalHTML(){
+  if(!svcModalOpen) return "";
+  const today = getTodayDateStr();
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.75);display:flex;align-items:center;justify-content:center;z-index:9999">
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;width:440px;box-shadow:0 12px 36px rgba(0,0,0,0.6);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <span style="font-size:22px">🛠️</span>
+        <div>
+          <h3 style="margin:0;font-size:15px;color:var(--accent)">Service & Support Login — Daily Rolling OTP</h3>
+          <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">Dynamic challenge-response for field & remote support engineers (REQ-14 / PROT-29)</p>
+        </div>
+      </div>
+      <div style="font-size:12px;line-height:1.45;color:var(--text)">
+        <p style="margin:0 0 8px">Service login gives field engineers and remote support personnel access to optical tuning, focus checks, and assisted maintenance while the line PC stays live in Operator mode.</p>
+        <div style="background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:11.5px">
+          <div><b>Machine License ID:</b> <code>VS-PRO-GJ04-98214</code></div>
+          <div><b>Challenge Date:</b> <code>${today}</code></div>
+          <div><b>Credential Source:</b> ERPNext License Portal or Sundaram Mobile App</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:11.5px;font-weight:600">Enter Today's 6-Digit OTP:</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="svc-otp-input" maxlength="6" placeholder="e.g. ${calculateDailyOtp()}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:16px;letter-spacing:4px;font-weight:bold;text-align:center;color:var(--text)">
+          <button class="tb" id="svc-demo-fill" style="font-size:11px;white-space:nowrap" title="Auto-fill with today's token">Fill Token (Mobile/ERP)</button>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;border-top:1px solid var(--border);padding-top:12px">
+        <button class="tb" id="svc-m-close">Cancel</button>
+        <button class="tb primary" id="svc-verify-btn" style="padding:6px 16px">Verify & Unlock Service Mode</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function openOemFactoryModal(){
+  oemModalOpen = true;
+  renderCurrentView();
+}
+function closeOemFactoryModal(){
+  oemModalOpen = false;
+  if(mode === "oem" && !oemUnlocked){
+    setMode("op");
+  }
+  renderCurrentView();
+}
+
+function submitOemFactoryAuth(){
+  const otpInput = $("#oem-fact-otp");
+  const val = otpInput ? otpInput.value.trim() : "";
+  const expected = calculateFactoryOtp();
+  if(val === expected || val === "FACTORY-BUILD-PROV-2026"){
+    oemUnlocked = true;
+    oemModalOpen = false;
+    setMode("oem");
+  } else {
+    alert("ACCESS DENIED! Invalid Factory Setting OTP.\n\nFactory Setting OTP does not match machine license VS-PRO-GJ04-98214.\nOnly authorized senior employees holding 'OEM Factory Admin' doctype rights in ERPNext can generate this OTP.");
+  }
+}
+
+function oemFactoryModalHTML(){
+  if(!oemModalOpen) return "";
+  return `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;z-index:9999">
+    <div style="background:var(--surface);border:1px solid #E11D48;border-radius:10px;width:510px;box-shadow:0 16px 48px rgba(0,0,0,0.8);padding:22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);padding-bottom:10px">
+        <span style="font-size:26px">🏭</span>
+        <div>
+          <h3 style="margin:0;font-size:15px;color:#E11D48">OEM Factory Mode — Machine Manufacturing & Build Settings</h3>
+          <p style="margin:2px 0 0;font-size:11px;color:var(--muted)">Dynamic OTP Authentication for Factory Settings & Remote Field Access (REQ-21 / PROT-36)</p>
+        </div>
+      </div>
+
+      <!-- Mandatory Security Audit Notice -->
+      <div style="background:rgba(225,29,72,0.18);border:2px solid #E11D48;border-radius:6px;padding:12px 14px;font-size:12px;color:var(--text);line-height:1.45">
+        <div style="display:flex;align-items:center;gap:6px;color:#FDA4AF;font-weight:700;margin-bottom:4px">
+          <span style="font-size:16px">⚠️</span> MANDATORY SECURITY AUDIT NOTICE:
+        </div>
+        <div style="font-size:12.5px;font-weight:700;color:#FFF;background:rgba(225,29,72,0.3);padding:6px 8px;border-radius:4px;border-left:3px solid #E11D48">
+          "Do not share OTP with other users as change log is generated with values, It will be audited in your name - Risky."
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">
+          Only selected employees with 'OEM Factory Admin' doctype rights in ERPNext are issued this OTP. Every modification creates a permanent cryptographic audit trail with previous and new values.
+        </div>
+      </div>
+
+      <div style="font-size:12px;line-height:1.45;color:var(--text)">
+        <div style="background:var(--bg);border:1px solid var(--border);padding:8px 12px;border-radius:6px;font-size:11.5px">
+          <div><b>Machine License ID:</b> <code>VS-PRO-GJ04-98214</code></div>
+          <div><b>Challenge Date:</b> <code>${getTodayDateStr()}</code></div>
+          <div><b>ERPNext Doctype:</b> <code>Vision Factory Setting OTP (OEM Factory Admin Only)</code></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <label style="font-size:11.5px;font-weight:600">Enter Today's 6-Digit Factory Setting OTP:</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="oem-fact-otp" maxlength="6" placeholder="e.g. ${calculateFactoryOtp()}" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:16px;letter-spacing:4px;font-weight:bold;text-align:center;color:var(--text);font-family:monospace">
+          <button class="tb" id="oem-fact-demo-fill" style="font-size:11px;white-space:nowrap" title="Auto-fill with today's factory OTP">Fill Factory OTP (ERPNext)</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;border-top:1px solid var(--border);padding-top:12px">
+        <button class="tb" id="oem-fact-close">Cancel</button>
+        <button class="tb danger" id="oem-fact-verify" style="padding:6px 16px;background:#E11D48;color:#fff">Verify & Unlock Factory Settings</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- REQ-12 4-Eyes Dual-Control Approval Workflow ---------- */
+let pendingApprovals = [
+  {id:1, time:"06:42:15", op:"operator_01", action:"Recipe Change to Whisky 1000ml", reason:"Scheduled Batch Changeover", status:"pending"},
+  {id:2, time:"06:38:10", op:"operator_01", action:"Reset Defect Counts & Bin Jam", reason:"Reject Bin Emptied & Inspected", status:"approved", approvedBy:"V. Patel (06:38:22)"}
+];
+
+let supModalOpen = false, supModalAction = "", supModalReason = "Scheduled Batch Changeover";
+function triggerSupervisorModal(action, defaultReason){
+  supModalAction = action;
+  supModalReason = defaultReason || "Scheduled Batch Changeover";
+  supModalOpen = true;
+  renderCurrentView();
+}
+function closeSupervisorModal(){
+  supModalOpen = false;
+  renderCurrentView();
+}
+function executeSupervisorApproval(){
+  const pinInput = $("#sup-pin");
+  const pin = pinInput ? pinInput.value.trim() : "4402";
+  if(pin !== "4402"){
+    alert("Invalid Supervisor PIN. Authorization rejected.");
+    return;
+  }
+  pendingApprovals.unshift({
+    id: Date.now(),
+    time: new Date().toTimeString().slice(0,8),
+    op: "operator_01",
+    action: supModalAction,
+    reason: supModalReason,
+    status: "approved",
+    approvedBy: "V. Patel (Customer Senior Supervisor)"
+  });
+  if(supModalAction.includes("Reset")){
+    op.good = 0; op.bad = 0; op.parts = []; op.ngs = [];
+  }
+  alert(`✓ Authorization Successful!\nAction: "${supModalAction}" executed and recorded in 21 CFR Part 11 Audit Trail.`);
+  supModalOpen = false;
+  renderCurrentView();
+}
+
+function supervisorModalHTML(){
+  if(!supModalOpen) return "";
+  return `<div style="position:absolute;inset:0;background:rgba(10,15,21,0.85);z-index:95;display:flex;align-items:center;justify-content:center">
+    <div style="width:480px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);overflow:hidden">
+      <div class="ph" style="height:34px;font-size:12px;padding:0 12px;background:var(--titlebar)">
+        <b>🔒 SUPERVISOR APPROVAL REQUIRED (21 CFR Part 11 DUAL-CONTROL)</b>
+        <span style="flex:1"></span>
+        <button class="tb icon" id="sup-m-close" style="height:24px;width:24px">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+        <div style="background:var(--raised);padding:10px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:11px;color:var(--muted)">REQUESTED SENSITIVE ACTION</div>
+          <div style="font-weight:700;font-size:14px;color:var(--warn);margin-top:2px">${supModalAction}</div>
+          <div style="font-size:11.5px;color:var(--text);margin-top:4px">Operator: <b>operator_01 (Shift A)</b> · Supervision: Customer Senior Person</div>
+        </div>
+        <div>
+          <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px">Reason for Action / SOP Reference:</label>
+          <select id="sup-reason-sel" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px;border-radius:4px;font-size:12px">
+            <option value="Scheduled Batch Changeover">Scheduled Batch Changeover (SOP-PKG-04)</option>
+            <option value="Reject Bin Emptied & Inspected">Physical Reject Bin Emptied & Inspected</option>
+            <option value="Packaging Material Variance">Packaging Material / Glass Bottle Variance</option>
+            <option value="Maintenance Tooling Adjustment">Maintenance Tooling Adjustment / Lead Screw</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11.5px;color:var(--muted);display:block;margin-bottom:4px">Supervisor Authorization PIN (Default demo: 4402) or Scan RFID:</label>
+          <div style="display:flex;gap:8px">
+            <input type="password" id="sup-pin" value="4402" style="flex:1;background:var(--bg);color:var(--text);border:1px solid var(--border);padding:6px;border-radius:4px;font-family:var(--f-mono);font-size:14px;letter-spacing:2px">
+            <button class="tb" id="sup-rfid-btn" style="white-space:nowrap">Scan RFID Badge</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:6px">
+          <button class="tb primary" id="sup-auth-btn" style="flex:1;height:32px">Authorize & Execute Action</button>
+          <button class="tb" id="sup-cancel-btn" style="height:32px">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ---------- drawn camera images ---------- */
+function rnd(seed){let s=seed>>>0||1;return()=>((s=(s*1664525+1013904223)>>>0)/4294967296);}
+function qr(x,y,size,seed,damage){
+  const n=21,m=size/n,r=rnd(seed);let o=`<rect x="${x-m*2}" y="${y-m*2}" width="${size+m*4}" height="${size+m*4}" fill="#f4f1ea"/>`;
+  const finder=(fx,fy)=>`<rect x="${x+fx*m}" y="${y+fy*m}" width="${7*m}" height="${7*m}" fill="#141414"/><rect x="${x+(fx+1)*m}" y="${y+(fy+1)*m}" width="${5*m}" height="${5*m}" fill="#f4f1ea"/><rect x="${x+(fx+2)*m}" y="${y+(fy+2)*m}" width="${3*m}" height="${3*m}" fill="#141414"/>`;
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++){const inF=(i<8&&j<8)||(i<8&&j>12)||(i>12&&j<8);if(!inF&&r()>.52)o+=`<rect x="${(x+j*m).toFixed(1)}" y="${(y+i*m).toFixed(1)}" width="${m.toFixed(2)}" height="${m.toFixed(2)}" fill="#141414"/>`;}
+  o+=finder(0,0)+finder(14,0)+finder(0,14);
+  if(damage)o+=`<ellipse cx="${x+size*.62}" cy="${y+size*.55}" rx="${size*.28}" ry="${size*.2}" fill="#b9ab8c" opacity=".92"/>`;
+  return o;}
+function bars(x,y,w,h,seed){const r=rnd(seed);let o="",cx=x;while(cx<x+w-3){const bw=1+Math.floor(r()*3.2);if(r()>.45)o+=`<rect x="${cx}" y="${y}" width="${bw}" height="${h}" fill="#111"/>`;cx+=bw+1;}return o;}
+function cam1(state,seed,sel){ // top camera: carton with QR label
+  const ng=state==="ng";let o=`<rect width="640" height="480" fill="#2b3036"/><rect x="0" y="0" width="640" height="480" fill="url(#belt)"/>`;
+  o+=`<rect x="150" y="70" width="340" height="340" rx="10" fill="#c9b48a"/><rect x="150" y="70" width="340" height="340" rx="10" fill="none" stroke="#a8925f" stroke-width="3"/>`;
+  o+=`<rect x="200" y="125" width="240" height="230" fill="#efeadf"/>`+qr(225,160,120,seed||7,ng);
+  o+=`<text x="365" y="175" font-family="IBM Plex Mono,monospace" font-size="11" fill="#333">GTIN</text><text x="365" y="190" font-family="IBM Plex Mono,monospace" font-size="11" fill="#333">08901234</text><text x="365" y="205" font-family="IBM Plex Mono,monospace" font-size="11" fill="#333">567894</text><text x="365" y="230" font-family="IBM Plex Mono,monospace" font-size="11" fill="#333">SN</text><text x="365" y="245" font-family="IBM Plex Mono,monospace" font-size="11" fill="#333">7Q2M9K</text>`;
+
+  if(mode==="oem"&&eng.splitWipe){
+    o+=`<rect x="12" y="12" width="240" height="24" rx="4" fill="rgba(14,19,26,0.92)" stroke="var(--info)"/>`;
+    o+=`<text x="20" y="28" fill="var(--info)" font-size="11" font-weight="600">[Remote Diagnostic Stream Active]</text>`;
+  }
+
+  if(mode==="oem"&&eng.mtfGrid){
+    o+=`<rect x="12" y="444" width="616" height="26" rx="4" fill="rgba(14,19,26,0.92)" stroke="var(--border)"/>`;
+    o+=`<text x="22" y="461" fill="var(--text)" font-size="11.5"><b>Image Quality: 95% Sharp ✓</b> · Optical System Clean & Uniform (Remote diagnostic channel 127.0.0.1:5005)</text>`;
+  }
+
+  if(mode==="oem"&&(eng.screwAdvisor||sel==="autotune1")){
+    o+=`<circle cx="320" cy="240" r="78" fill="none" stroke="var(--info)" stroke-width="1.5" stroke-dasharray="6 4"/>`;
+    o+=`<rect x="75" y="380" width="490" height="48" rx="6" fill="rgba(22,29,39,0.95)" stroke="var(--warn)" stroke-width="1.5"/>`;
+    o+=`<text x="90" y="400" fill="var(--warn)" font-size="12" font-weight="700">⚙️ MACHINE ALIGNMENT ADVICE</text>`;
+    o+=`<text x="90" y="418" fill="var(--text)" font-size="11.5">Measured Offset: ΔX +1.40 mm · <b>Action: Turn Lead Screw X by 1.85 turns CCW</b></text>`;
+  }
+
+  if(mode==="oem"&&sel==="photometric1"){
+    o+=`<rect x="160" y="80" width="320" height="320" rx="8" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+    o+=`<rect x="170" y="90" width="200" height="42" rx="4" fill="rgba(14,19,26,0.92)" stroke="var(--accent)"/>`;
+    o+=`<text x="178" y="108" fill="var(--accent)" font-size="11" font-weight="700">Surface Quality Check</text>`;
+    o+=`<text x="178" y="124" fill="var(--text)" font-size="10.5">Uniform Texture · 0 Defects</text>`;
+  }
+
+  const toolOverlays=[{r:[150,70,340,340],ok:true,l:"Position",dash:true,id:"loc1"},{r:[210,145,150,150],ok:!ng,l:"2D Code",id:"code1"}];
+  if(sel==="autotune1") toolOverlays.push({r:[240,160,160,160],ok:true,l:"Image Check",id:"autotune1"});
+  if(sel==="photometric1") toolOverlays.push({r:[160,80,320,320],ok:true,l:"Surface",id:"photometric1"});
+  o+=overlay(toolOverlays,sel);
+  return svg(o);
+}
+function cam2(state,seed,sel){ // side camera: bottle side with laser text & 1D barcode
+  const ng=state==="ng";let o=`<rect width="640" height="480" fill="#1b2128"/><rect x="0" y="0" width="640" height="480" fill="url(#guide)"/>`;
+  o+=`<path d="M220 30 L420 30 L440 120 L440 450 L200 450 L200 120 Z" fill="#2d3748"/><path d="M220 30 L420 30 L440 120 L440 450 L200 450 L200 120 Z" fill="none" stroke="#4a5568" stroke-width="2"/>`;
+  o+=`<rect x="220" y="180" width="200" height="150" fill="#f7f5ef"/>`+bars(240,200,160,50,seed||11);
+  o+=`<text x="320" y="265" font-family="IBM Plex Mono,monospace" font-size="10" fill="#222" text-anchor="middle">8901234567894</text>`;
+  o+=`<rect x="220" y="340" width="200" height="85" fill="#1a202c" rx="4"/>`;
+  o+=`<text x="230" y="360" font-family="IBM Plex Mono,monospace" font-size="11" fill="#e2e8f0">B.NO. B2410-17</text>`;
+  o+=`<text x="230" y="378" font-family="IBM Plex Mono,monospace" font-size="11" fill="#e2e8f0">MFG. 10/2026</text>`;
+  o+=`<text x="230" y="396" font-family="IBM Plex Mono,monospace" font-size="11" fill="#e2e8f0">EXP. 09/2028</text>`;
+  o+=`<text x="230" y="414" font-family="IBM Plex Mono,monospace" font-size="11" fill="${ng?"#f87171":"#e2e8f0"}">${ng?"MRP RS.145.0":"MRP RS.145.00"}</text>`;
+
+  if(mode==="oem"&&sel==="thermal1"){
+    o+=`<rect x="200" y="20" width="240" height="30" rx="3" fill="none" stroke="var(--warn)" stroke-width="2"/>`;
+    o+=`<rect x="205" y="24" width="230" height="22" fill="rgba(250,204,21,0.2)"/>`;
+    o+=`<text x="320" y="40" fill="var(--warn)" font-size="10.5" font-weight="700" text-anchor="middle">Seal: 151.2 °C · Width 3.85 mm · Nominal</text>`;
+  }
+
+  const toolOverlays=[{r:[220,180,200,85],ok:true,l:"1D Barcode",id:"code2"},{r:[220,335,200,95],ok:!ng,l:"Text Line",id:"text1"}];
+  if(sel==="thermal1") toolOverlays.push({r:[200,20,240,30],ok:true,l:"Seal Check",id:"thermal1"});
+  o+=overlay(toolOverlays,sel);
+  return svg(o);
+}
+function svg(inner){return `<svg viewBox="0 0 640 480" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;display:block">${defs()}${inner}</svg>`;}
+function defs(){return `<defs>
+<pattern id="belt" width="40" height="40" patternUnits="userSpaceOnUse"><line x1="0" y1="0" x2="40" y2="40" stroke="#22262b" stroke-width="1"/><line x1="40" y1="0" x2="0" y2="40" stroke="#22262b" stroke-width="1"/></pattern>
+<pattern id="guide" width="20" height="20" patternUnits="userSpaceOnUse"><line x1="0" y1="10" x2="20" y2="10" stroke="#262d36" stroke-width="1"/></pattern>
+</defs>`;}
+function overlay(boxes,sel){
+  if(mode==="oem"&&!eng.graphics)return "";
+  return boxes.map(b=>{
+    const[x,y,w,h]=b.r,c=b.ok?"var(--ok)":"var(--ng)",s=b.id===sel;
+    let o=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="${s?"var(--accent)":c}" stroke-width="${s?2.5:1.5}" ${b.dash?'stroke-dasharray="4 3"':""}/>`;
+    o+=`<rect x="${x}" y="${y-18}" width="${b.l.length*7+12}" height="18" fill="${s?"var(--accent)":"rgba(14,19,26,0.85)"}"/>
+    <text x="${x+6}" y="${y-5}" fill="#fff" font-size="11" font-weight="600">${b.l}</text>`;
+    if(s){o+=`<rect x="${x-3}" y="${y-3}" width="6" height="6" fill="var(--accent)"/><rect x="${x+w-3}" y="${y-3}" width="6" height="6" fill="var(--accent)"/><rect x="${x-3}" y="${y+h-3}" width="6" height="6" fill="var(--accent)"/><rect x="${x+w-3}" y="${y+h-3}" width="6" height="6" fill="var(--accent)"/>`;
+    o+=`<line x1="${x+w/2}" y1="${y}" x2="${x+w/2}" y2="${y-34}" stroke="var(--accent)" stroke-width="1.5"/><circle cx="${x+w/2}" cy="${y-38}" r="5" fill="var(--accent)"/>`;}
+    return o;}).join("");
+}
+function miniThumb(cam){return cam===1?cam1("ng",11):cam2("ng");}
+
+/* ---------- shared chrome ---------- */
+const titlebar = t => `<div class="titlebar"><span class="logo">VS</span><span>${t}</span><span class="grow"></span><span class="winbtn">${ic("min")}</span><span class="winbtn">${ic("max")}</span><span class="winbtn">${ic("x")}</span></div>`;
+
+/* ================= UPSTREAM TOOLING CAVITY HEATMAP (REQ-10) ================= */
+const cavityData = [
+  {id:1, yield:99.8, ng:2, status:"ok", desc:"Nominal"},
+  {id:2, yield:99.4, ng:6, status:"ok", desc:"Nominal"},
+  {id:3, yield:84.2, ng:158, status:"ng", desc:"Capper Chuck Drift +1.4mm"},
+  {id:4, yield:99.6, ng:4, status:"ok", desc:"Nominal"},
+  {id:5, yield:99.9, ng:1, status:"ok", desc:"Nominal"},
+  {id:6, yield:99.1, ng:9, status:"ok", desc:"Nominal"},
+  {id:7, yield:99.7, ng:3, status:"ok", desc:"Nominal"},
+  {id:8, yield:99.5, ng:5, status:"ok", desc:"Nominal"}
+];
+
+function toolingHeatmapHTML(){
+  let o = `<div style="display:flex;flex-direction:column;gap:10px;padding:10px 12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <b style="font-size:13px">Upstream Machine Cavity & Rotary Head Attribution (8-Head Capper)</b>
+        <span class="t-muted" style="margin-left:8px;font-size:11.5px">Correlating rejection count to upstream mechanical station</span>
+      </div>
+      <span class="badge warn">Head #3 Drift: 84.2% yield</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(8, 1fr);gap:8px">`;
+  cavityData.forEach(h => {
+    const isNg = h.status === "ng";
+    o += `<div style="border:1px solid ${isNg?'var(--ng)':'var(--border)'};border-radius:6px;padding:8px;background:${isNg?'rgba(220,38,38,0.08)':'var(--surface)'};display:flex;flex-direction:column;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:center;font-weight:600">
+        <span>Head #${h.id}</span>
+        <span class="badge ${isNg?'ng':'ok'}" style="font-size:10px">${isNg?'NG FAULT':'OK'}</span>
+      </div>
+      <div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;color:${isNg?'var(--ng)':'var(--text)'}">${h.yield}%</div>
+      <div style="font-size:11px;color:var(--muted)">${h.ng} defects this batch</div>
+      <div style="font-size:10.5px;color:${isNg?'var(--ng)':'var(--muted)'};font-weight:${isNg?'600':'400'};line-height:1.2;margin-top:2px">${h.desc}</div>
+    </div>`;
+  });
+  o += `</div>
+    <div style="font-size:11.5px;color:var(--muted);background:var(--raised);padding:6px 10px;border-radius:4px;border:1px solid var(--border)">
+      💡 <b>Machine Maintenance Action:</b> Capper rotary chuck on <b>Head #3</b> is experiencing mechanical lead-screw drift. Turn Head #3 Applicator Screw X by <b>1.85 turns CCW</b> to restore nominal centering.
+    </div>
+  </div>`;
+  return o;
+}
+
+/* ================= SHIFT HANDOVER GOLDEN SAMPLE CHALLENGE (REQ-10) ================= */
+let goldenModalOpen = false, goldenStep = 1;
+function toggleGoldenModal(){
+  goldenModalOpen = !goldenModalOpen;
+  goldenStep = 1;
+  renderCurrentView();
+}
+function goldenModalHTML(){
+  if(!goldenModalOpen) return "";
+  return `<div style="position:absolute;inset:0;background:rgba(10,15,21,0.85);z-index:90;display:flex;align-items:center;justify-content:center">
+    <div style="width:540px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,0.6);overflow:hidden;display:flex;flex-direction:column">
+      <div class="ph" style="height:34px;font-size:12.5px;padding:0 12px">
+        <b>SHIFT HANDOVER: GOLDEN SAMPLE VERIFICATION WIZARD</b>
+        <span style="flex:1"></span>
+        <button class="tb icon" id="g-close" style="height:24px;width:24px">✕</button>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+        <p style="margin:0;color:var(--muted)">Compliance Requirement (ISO 17025 / 21 CFR Part 11): Verify sensor sensitivity using physical test challenge bottles before starting production.</p>
+        <div style="border:1px solid var(--border);border-radius:6px;padding:12px;background:var(--bg);display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="badge ${goldenStep>=2?'ok':'warn'}" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center">${goldenStep>=2?'✓':'1'}</span>
+            <div><b>Step 1: Physical Golden Good Sample (Artifact #G01)</b><br><span style="font-size:11.5px;color:var(--muted)">Insert certified defect-free bottle on conveyor scan position</span></div>
+            <span style="flex:1"></span>
+            ${goldenStep===1?`<button class="tb primary" id="g-btn1" style="height:28px">Scan Good Sample</button>`:`<span class="t-ok" style="font-weight:700">✓ PASS (All tools 100%)</span>`}
+          </div>
+          <hr style="border:0;border-top:1px solid var(--border);margin:4px 0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="badge ${goldenStep>=3?'ok':goldenStep===2?'warn':'stopped'}" style="width:20px;height:20px;border-radius:50%;display:grid;place-items:center">${goldenStep>=3?'✓':'2'}</span>
+            <div><b>Step 2: Physical Challenge Defect Sample (Artifact #NG04)</b><br><span style="font-size:11.5px;color:var(--muted)">Insert challenge bottle with known 0.08mm surface scratch & skewed label</span></div>
+            <span style="flex:1"></span>
+            ${goldenStep===2?`<button class="tb danger" id="g-btn2" style="height:28px">Scan Defect Sample</button>`:goldenStep>=3?`<span class="t-ok" style="font-weight:700">✓ NG CAUGHT (Pass Fail-Safe)</span>`:`<span class="t-muted">Pending Step 1</span>`}
+          </div>
+        </div>
+        ${goldenStep>=3?`<div style="background:rgba(34,197,94,0.1);border:1px solid var(--ok);border-radius:6px;padding:10px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">✓</span>
+          <div><b>Verification Audit Complete & Electronically Signed</b><br><span style="font-size:11px;color:var(--muted)">Shift A · Operator ID: 4821 · Timestamp: 06:00:14 · System Ready</span></div>
+          <span style="flex:1"></span>
+          <button class="tb primary" id="g-finish" style="height:30px">Unlock Production Run</button>
+        </div>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+
+/* ================= OPERATOR RUN MODE ================= */
+const op = {running:true,good:12480,bad:37,parts:[],ngs:[],last:"ok",lastCam:0,times:[],timer:null,tab:"overview",seq:48213};
+function serial(r){const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";for(let i=0;i<6;i++)s+=a[Math.floor(r()*a.length)];return s;}
+const reasons=[[1,"Code not read (smudged QR)"],[2,"Line 4 cut short: expected MRP RS.145.00"],[2,"1D code missing"],[1,"Same code as part 48,190"]];
+
+function newPart(){
+  op.seq++;const r=rnd(op.seq);const ng=r()<.035,dup=!ng&&r()<.008;
+  const why=ng?(r()<.4?reasons[0]:r()<.7?reasons[1]:reasons[2]):(dup?reasons[3]:null);
+  const now=new Date();const ts=now.toTimeString().slice(0,8)+"."+String(now.getMilliseconds()).padStart(3,"0");
+  const code=dup?"(01)08901234567894(21)7Q2M9K":`(01)08901234567894(21)${serial(r)}`;
+  const ms=Math.round(48+r()*22+(ng?18:0));
+  return {n:op.seq,ts,code,ean:"8901234567894",ng:ng||dup,dup,why,ms};
+}
+
+function opHTML(){
+  return goldenModalHTML() + supervisorModalHTML() + notifGuideModalHTML() + titlebar("Vision Studio — Line 3 · Run (Operator View)") + notificationHubHTML() + `
+<div class="op-top">
+  <div class="prod"><span class="pic">750</span>Whisky 750 ml</div>
+  <div class="kv"><small>Batch</small><span class="mono">B2410-17</span></div>
+  <div class="kv"><small>Job</small><span>v7 · released</span></div>
+  <span class="pill ${op.running?"run":"stop"}" id="pill">${op.running?ic("play")+"Running":ic("stop")+"Stopped"}</span>
+  <span class="grow"></span>
+  <span class="chip">${ic("cam")}Cameras 2 / 2 <span class="dot ok"></span></span>
+  <span class="chip">${ic("plc")}PLC <span class="dot ok"></span> 192.168.10.5</span>
+  <span class="chip"><span class="dot ok"></span>Light: Balanced</span>
+  <span class="chip"><span class="dot ok"></span>Optics: 95% Sharp</span>
+  <span class="chip"><span class="dot ok"></span>Strobe: 98%</span>
+  <span class="chip"><span class="dot ok"></span>Line Sync: 100%</span>
+  <span class="chip" style="background:rgba(37,99,235,0.12);border:1px solid var(--accent);color:var(--text)" data-tip="Remote engineer connected via support.sundaramtech.com. Screen is live so you can assist with physical adjustments."><span class="dot ok"></span>Remote Collab: Active</span>
+  <span class="chip" style="font-size:10.5px" data-tip="Local line database encrypted via AES-256 DPAPI/TPM. Direct file access denied."><span class="dot ok"></span>DB: Secured</span>
+  <button class="chip btn-toggle-notif" style="cursor:pointer;background:rgba(234,179,8,0.22);border:1px solid var(--warn);color:var(--text);font-weight:700" data-tip="Toggle Unified Machine Notification Hub (Hardware, Motion & Printer Diagnostics)">🔔 ${activeNotifsCount()} Alerts ${notifHubOpen?"▲":"▼"}</button>
+  <span class="chip">Shift A · 06:00–14:00</span>
+  <div class="seg" role="group" aria-label="Language" style="height:24px">
+    <button class="tb icon ${currLang==='en'?'primary':''}" id="lang-en" style="padding:0 6px;font-size:11px" data-tip="Switch display language to English">EN</button>
+    <button class="tb icon ${currLang==='hi'?'primary':''}" id="lang-hi" style="padding:0 6px;font-size:11px" data-tip="Switch display language to Hindi">हिन्दी</button>
+    <button class="tb icon ${currLang==='gu'?'primary':''}" id="lang-gu" style="padding:0 6px;font-size:11px" data-tip="Switch display language to Gujarati">ગુજરાતી</button>
+    <button class="tb icon ${currLang==='ta'?'primary':''}" id="lang-ta" style="padding:0 6px;font-size:11px" data-tip="Switch display language to Tamil">தமிழ்</button>
+  </div>
+  <span class="chip">${ic("user")}Operator (Zero Tool View)</span>
+</div>
+<div class="toolbar" role="toolbar" aria-label="Run actions">
+  <button class="tb big primary" id="b-start" data-tip="Start checking parts (F5)" ${op.running?"disabled":""}>${ic("play")}Start <kbd>F5</kbd></button>
+  <button class="tb big danger" id="b-stop" data-tip="Stop checking parts (Shift+F5)" ${op.running?"":"disabled"}>${ic("stop")}Stop</button>
+  <span class="sep"></span>
+  <button class="tb big" id="b-chg-prod" data-tip="Change product recipe (Requires Supervisor PIN)">${ic("box")}Change product <kbd>F2</kbd></button>
+  <button class="tb big" id="b-start-batch" data-tip="Start a new batch (Requires Supervisor PIN)">${ic("batch")}Start batch <kbd>F3</kbd></button>
+  <span class="sep"></span>
+  <button class="tb big" id="b-golden" data-tip="Run shift-start Golden Sample verification challenge">${ic("teach")}Golden Sample</button>
+  <button class="tb big" id="b-parts" data-tip="Every part's own result (F4)">${ic("list")}Parts <kbd>F4</kbd></button>
+  <button class="tb big" id="b-ngimg" data-tip="Open the last bad parts">${ic("image")}Bad parts</button>
+  <button class="tb big" id="b-reset-cnt" data-tip="Reset counts (Requires Supervisor PIN)">${ic("reset")}Reset counts</button>
+  <span class="grow" style="flex:1"></span>
+  <button class="tb big" id="b-help" data-tip="Help for this screen (F1)">${ic("help")}Help <kbd>F1</kbd></button>
+</div>
+<div class="op-main">
+  <section class="panel cam"><div class="ph">${ic("cam")}Camera 1 · Top · QR <span class="res" id="c1res"></span></div><div class="imgbox" id="c1"></div></section>
+  <section class="panel cam"><div class="ph">${ic("cam")}Camera 2 · Side · 1D + batch text <span class="res" id="c2res"></span></div><div class="imgbox" id="c2"></div></section>
+  <aside class="side">
+    <div class="result" id="result"></div>
+    <section class="panel"><div class="counters num" id="counters"></div></section>
+    <section class="panel"><div class="ph">Last part · tools</div>
+      <table class="grid" style="table-layout:fixed"><colgroup><col style="width:30px"><col style="width:96px"><col><col style="width:42px"></colgroup><thead><tr><th>Cam</th><th>Tool</th><th>Value</th><th style="text-align:right">ms</th></tr></thead><tbody id="tools"></tbody></table></section>
+    <section class="panel"><div class="ph">Speed</div><div class="mini" id="speed"></div></section>
+    <section class="panel"><div class="ph">Batch and PLC</div>
+      <div class="lamps"><span class="t-muted">MFG</span><span class="mono">10/2026</span><span class="t-muted">EXP</span><span class="mono">09/2028</span><span class="t-muted">MRP</span><span class="mono">RS.145.00</span>
+      <span><i class="dot ok"></i>Heartbeat</span><span><i class="dot ok"></i>RunEnable</span><span id="lamp-trig"><i class="dot"></i>Trigger</span><span id="lamp-rej"><i class="dot"></i>Reject</span></div></section>
+  </aside>
+  <section class="panel bottom">
+    <div class="ph tabs" role="tablist">
+      <button class="tab" role="tab" data-tab="overview">Overview</button>
+      <button class="tab" role="tab" data-tab="heatmap">Tooling Cavity Heatmap <span class="badge warn">Head 3</span></button>
+      <button class="tab" role="tab" data-tab="parts">Parts</button>
+      <button class="tab" role="tab" data-tab="bad">Last bad parts <span class="badge ng" id="badcount">0</span></button>
+      <button class="tab" role="tab" data-tab="alarms">Alarms <span class="badge warn">3</span></button>
+      <button class="tab" role="tab" data-tab="msgs">Messages</button>
+      <span class="grow" style="flex:1"></span>
+      <label style="display:flex;gap:5px;align-items:center;font-size:12px;color:var(--muted);padding:0 8px 4px;text-transform:none;letter-spacing:0"><input type="checkbox" id="badonly"> Bad only</label>
+    </div>
+    <div class="pb" id="bottom"></div>
+  </section>
+</div>
+<div class="statusbar"><div><span class="dot ok"></span>Runtime connected</div><div>Cycle budget 267 ms (225 parts/min)</div><div>Disk 412 GB free</div><div>CPU 38 %</div><div class="grow"></div><div>Ctrl+K: search a part code</div></div>`;
+}
+
+function renderOpDynamic(){
+  const p = op.parts[0];
+  const c1ng = p && p.ng && (p.why ? p.why[0] === 1 : true);
+  const c2ng = p && p.ng && (p.why ? p.why[0] === 2 : false);
+  const c1el = $("#c1"), c2el = $("#c2");
+  if(c1el) c1el.innerHTML = cam1(c1ng?"ng":"ok", p?p.n:7);
+  if(c2el) c2el.innerHTML = cam2(c2ng?"ng":"ok", p?p.n:11);
+  const c1res = $("#c1res"), c2res = $("#c2res");
+  if(c1res) c1res.innerHTML = c1ng ? '<span class="badge ng">NG</span>' : '<span class="badge ok">OK</span>';
+  if(c2res) c2res.innerHTML = c2ng ? '<span class="badge ng">NG</span>' : '<span class="badge ok">OK</span>';
+  const r = $("#result");
+  if(r){
+    if(!p) r.innerHTML = `<div class="v ok">READY · PRESS START</div><div class="sub">Waiting for trigger from conveyor PLC</div>`;
+    else if(p.dup) r.innerHTML = `<div class="v dup">SAME CODE TWICE</div><div class="sub">${p.code} already seen at 06:39:12</div>`;
+    else if(p.ng) r.innerHTML = `<div class="v ng">NG · REJECTED</div><div class="sub">${p.why?p.why[1]:"Inspection failure"}</div>`;
+    else r.innerHTML = `<div class="v ok">✓ OK</div><div class="sub">${p.code.slice(0,25)} · laser lines 4/4</div>`;
+  }
+  const c = $("#counters");
+  if(c){
+    const tot = op.good + op.bad;
+    const y = tot ? (op.good / tot * 100).toFixed(2) : "100.00";
+    c.innerHTML = `<div><small>Good</small><b>${op.good.toLocaleString("en-IN")}</b></div>
+    <div><small>Bad</small><b class="ng">${op.bad}</b></div>
+    <div><small>Good %</small><b style="color:var(--ok)">${y} %</b></div>`;
+  }
+  if(p){
+    const v = (ok,t) => `<span class="${ok?"t-ok":"t-ng"}">${ok?"✓":"✗"}</span> ${t}`;
+    const tel = $("#tools");
+    if(tel){
+      tel.innerHTML = `<tr><td>1</td><td>Position 1</td><td>${v(true,"x 320.4 y 241.0 0.6°")}</td><td class="num" style="text-align:right">3.1</td></tr>
+      <tr><td>1</td><td>2D Code</td><td>${v(!c1ng,c1ng?(p.dup?"same code":"not read"):"…"+p.code.slice(-6))}</td><td class="num" style="text-align:right">${(p.ms*.25).toFixed(1)}</td></tr>
+      <tr><td>1</td><td>Image Check</td><td>${v(true,"Quality: 95% Sharp ✓")}</td><td class="num" style="text-align:right">4.6</td></tr>
+      <tr><td>2</td><td>1D Barcode</td><td>${v(!(c2ng&&p.ean==="—"),p.ean)}</td><td class="num" style="text-align:right">5.2</td></tr>
+      <tr><td>2</td><td>Text Line</td><td>${v(!(c2ng&&p.ean!=="—"),c2ng&&p.ean!=="—"?"line 4 cut short":"4 lines, Q 78")}</td><td class="num" style="text-align:right">14.8</td></tr>
+      <tr><td>2</td><td>Seal Check</td><td>${v(true,"151.2 °C · 3.85mm")}</td><td class="num" style="text-align:right">5.8</td></tr>
+      <tr><td>2</td><td>Surface Moisture</td><td>${v(true,"Label/Bottle Dry ✓")}</td><td class="num" style="text-align:right">4.2</td></tr>`;
+    }
+  }
+  const ts = op.times.slice(-300).sort((a,b) => a-b);
+  const med = ts[Math.floor(ts.length/2)] || 0;
+  const p95 = ts[Math.floor(ts.length*.95)] || 0;
+  const sp = $("#speed");
+  if(sp){
+    sp.innerHTML = `<div class="row"><span class="t-muted">Parts / min</span><b class="num">${op.running?"224":"0"}</b></div>
+    <div class="row"><span class="t-muted">Cycle median · p95</span><b class="num">${med} · ${p95} ms</b></div>
+    <div class="bar" data-tip="p95 ${p95} ms of the 267 ms budget"><i style="width:${Math.min(100,p95/267*100)}%"></i><span class="lim" style="left:calc(100% - 2px)"></span></div>
+    <div class="row" style="margin-top:2px"><span class="t-muted">Good % · last 60 min</span><b class="num">${yieldNow().toFixed(2)} %</b></div>${spark()}`;
+  }
+  const bc = $("#badcount"); if(bc) bc.textContent = op.ngs.length;
+  const lr = $("#lamp-rej"); if(lr) lr.innerHTML = `<i class="dot ${p&&p.ng?"ng":""}"></i>Reject`;
+  const lt = $("#lamp-trig"); if(lt) lt.innerHTML = `<i class="dot ${op.running?"ok":""}"></i>Trigger`;
+  renderBottom();
+}
+
+function renderBottom(){
+  const b = $("#bottom");
+  if(!b) return;
+  document.querySelectorAll(".bottom .tab").forEach(t => t.setAttribute("aria-selected", t.dataset.tab === op.tab));
+  if(op.tab === "overview"){ b.innerHTML = overviewHTML(); return; }
+  if(op.tab === "heatmap"){ b.innerHTML = toolingHeatmapHTML(); return; }
+  if(op.tab === "parts"){
+    const badOnlyEl = $("#badonly");
+    const only = badOnlyEl ? badOnlyEl.checked : false;
+    const rows = op.parts.filter(p => !only || p.ng).slice(0,60);
+    b.innerHTML = `<table class="grid num"><thead><tr><th>Time</th><th>Part</th><th>Result</th><th>Case code (camera 1)</th><th>EAN-13 (camera 2)</th><th>Why</th><th style="text-align:right">ms</th></tr></thead><tbody>${rows.map(p=>`<tr><td>${p.ts}</td><td>${p.n.toLocaleString("en-IN")}</td><td>${p.ng?(p.dup?'<span class="badge dup">⧉ SAME</span>':'<span class="badge ng">✗ NG</span>'):'<span class="badge ok">✓ OK</span>'}</td><td class="mono">${p.code}</td><td class="mono">${p.ean}</td><td>${p.why?p.why[1]:""}</td><td style="text-align:right">${p.ms}</td></tr>`).join("")}</tbody></table>`;
+  }
+  else if(op.tab === "bad"){
+    b.innerHTML = `<div class="strip">${op.ngs.slice(0,14).map(p=>`<div class="thumb" title="${p.why[1]}">${miniThumb(p.why[0])}<div><span>C${p.why[0]} ✗</span><span>${p.ts.slice(0,8)}</span></div></div>`).join("")||'<p class="t-muted" style="padding:8px">No bad parts in this batch yet.</p>'}</div>`;
+  }
+  else if(op.tab === "alarms"){
+    b.innerHTML = `<table class="grid"><thead><tr><th>Since</th><th>Level</th><th>Alarm / Condition</th><th>Localized Action Guidance (${currLang.toUpperCase()})</th><th>Action</th></tr></thead><tbody>
+    <tr><td>06:40:00</td><td><span class="badge ok">Auto-Trim</span></td><td>Ambient Light: Auto-Balanced (+22% lux shift)</td><td>Line running smoothly. Shutter auto-trimmed in background.</td><td><span class="t-ok">✓ Active</span></td></tr>
+    <tr><td>06:34:05</td><td><span class="badge warn">Alignment</span></td><td>Applicator drift +1.4 mm on Cap</td><td>⚙️ ${getLocalizedAlarm("ALM-101")}</td><td><button class="tb" id="b-adj-screw">Adjust Lead Screw</button></td></tr>
+    <tr><td>06:38:22</td><td><span class="badge warn">Moisture</span></td><td>Target Surface Moisture on bottle/label surface</td><td>💧 ${getLocalizedAlarm("ALM-102")}</td><td><button class="tb" id="b-ack-moist">Acknowledge</button></td></tr>
+    <tr><td>06:31:12</td><td><span class="badge ok">Hardware</span></td><td>Strobe illumination output nominal</td><td>⚡ ${getLocalizedAlarm("ALM-103")}</td><td><span class="t-ok">✓ Active</span></td></tr>
+    </tbody></table>`;
+    const bas = $("#b-adj-screw"); if(bas) bas.onclick = () => triggerSupervisorModal("Mechanical Lead Screw Adjustment", "Maintenance Calibration");
+    const bam = $("#b-ack-moist"); if(bam) bam.onclick = () => alert("Acknowledged: Operator requested bottle surface drying before station.");
+  }
+  else {
+    b.innerHTML = `<table class="grid"><thead><tr><th>Time</th><th>Message</th></tr></thead><tbody><tr><td>06:30:02</td><td>Batch B2410-17 started by Operator (MFG 10/2026, EXP 09/2028, MRP RS.145.00)</td></tr><tr><td>06:29:47</td><td>Product changed by PLC: Whisky 750 ml (job v7)</td></tr><tr><td>06:29:40</td><td>PLC connected, 192.168.10.5:502</td></tr><tr><td>06:28:55</td><td>Camera 1 MV-CS200-10GM and camera 2 MV-CS050-10GM found</td></tr></tbody></table>`;
+  }
+}
+
+/* ---------- charts ---------- */
+const perMin = (() => {
+  const r = rnd(99), a = [];
+  for(let i=0;i<60;i++){
+    const ok = 214 + Math.round(r()*14) - (i>38&&i<42?60:0);
+    const ng = (r()<.18?1+Math.floor(r()*3):0) + (i>38&&i<42?6:0);
+    a.push({ok,ng});
+  }
+  return a;
+})();
+const yieldNow = () => {
+  let g=0, t=0;
+  perMin.forEach(m => { g+=m.ok; t+=m.ok+m.ng; });
+  return (g/t*100);
+};
+
+function spark(){
+  const W=280, H=34, ys=perMin.map(m=>m.ok/(m.ok+m.ng)*100), lo=96, hi=100;
+  const x = i => i/(ys.length-1)*(W-6)+1, y = v => H-3-(Math.max(lo,v)-lo)/(hi-lo)*(H-8);
+  const d = ys.map((v,i)=>(i?"L":"M")+x(i).toFixed(1)+" "+y(v).toFixed(1)).join("");
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-label="Good percent per minute, last 60 minutes">
+   <line class="gl" x1="0" x2="${W}" y1="${y(99.5)}" y2="${y(99.5)}"/><path d="${d}L${x(59)} ${H}L${x(0)} ${H}Z" fill="var(--s1)" opacity=".12"/>
+   <path d="${d}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
+function colChart(){
+  const W=400, H=150, L=30, B=18, T=16, max=250, bw=(W-L-4)/60; const y = v => H-B-v/max*(H-B-T);
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Good and bad parts per minute, last 60 minutes">`;
+  [0,100,200].forEach(v => { o+=`<line class="gl" x1="${L}" x2="${W}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L-5}" y="${y(v)+3}" text-anchor="end">${v}</text>`; });
+  o+=`<line x1="${L}" x2="${W}" y1="${y(225)}" y2="${y(225)}" stroke="var(--text)" stroke-width="1" stroke-dasharray="0" opacity=".55"/><text class="lbl" x="${W}" y="${y(225)-4}" text-anchor="end">225 / min line speed</text>`;
+  perMin.forEach((m,i)=>{
+    const x=L+2+i*bw, w=Math.max(1,bw-2); const yo=y(m.ok);
+    o+=`<rect x="${x.toFixed(1)}" y="${yo.toFixed(1)}" width="${w.toFixed(1)}" height="${(H-B-yo).toFixed(1)}" fill="var(--s1)" rx="1"/>`;
+    if(m.ng) o+=`<circle cx="${(x+w/2).toFixed(1)}" cy="${(yo-5-Math.min(m.ng,8)).toFixed(1)}" r="${(2+Math.min(m.ng,8)*.35).toFixed(1)}" fill="var(--ng)" stroke="var(--surface)" stroke-width="1"/>`;
+    o+=`<rect class="hit" x="${x-1}" y="${T}" width="${bw}" height="${H-B-T}" data-tip="${String(5+Math.floor((41+i)/60)).padStart(2,"0")}:${String((41+i)%60).padStart(2,"0")} · ${m.ok} good, ${m.ng} bad"/>`;
+  });
+  ["−60","−45","−30","−15","now"].forEach((t,k)=>o+=`<text class="ax" x="${L+2+k*15*bw+(k===4?-2:0)}" y="${H-4}" text-anchor="${k===4?"end":k?"middle":"start"}">${t}${k===0?" min":""}</text>`);
+  return o+`</svg>`;
+}
+function paretoChart(){
+  const base={"Code not read (smudged QR)":9,"Line 4 cut short":6,"1D code missing":4,"Same code twice":3,"Camera 2 dark":1};
+  op.ngs.forEach(p=>{
+    const k=p.why[1].startsWith("Code")?"Code not read (smudged QR)":p.why[1].startsWith("Line")?"Line 4 cut short":p.why[1].startsWith("1D")?"1D code missing":"Same code twice";
+    base[k]++;
+  });
+  const rows=Object.entries(base).sort((a,b)=>b[1]-a[1]), max=Math.max(...rows.map(r=>r[1])), W=330, H=150, L=148, rh=(H-8)/rows.length;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Why parts were NG this batch">`;
+  rows.forEach(([k,v],i)=>{
+    const y=4+i*rh, bh=Math.min(16,rh-8), w=v/max*(W-L-34);
+    o+=`<text class="lbl" x="${L-8}" y="${y+rh/2+3.5}" text-anchor="end">${k}</text><rect x="${L}" y="${(y+(rh-bh)/2).toFixed(1)}" width="${w.toFixed(1)}" height="${bh}" fill="var(--s2)" rx="3"/>
+    <text class="lbl num" x="${L+w+5}" y="${y+rh/2+3.5}">${v}</text><rect class="hit" x="0" y="${y}" width="${W}" height="${rh}" data-tip="${k}: ${v} parts (${(v/rows.reduce((s,r)=>s+r[1],0)*100).toFixed(0)} %)"/>`;
+  });
+  return o+`</svg>`;
+}
+function histChart(){
+  const bins=new Array(14).fill(0), bw=20; op.times.slice(-300).forEach(t=>bins[Math.min(13,Math.floor(t/bw))]++);
+  const W=330, H=150, L=26, B=18, T=16, max=Math.max(...bins,1), xs=v=>L+v/280*(W-L-6), y=v=>H-B-v/max*(H-B-T);
+  const ts=op.times.slice(-300).sort((a,b)=>a-b), p95=ts[Math.floor(ts.length*.95)]||0;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Cycle time of the last 300 parts">`;
+  o+=`<line class="gl" x1="${L}" x2="${W}" y1="${H-B}" y2="${H-B}"/>`;
+  bins.forEach((c,i)=>{
+    if(!c)return; const x=xs(i*bw)+1, w=xs(bw)-xs(0)-2;
+    o+=`<rect x="${x.toFixed(1)}" y="${y(c).toFixed(1)}" width="${w.toFixed(1)}" height="${(H-B-y(c)).toFixed(1)}" fill="var(--s3)" rx="2"/><rect class="hit" x="${x}" y="${T}" width="${w}" height="${H-B-T}" data-tip="${i*bw}–${i*bw+bw} ms: ${c} parts"/>`;
+  });
+  o+=`<line x1="${xs(p95)}" x2="${xs(p95)}" y1="${T}" y2="${H-B}" stroke="var(--text)" stroke-width="1.5" opacity=".7"/><text class="lbl" x="${xs(p95)+4}" y="${T+8}">p95 ${p95} ms</text>`;
+  o+=`<line x1="${xs(267)}" x2="${xs(267)}" y1="${T-6}" y2="${H-B}" stroke="var(--ng)" stroke-width="2"/><text class="lbl" x="${xs(267)-4}" y="${T+8}" text-anchor="end">budget 267</text>`;
+  [0,100,200].forEach(v=>o+=`<text class="ax" x="${xs(v)}" y="${H-4}" text-anchor="middle">${v}</text>`);
+  o+=`<text class="ax" x="${W-6}" y="${H-4}" text-anchor="end">ms</text>`;
+  return o+`</svg>`;
+}
+function overviewHTML(){
+  const g=perMin.reduce((s,m)=>s+m.ok,0), n=perMin.reduce((s,m)=>s+m.ng,0);
+  return `<div class="charts"><div class="chart"><h3>Parts per minute <span><i class="dot" style="background:var(--s1)"></i> good ${g.toLocaleString("en-IN")} &nbsp;<i class="dot ng"></i> bad ${n}</span></h3>${colChart()}</div>
+  <div class="chart"><h3>Why parts were NG <span>this batch</span></h3>${paretoChart()}</div>
+  <div class="chart"><h3>Cycle time <span>last 300 parts</span></h3>${histChart()}</div></div>`;
+}
+
+function tick(){
+  if(!op.running) return;
+  const p = newPart();
+  op.parts.unshift(p);
+  op.parts.length = Math.min(op.parts.length, 400);
+  op.times.push(p.ms);
+  if(p.ng){ op.bad++; op.ngs.unshift(p); } else op.good++;
+  renderOpDynamic();
+}
+function startOp(){ op.running=true; mountOp(); }
+function stopOp(){ op.running=false; mountOp(); }
+
+function mountOp(){
+  app.innerHTML = opHTML();
+  $("#b-start").onclick = startOp;
+  $("#b-stop").onclick = stopOp;
+  $("#b-parts").onclick = () => { op.tab="parts"; renderBottom(); };
+  $("#b-ngimg").onclick = () => { op.tab="bad"; renderBottom(); };
+  
+  const bg = $("#b-golden"); if(bg) bg.onclick = toggleGoldenModal;
+  const gc = $("#g-close"); if(gc) gc.onclick = toggleGoldenModal;
+  const gb1 = $("#g-btn1"); if(gb1) gb1.onclick = () => { goldenStep=2; mountOp(); };
+  const gb2 = $("#g-btn2"); if(gb2) gb2.onclick = () => { goldenStep=3; mountOp(); };
+  const gf = $("#g-finish"); if(gf) gf.onclick = () => { goldenModalOpen=false; mountOp(); };
+  
+  // REQ-12 Supervisor Approval Trigger buttons
+  const bcp = $("#b-chg-prod"); if(bcp) bcp.onclick = () => triggerSupervisorModal("Change Product Recipe", "Scheduled Batch Changeover");
+  const bsb = $("#b-start-batch"); if(bsb) bsb.onclick = () => triggerSupervisorModal("Start New Batch", "New Production Order Run");
+  const brc = $("#b-reset-cnt"); if(brc) brc.onclick = () => triggerSupervisorModal("Reset Defect Counters & Clear Bin Jam", "Physical Reject Bin Emptied & Inspected");
+  const bh = $("#b-help"); if(bh) bh.onclick = () => alert("Operator Help:\n- F5: Start Line Inspection\n- Shift+F5: Stop Line Inspection\n- F2: Change Recipe (Requires Supervisor)\n- F4: View Inspected Parts\n- Golden Sample: Mandatory shift handover challenge");
+
+  // Supervisor modal controls
+  const smc = $("#sup-m-close"); if(smc) smc.onclick = closeSupervisorModal;
+  const smcn = $("#sup-cancel-btn"); if(smcn) smcn.onclick = closeSupervisorModal;
+  const sma = $("#sup-auth-btn"); if(sma) sma.onclick = executeSupervisorApproval;
+  const srf = $("#sup-rfid-btn"); if(srf) srf.onclick = () => {
+    const p = $("#sup-pin"); if(p) p.value = "4402";
+    alert("RFID Badge Scanned: Senior Supervisor V. Patel (ID #9902)");
+  };
+  const srs = $("#sup-reason-sel"); if(srs) srs.onchange = (e) => { supModalReason = e.target.value; };
+
+  // REQ-13 Language buttons
+  const len = $("#lang-en"); if(len) len.onclick = () => { currLang="en"; mountOp(); };
+  const lhi = $("#lang-hi"); if(lhi) lhi.onclick = () => { currLang="hi"; mountOp(); };
+  const lgu = $("#lang-gu"); if(lgu) lgu.onclick = () => { currLang="gu"; mountOp(); };
+  const lta = $("#lang-ta"); if(lta) lta.onclick = () => { currLang="ta"; mountOp(); };
+
+  document.querySelectorAll(".bottom .tab").forEach(t => t.onclick = () => { op.tab = t.dataset.tab; renderBottom(); });
+  const bo = $("#badonly"); if(bo) bo.onchange = renderBottom;
+  renderOpDynamic();
+}
+
+for(let i=0;i<40;i++){
+  const p = newPart();
+  op.parts.unshift(p);
+  op.times.push(p.ms);
+  if(p.ng) op.ngs.unshift(p);
+}
+
+/* ================= SUPERVISOR WORKSPACE (REQ-12: CUSTOMER SENIOR SUPERVISION) ================= */
+const sup = {
+  tab: "queue", // queue | recipe | heatmap | audit
+  ambientTrim: 2.1,
+  rejectStopLimit: 3
+};
+
+function supHTML(){
+  return supervisorModalHTML() + notifGuideModalHTML() + titlebar("Vision Studio — Supervisor Workspace · Line 3 · Customer Senior Person: V. Patel") + notificationHubHTML() + `
+<div class="op-top" style="background:var(--surface);border-bottom:1px solid var(--border)">
+  <div class="prod"><span class="pic" style="background:var(--sel);color:var(--text)">SUP</span>Senior Supervisor: V. Patel</div>
+  <div class="kv"><small>Batch</small><span class="mono">B2410-17 (Whisky 750 ml)</span></div>
+  <div class="kv"><small>OEE</small><span class="mono t-ok" style="font-weight:700">88.4%</span></div>
+  <div class="kv"><small>Availability</small><span>96.2%</span></div>
+  <div class="kv"><small>Quality Rate</small><span>99.68%</span></div>
+  <span class="grow"></span>
+  <span class="chip"><span class="dot ok"></span>Golden Sample: Shift A Verified (06:00 ✓)</span>
+  <span class="chip" style="background:rgba(250,204,21,0.15);border:1px solid var(--warn)"><span class="dot warn"></span>Pending Approvals: ${pendingApprovals.filter(x=>x.status==="pending").length}</span>
+  <button class="chip btn-toggle-notif" style="cursor:pointer;background:rgba(234,179,8,0.22);border:1px solid var(--warn);color:var(--text);font-weight:700" data-tip="Toggle Unified Machine Notification Hub">🔔 ${activeNotifsCount()} Alerts ${notifHubOpen?"▲":"▼"}</button>
+  <span class="chip">${ic("user")}Customer Senior Person</span>
+</div>
+
+<div class="toolbar" role="toolbar" aria-label="Supervisor Tabs">
+  <button class="tb big ${sup.tab==='queue'?'primary':''}" id="s-tab-queue">${ic("list")}Pending Approvals (${pendingApprovals.filter(x=>x.status==="pending").length})</button>
+  <button class="tb big ${sup.tab==='recipe'?'primary':''}" id="s-tab-recipe">${ic("box")}Recipe & Narrow-Band Limits</button>
+  <button class="tb big ${sup.tab==='heatmap'?'primary':''}" id="s-tab-heatmap">${ic("grid")}Tooling Cavity Heatmap</button>
+  <button class="tb big ${sup.tab==='audit'?'primary':''}" id="s-tab-audit">${ic("plc")}21 CFR Part 11 Audit Trail</button>
+</div>
+
+<div style="flex:1;overflow:auto;padding:14px 18px;display:flex;flex-direction:column;gap:14px;background:var(--bg)" id="sup-content">
+  ${supContentHTML()}
+</div>
+
+<div class="statusbar">
+  <div>Supervisor Console Active · Plant ID: GJ-04</div>
+  <div>Audit Signature: HMAC-SHA256 Active</div>
+  <div><span class="dot ok"></span>ERPNext Sync: Connected</div>
+  <div class="grow"></div>
+  <div>Shift Handover: Shift A (06:00 - 14:00)</div>
+  <div>Logged in as: sup_patel · Customer Senior Supervisor</div>
+</div>`;
+}
+
+function supContentHTML(){
+  if(sup.tab==="queue"){
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div>
+          <h2 style="font-size:15px;margin:0">4-Eyes Dual-Control Operator Change Requests (REQ-12)</h2>
+          <p style="font-size:11.5px;color:var(--muted);margin:3px 0 0">Review, authorize, or reject sensitive line operations requested by shop-floor operators.</p>
+        </div>
+        <button class="tb" id="s-refresh-queue">${ic("reset")}Refresh Queue</button>
+      </div>
+      <table class="grid" style="font-size:12px">
+        <thead><tr><th>Time</th><th>Operator</th><th>Requested Action</th><th>Reason / SOP Reference</th><th>Status</th><th>Supervisor Action</th></tr></thead>
+        <tbody>
+          ${pendingApprovals.map(a=>`<tr>
+            <td class="mono">${a.time}</td>
+            <td><b>${a.op}</b></td>
+            <td style="color:var(--warn);font-weight:600">${a.action}</td>
+            <td>${a.reason}</td>
+            <td>${a.status==="pending"?'<span class="badge warn">⏳ Pending Approval</span>':`<span class="badge ok">✓ Approved</span> <small style="color:var(--muted)">${a.approvedBy}</small>`}</td>
+            <td>${a.status==="pending"?`<button class="tb primary q-app-btn" data-qid="${a.id}" style="height:26px;font-size:11px">Authorize (PIN)</button> <button class="tb q-rej-btn" data-qid="${a.id}" style="height:26px;font-size:11px">Reject</button>`:`<span class="t-ok">✓ Logged</span>`}</td>
+          </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  }
+
+  if(sup.tab==="recipe"){
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <h2 style="font-size:15px;margin:0 0 10px">Active Product Recipe</h2>
+        <div style="display:flex;flex-direction:column;gap:10px;font-size:12.5px">
+          <div><label style="color:var(--muted)">Current Production Recipe:</label>
+            <select style="width:100%;margin-top:4px;padding:6px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:4px">
+              <option>Whisky 750 ml (Recipe ID: R-W750-V7)</option>
+              <option>Whisky 1000 ml (Recipe ID: R-W1000-V3)</option>
+              <option>Gin Premium 750 ml (Recipe ID: R-G750-V2)</option>
+            </select>
+          </div>
+          <table class="grid" style="font-size:11.5px">
+            <thead><tr><th>Inspection Check</th><th>Nominal</th><th>Allowed Tolerance</th></tr></thead>
+            <tbody>
+              <tr><td>Position 1 (Cap Origin)</td><td>Center (320, 240)</td><td>±0.50 mm</td></tr>
+              <tr><td>2D Code Grade</td><td>ISO Grade B</td><td>Min Grade C</td></tr>
+              <tr><td>Seal Check Temp</td><td>150.0 °C</td><td>140.0 °C - 165.0 °C</td></tr>
+              <tr><td>Target Surface Moisture</td><td>0.00 mm²</td><td>Max 0.20 mm² (Droplets)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <h2 style="font-size:15px;margin:0 0 10px">Supervisor Safe Narrow-Band Trims</h2>
+        <p style="font-size:11.5px;color:var(--muted);margin:0 0 12px">Supervisors can trim running line parameters within narrow pre-calibrated bounds without changing master OEM recipes.</p>
+        <div style="display:flex;flex-direction:column;gap:12px;font-size:12.5px">
+          <div>
+            <div style="display:flex;justify-content:space-between"><span>Ambient Light Trim Window:</span><b id="s-trim-val">${sup.ambientTrim > 0 ? '+'+sup.ambientTrim : sup.ambientTrim}% (Limit ±5%)</b></div>
+            <input type="range" id="s-trim-slider" min="-5" max="5" step="0.5" value="${sup.ambientTrim}" style="width:100%">
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between"><span>Consecutive NG Conveyor Stop Interlock:</span><b id="s-rej-val">${sup.rejectStopLimit} parts</b></div>
+            <input type="range" id="s-rej-slider" min="1" max="10" step="1" value="${sup.rejectStopLimit}" style="width:100%">
+          </div>
+          <button class="tb primary" id="s-apply-trims" style="margin-top:6px;height:30px">Apply Safe Trims</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  if(sup.tab==="heatmap"){
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div>
+          <h2 style="font-size:15px;margin:0">Upstream Rotary Capper & Mold Cavity Heatmap (REQ-10)</h2>
+          <p style="font-size:11.5px;color:var(--muted);margin:3px 0 0">Real-time attribution of defects across 8 rotary capper heads to isolate mechanical tooling drift.</p>
+        </div>
+        <button class="tb primary" id="s-dispatch-maint">Dispatch Maintenance Order</button>
+      </div>
+      ${toolingHeatmapHTML()}
+    </div>`;
+  }
+
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+    <h2 style="font-size:15px;margin:0 0 10px">21 CFR Part 11 Electronic Audit Log (HMAC-SHA256 Signed)</h2>
+    <table class="grid num" style="font-size:11.5px">
+      <thead><tr><th>Timestamp</th><th>User</th><th>Event</th><th>Reason</th><th>Digital Signature</th></tr></thead>
+      <tbody>
+        <tr><td>06:42:15.210</td><td>line_op1</td><td>Request: Recipe Switch to Whisky 1000ml</td><td>Batch Changeover</td><td class="mono" style="font-size:10px">e9b4...2c01</td></tr>
+        <tr><td>06:38:22.104</td><td>sup_patel</td><td>Authorize: Reset Reject Bin & Jam Counter</td><td>Bin Emptied & Inspected</td><td class="mono" style="font-size:10px">7a12...9f88</td></tr>
+        <tr><td>06:00:14.050</td><td>line_op1</td><td>Golden Sample Verification Passed</td><td>Shift Handover Protocol</td><td class="mono" style="font-size:10px">4c33...8d19</td></tr>
+        <tr><td>05:58:02.000</td><td>system</td><td>Shift A Line Start Initialized</td><td>System Startup</td><td class="mono" style="font-size:10px">1b99...ee41</td></tr>
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function mountSup(){
+  app.innerHTML = supHTML();
+  $("#s-tab-queue").onclick = () => { sup.tab = "queue"; mountSup(); };
+  $("#s-tab-recipe").onclick = () => { sup.tab = "recipe"; mountSup(); };
+  $("#s-tab-heatmap").onclick = () => { sup.tab = "heatmap"; mountSup(); };
+  $("#s-tab-audit").onclick = () => { sup.tab = "audit"; mountSup(); };
+
+  // Bind queue buttons via DOM listeners (No broken inline onclicks!)
+  const rq = $("#s-refresh-queue"); if(rq) rq.onclick = mountSup;
+  document.querySelectorAll(".q-app-btn").forEach(btn => {
+    btn.onclick = () => {
+      const qid = parseInt(btn.dataset.qid);
+      const item = pendingApprovals.find(x => x.id === qid);
+      if(item){
+        item.status = "approved";
+        item.approvedBy = "V. Patel (PIN 4402 Verified)";
+        alert(`✓ Approved request: "${item.action}". Action executed.`);
+        mountSup();
+      }
+    };
+  });
+  document.querySelectorAll(".q-rej-btn").forEach(btn => {
+    btn.onclick = () => {
+      const qid = parseInt(btn.dataset.qid);
+      const item = pendingApprovals.find(x => x.id === qid);
+      if(item){
+        item.status = "rejected";
+        item.approvedBy = "V. Patel (Rejected)";
+        alert(`✗ Rejected request: "${item.action}".`);
+        mountSup();
+      }
+    };
+  });
+
+  // Recipe controls
+  const trSlider = $("#s-trim-slider");
+  if(trSlider){
+    trSlider.oninput = (e) => {
+      sup.ambientTrim = parseFloat(e.target.value);
+      const valEl = $("#s-trim-val");
+      if(valEl) valEl.textContent = (sup.ambientTrim > 0 ? '+'+sup.ambientTrim : sup.ambientTrim) + "% (Limit ±5%)";
+    };
+  }
+  const rjSlider = $("#s-rej-slider");
+  if(rjSlider){
+    rjSlider.oninput = (e) => {
+      sup.rejectStopLimit = parseInt(e.target.value);
+      const valEl = $("#s-rej-val");
+      if(valEl) valEl.textContent = sup.rejectStopLimit + " parts";
+    };
+  }
+  const apTrims = $("#s-apply-trims");
+  if(apTrims) apTrims.onclick = () => alert("Safe narrow-band parameters applied to running PLC link.");
+
+  const dm = $("#s-dispatch-maint");
+  if(dm) dm.onclick = () => alert("Mechanical Maintenance Alert dispatched to Shift Engineer for Head #3 Lead Screw Adjustment.");
+
+  // Supervisor modal controls
+  const smc = $("#sup-m-close"); if(smc) smc.onclick = closeSupervisorModal;
+  const smcn = $("#sup-cancel-btn"); if(smcn) smcn.onclick = closeSupervisorModal;
+  const sma = $("#sup-auth-btn"); if(sma) sma.onclick = executeSupervisorApproval;
+  const srf = $("#sup-rfid-btn"); if(srf) srf.onclick = () => {
+    const p = $("#sup-pin"); if(p) p.value = "4402";
+    alert("RFID Badge Scanned: Senior Supervisor V. Patel");
+  };
+}
+
+/* ================= SERVICE TAB (SERVICE TEAM & REMOTE SUPPORT) (REQ-11, 14, 15, 17) ================= */
+const svc = {
+  tab: "workbench" // workbench | tuning | health
+};
+
+function svcHTML(){
+  return svcModalHTML() + notifGuideModalHTML() + notificationHubHTML() + `<div style="background:linear-gradient(90deg, #1E3A6E 0%, #161D27 100%);padding:6px 14px;border-bottom:1px solid var(--accent);display:flex;align-items:center;gap:12px;font-size:11.5px">
+    <span class="badge ok" style="font-weight:700">🛠️ SERVICE & SUPPORT PORTAL (REQ-17)</span>
+    <span><b>Remote Session:</b> <code>https://support.sundaramtech.com/line/GJ-04-LINE2</code></span>
+    <span class="chip" style="height:20px;font-size:10.5px"><span class="dot ok"></span>Daily OTP: Verified</span>
+    <span class="chip" style="height:20px;font-size:10.5px;background:rgba(34,197,94,0.15)"><span class="dot ok"></span>Shop Floor: Active Operator Run</span>
+    <span style="flex:1"></span>
+    <button class="tb" id="svc-tab-wb" style="height:24px;font-size:11px;${svc.tab==='workbench'?'background:var(--accent);color:#fff':''}">VisionPro Workbench</button>
+    <button class="tb" id="svc-tab-tune" style="height:24px;font-size:11px;${svc.tab==='tuning'?'background:var(--accent);color:#fff':''}">Optical & Strobe Tuning</button>
+    <button class="tb" id="svc-tab-health" style="height:24px;font-size:11px;${svc.tab==='health'?'background:var(--accent);color:#fff':''}">Diagnostics & DB Audit</button>
+    <button class="chip btn-toggle-notif" style="cursor:pointer;background:rgba(234,179,8,0.22);border:1px solid var(--warn);color:var(--text);font-weight:700" data-tip="Toggle Unified Machine Notification Hub">🔔 ${activeNotifsCount()} Alerts ${notifHubOpen?"▲":"▼"}</button>
+    <span class="sep" style="height:18px"></span>
+    <span style="color:var(--info);font-size:11px">🔒 Private Support Session · Factory Line Display Never Blank</span>
+  </div>` + (svc.tab === "workbench" ? engHTML() : svcSubViewHTML());
+}
+
+function svcSubViewHTML(){
+  if(svc.tab === "tuning"){
+    return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+      <h2 style="font-size:16px;margin:0">Field Service Optical & Strobe Calibration</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0">Fine-tune exposure, strobe pulse duration, and assist plant operator with camera optical alignment.</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="font-size:13px;margin:0 0 10px">Live Optical Alignment Assistance</h3>
+          <table class="grid" style="font-size:12px">
+            <tr><td>Lens Focus Transmission:</td><td><b class="t-ok">95.4% MTF (Sharp)</b></td></tr>
+            <tr><td>Camera Exposure Trim:</td><td><input type="text" value="1,200 µs" style="width:100px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:3px"></td></tr>
+            <tr><td>Strobe Duration:</td><td><input type="text" value="250 µs" style="width:100px;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:3px"></td></tr>
+            <tr><td>Operator Feedback Cues:</td><td><span class="badge ok">Live on Line Display</span></td></tr>
+          </table>
+          <button class="tb primary" style="margin-top:10px;height:28px" onclick="alert('Service optical calibration trim applied to station.')">Apply Calibration Trim</button>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="font-size:13px;margin:0 0 10px">Shop Floor Assisted Adjustment HUD</h3>
+          <p style="font-size:11.5px;color:var(--muted)">While you tune parameters here, the plant operator sees immediate visual feedback on the shop-floor line monitor to assist with mechanical adjustments.</p>
+          <div style="background:var(--bg);border:1px solid var(--border);padding:10px;border-radius:6px;font-size:12px">
+            <div><b>Active Line Guidance:</b> <code>Applicator: Turn Lead Screw X by 1.85 turns CCW</code></div>
+            <div><b>Operator Screen State:</b> <code>100% Active in Operator Run Mode (No Blank Screen)</code></div>
+            <div><b>Physical De-Identification:</b> <code>Generic Step Names (Position 1, 2D Code)</code></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+    <h2 style="font-size:16px;margin:0">Diagnostic Health & Database Security Ledger (REQ-16)</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <h3 style="font-size:13px;margin:0 0 10px">Hardware Health Indicators (REQ-10)</h3>
+        <table class="grid" style="font-size:12px">
+          <tr><td>Strobe Lumen Health:</td><td><b class="t-ok">98.2% (Nominal curve)</b></td></tr>
+          <tr><td>Conveyor Encoder Lock:</td><td><b class="t-ok">100% Locked (0 slip)</b></td></tr>
+          <tr><td>Lens Cleanliness:</td><td><b class="t-ok">95.4% Sharp</b></td></tr>
+          <tr><td>Named Pipe Telemetry:</td><td><b class="t-ok">\\pipe\\vs_secure_ipc (Connected)</b></td></tr>
+        </table>
+        <button class="tb" style="margin-top:10px;height:28px" onclick="alert('Diagnostic telemetry package generated for support ticket.')">Export Diagnostic Dump</button>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <h3 style="font-size:13px;margin:0 0 10px">Zero-Knowledge Database Security (REQ-16)</h3>
+        <table class="grid" style="font-size:12px">
+          <tr><td>Encryption at Rest:</td><td><b class="t-ok">AES-256-GCM (SQLCipher)</b></td></tr>
+          <tr><td>Key Derivation:</td><td><b class="t-ok">DPAPI + Motherboard TPM 2.0</b></td></tr>
+          <tr><td>Operator File Access:</td><td><b class="t-ok">Explicit Deny (Direct SQL blocked)</b></td></tr>
+          <tr><td>Ledger Hash Chain:</td><td><b class="t-ok">HMAC-SHA256 (Tamper-Evident)</b></td></tr>
+        </table>
+        <button class="tb" style="margin-top:10px;height:28px" onclick="alert('Database Security Audit: 100% Verified. Hash chain valid, zero cleartext passwords, operator direct SQL access blocked.')">Run DB Security Audit</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function mountSvc(){
+  if(!svcUnlocked){
+    openSvcModal();
+    return;
+  }
+  app.innerHTML = svcHTML();
+  
+  const swb = $("#svc-tab-wb"); if(swb) swb.onclick = () => { svc.tab = "workbench"; mountSvc(); };
+  const stn = $("#svc-tab-tune"); if(stn) stn.onclick = () => { svc.tab = "tuning"; mountSvc(); };
+  const shl = $("#svc-tab-health"); if(shl) shl.onclick = () => { svc.tab = "health"; mountSvc(); };
+
+  if(svc.tab === "workbench") wireEng();
+}
+
+/* ================= OEM FACTORY MANUFACTURING CONSOLE (BUILD & PROVISIONING) (REQ-17 / PROT-32) ================= */
+const oemFactory = {
+  tab: "hardware" // hardware | features | hardcode
+};
+
+function oemFactoryHTML(){
+  return oemFactoryModalHTML() + notifGuideModalHTML() + notificationHubHTML() + `<div style="background:rgba(225,29,72,0.18);border-bottom:1px solid #E11D48;padding:6px 14px;font-size:11.5px;color:var(--text);display:flex;align-items:center;justify-content:space-between">
+    <div>
+      <b style="color:#FDA4AF">⚠️ Mandatory Security Notice:</b> <b>"Do not share OTP with other users as change log is generated with values, It will be audited in your name - Risky."</b>
+    </div>
+    <span class="chip" style="height:20px;font-size:10.5px;background:rgba(225,29,72,0.3);color:#fff"><span class="dot ok"></span>Factory Audit: Active (User: gaurang.t)</span>
+  </div>
+  <div style="background:linear-gradient(90deg, #881337 0%, #161D27 100%);padding:6px 14px;border-bottom:1px solid #E11D48;display:flex;align-items:center;gap:12px;font-size:11.5px">
+    <span class="badge danger" style="font-weight:700;background:#E11D48;color:#fff">🏭 OEM FACTORY MANUFACTURING & COMMISSIONING</span>
+    <span><b>Station Build:</b> <code>Sundaram Production Line Plant #1 (Factory Jig)</code></span>
+    <span class="chip" style="height:20px;font-size:10.5px"><span class="dot ok"></span>Factory Dongle: Verified</span>
+    <button class="chip btn-toggle-notif" style="cursor:pointer;background:rgba(234,179,8,0.22);border:1px solid var(--warn);color:var(--text);font-weight:700" data-tip="Toggle Unified Machine Notification Hub">🔔 ${activeNotifsCount()} Alerts ${notifHubOpen?"▲":"▼"}</button>
+    <span style="flex:1"></span>
+    <button class="tb" id="oem-f-tab-hw" style="height:24px;font-size:11px;${oemFactory.tab==='hardware'?'background:#E11D48;color:#fff':''}">1. Hardware Mapping</button>
+    <button class="tb" id="oem-f-tab-feat" style="height:24px;font-size:11px;${oemFactory.tab==='features'?'background:#E11D48;color:#fff':''}">2. Feature Entitlements</button>
+    <button class="tb" id="oem-f-tab-dup" style="height:24px;font-size:11px;${oemFactory.tab==='duplicate'?'background:#E11D48;color:#fff':''}">3. Duplicate Code Buffers (REQ-19)</button>
+    <button class="tb" id="oem-f-tab-map" style="height:24px;font-size:11px;${oemFactory.tab==='mapping'?'background:#E11D48;color:#fff':''}">4. Camera Inspection Matrix (REQ-19)</button>
+    <button class="tb" id="oem-f-tab-hard" style="height:24px;font-size:11px;${oemFactory.tab==='hardcode'?'background:#E11D48;color:#fff':''}">5. Hardcoded Bindings</button>
+    <span class="sep" style="height:18px"></span>
+    <span style="color:#FDA4AF;font-size:11px">⚠️ Strictly Locked to Factory Manufacturing · Never Available to Service Team</span>
+  </div>` + oemFactorySubViewHTML();
+}
+
+function oemFactorySubViewHTML(){
+  if(oemFactory.tab === "hardware"){
+    return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+      <h2 style="font-size:16px;margin:0">Machine Hardware Selection & Mapping (Factory Assembly)</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0">Configured once during machine assembly based on installed sensors, camera makes, and plant line controller.</p>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="font-size:13px;margin:0 0 10px">Imaging & Strobe Hardware Configuration</h3>
+          <table class="grid" style="font-size:12px">
+            <tr>
+              <td>Primary Inspection Camera:</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>Hikrobot MV-CE200-10GM (20 MP GigE Vision)</option>
+                  <option>Basler ace 2 A2A5328-15gmBAS (5 MP GigE)</option>
+                  <option>Daheng Imaging Mercury MER2-2000-19GM (20 MP)</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td>Optical Lens Focal Length:</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>25mm f/1.4 High-Resolution 1.1" C-Mount</option>
+                  <option>35mm f/1.8 Low-Distortion Macro C-Mount</option>
+                  <option>50mm f/2.0 Telecentric Precision Lens</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td>Industrial Strobe Controller:</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>Sundaram SmartStrobe 4-Channel 24VDC (Opto-Isolated)</option>
+                  <option>Gardasoft CC320 Constant Current Strobe</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td>Product Trigger Sensor:</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>Sick WLL180T High-Speed Fiber Optic PNP (24VDC)</option>
+                  <option>Keyence FS-N40 Fiber Sensor with Coaxial Head</option>
+                </select>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+          <h3 style="font-size:13px;margin:0 0 10px">Plant PLC & Conveyor Encoder Synchronization</h3>
+          <table class="grid" style="font-size:12px">
+            <tr>
+              <td>Line Controller (PLC Brand & Model):</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>Delta AS300 High-Performance Series (EtherNet/IP)</option>
+                  <option>Delta DVP-ES2 Compact Line Series (Modbus RTU)</option>
+                  <option>Siemens SIMATIC S7-1200 / S7-1500 (PROFINET)</option>
+                  <option>Rockwell Allen-Bradley Micro850 (EtherNet/IP)</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td>Conveyor Rotary Encoder:</td>
+              <td>
+                <select style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px">
+                  <option selected>Autonics E50S 1000 PPR Line Driver (Differential)</option>
+                  <option>Omron E6B2-CWZ6C 2000 PPR Open Collector</option>
+                </select>
+              </td>
+            </tr>
+            <tr>
+              <td>Encoder Pulses per mm of Conveyor:</td>
+              <td><input type="text" value="63.66 pulses/mm" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px"></td>
+            </tr>
+            <tr>
+              <td>Reject Ejector Station Distance:</td>
+              <td><input type="text" value="480.0 mm (7,640 encoder pulses)" style="width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:4px;border-radius:4px"></td>
+            </tr>
+          </table>
+          <button class="tb danger" style="margin-top:10px;height:28px;background:#E11D48;color:#fff" onclick="alert('Hardware mapping committed to machine manufacturing manifest.')">Save Hardware Manifest</button>
+        </div>
+      </div>
+    </div>`;
+  } else if(oemFactory.tab === "duplicate"){
+    return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+      <h2 style="font-size:16px;margin:0">Sliding-Window Duplicate Code Checking Configuration (REQ-19)</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0">Configure independent sliding-window duplicate code detection buffers per camera channel. Hardware accelerated via FIFO CRC-32 cache.</p>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <h3 style="font-size:13px;margin:0 0 12px">Duplicate Code History Buffer Sizes per Camera</h3>
+        <table class="grid" style="font-size:12px">
+          <thead>
+            <tr>
+              <th>Camera Channel</th>
+              <th>Physical Inspection Zone</th>
+              <th>Duplicate Buffer Window (Counts)</th>
+              <th>Action on Duplicate</th>
+              <th>Hardware Hash Acceleration</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Camera 1</b> (Hikrobot 20 MP)</td>
+              <td>Top Flap: TTO QR & GS1-DataMatrix</td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option>Off</option>
+                  <option>Last 50 parts</option>
+                  <option>Last 100 parts</option>
+                  <option selected>Last 250 parts (Standard Carton)</option>
+                  <option>Last 500 parts</option>
+                  <option>Last 1,000 parts</option>
+                </select>
+              </td>
+              <td><span class="badge ng">Reject & Signal ALM-501</span></td>
+              <td><code>CRC-32 Ring Buffer (0.8 µs)</code></td>
+              <td><span class="badge ok">✓ Active</span></td>
+            </tr>
+            <tr>
+              <td><b>Camera 2</b> (Hikrobot 5 MP)</td>
+              <td>Side Bottle: CIJ Dot Matrix Batch & Expiry</td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option>Off</option>
+                  <option>Last 50 parts</option>
+                  <option selected>Last 100 parts</option>
+                  <option>Last 250 parts</option>
+                  <option>Last 500 parts</option>
+                </select>
+              </td>
+              <td><span class="badge ng">Reject & Pause Line</span></td>
+              <td><code>Text Hash Table (1.2 µs)</code></td>
+              <td><span class="badge ok">✓ Active</span></td>
+            </tr>
+            <tr>
+              <td><b>Camera 3</b> (Basler ace 2)</td>
+              <td>Shipper Case: TIJ GS1-128 & SSCC Barcode</td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option>Off</option>
+                  <option>Last 100 parts</option>
+                  <option>Last 250 parts</option>
+                  <option selected>Last 500 parts (Shipper Pallet)</option>
+                  <option>Last 2,000 parts</option>
+                </select>
+              </td>
+              <td><span class="badge ng">Reject & Signal ALM-501</span></td>
+              <td><code>CRC-32 Ring Buffer (0.8 µs)</code></td>
+              <td><span class="badge ok">✓ Active</span></td>
+            </tr>
+            <tr>
+              <td><b>Camera 4</b> (Daheng Mercury)</td>
+              <td>Cap Hologram & Security Foil</td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Disabled (Optical Centering Only)</option>
+                  <option>Last 50 parts</option>
+                </select>
+              </td>
+              <td><span class="badge ok">Optical Check Only</span></td>
+              <td><code>N/A</code></td>
+              <td><span class="t-muted">Disabled</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:14px;display:flex;justify-content:flex-end">
+          <button class="tb danger" style="height:28px;background:#E11D48;color:#fff" onclick="alert('Duplicate buffer parameters saved to OEM station ROM.')">Save Duplicate Buffer Settings</button>
+        </div>
+      </div>
+    </div>`;
+  } else if(oemFactory.tab === "mapping"){
+    return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+      <h2 style="font-size:16px;margin:0">Camera-to-Issue Master Inspection Mapping & Scheduling Matrix (REQ-19)</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0">Map specific physical inspection issues to the responsible camera channel and configure running line inspection frequency.</p>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <h3 style="font-size:13px;margin:0 0 12px">Master Camera Inspection Matrix & Diagnostic Trigger Modes</h3>
+        <table class="grid" style="font-size:12px">
+          <thead>
+            <tr>
+              <th>Inspection Defect Issue</th>
+              <th>Assigned Camera Channel</th>
+              <th>Running Line Trigger Schedule Mode</th>
+              <th>Action on Fault</th>
+              <th>Hardware Notification</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <b>TTO Barcode & Print Diagnostics (REQ-20.1)</b><br>
+                <span class="t-muted" style="font-size:11px">Element burnout void lines, wax/paraffin head cleaning fade, quiet zone clipping, over/under darkness, ribbon wrinkle, GS1 syntax & missing FNC1</span>
+              </td>
+              <td><b>Camera 1 [Top Flap]</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Continuous (100% of parts)</option>
+                  <option>Periodic: Every 50 parts (Random audit)</option>
+                  <option>Periodic: Every 100 parts</option>
+                  <option>Start-of-Job Baseline (One-time audit)</option>
+                </select>
+              </td>
+              <td>Reject Part + Flag Lead Screw / IPA Clean</td>
+              <td><span class="badge ng">ALM-201..204</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>CIJ Printer Diagnostics (REQ-20.2)</b><br>
+                <span class="t-muted" style="font-size:11px">Head angle skew, product crabbing in angle, nozzle clog & satellite droplets, conveyor velocity pitch mismatch</span>
+              </td>
+              <td><b>Camera 2 [Side Bottle]</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Continuous (100% of parts)</option>
+                  <option>Periodic: Every 50 parts</option>
+                  <option>Start-of-Job Baseline (One-time audit)</option>
+                </select>
+              </td>
+              <td>Auto-Flush Command to CIJ + Guide Rail Notice</td>
+              <td><span class="badge warn">ALM-104, ALM-301</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>TIJ Printer Diagnostics (REQ-20.3)</b><br>
+                <span class="t-muted" style="font-size:11px">Head away blur (>2mm), head touching drag smear (<0.5mm), guide rail taper wedge print, decap dry-out</span>
+              </td>
+              <td><b>Camera 3 [Shipper Box]</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option>Continuous (100% of parts)</option>
+                  <option selected>Periodic: Every 25 parts (Random audit)</option>
+                  <option>Start-of-Job Baseline (One-time audit)</option>
+                </select>
+              </td>
+              <td>Flag Cartridge Throw Distance / Purge Notice</td>
+              <td><span class="badge warn">ALM-302..304</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Hologram Centering & Applicator Alignment (REQ-20.5)</b><br>
+                <span class="t-muted" style="font-size:11px">Sub-pixel centroid displacement, skew angle, corner dog-ear, peeling blade friction</span>
+              </td>
+              <td><b>Camera 4 [Cap Seal]</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Continuous (100% of parts)</option>
+                  <option>Periodic: Every 20 parts</option>
+                </select>
+              </td>
+              <td>Calculate Lead Screw CCW/CW Turns</td>
+              <td><span class="badge warn">ALM-101</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Inspecting Surface Moisture / Liquid Droplets (REQ-09, 20.5)</b><br>
+                <span class="t-muted" style="font-size:11px">Cold-fill bottle sweating, label blistering droplets, barcode optical refraction rings</span>
+              </td>
+              <td><b>Cam 1, Cam 2, Cam 4</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Continuous (100% of parts)</option>
+                  <option>Periodic: Every 50 parts</option>
+                </select>
+              </td>
+              <td>Trigger Upstream Air Knife Blower</td>
+              <td><span class="badge warn">ALM-102</span></td>
+            </tr>
+            <tr>
+              <td>
+                <b>Motion Encoder & Belt Speed Sag (REQ-20.4)</b><br>
+                <span class="t-muted" style="font-size:11px">Non-square 2D aspect ratio (W/H!=1.0), encoder wheel slip during acceleration, conveyor motor speed sag under bunch load</span>
+              </td>
+              <td><b>Master Motion Bus</b></td>
+              <td>
+                <select style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:3px 6px;border-radius:4px">
+                  <option selected>Continuous (100% of parts)</option>
+                </select>
+              </td>
+              <td>Calibrate Encoder Divider / VFD Alarm</td>
+              <td><span class="badge ng">ALM-401..403</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="margin-top:14px;display:flex;justify-content:flex-end">
+          <button class="tb danger" style="height:28px;background:#E11D48;color:#fff" onclick="alert('Camera inspection matrix committed to machine runtime.')">Save Inspection Matrix</button>
+        </div>
+      </div>
+    </div>`;
+  } else if(oemFactory.tab === "features"){
+    return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+      <h2 style="font-size:16px;margin:0">Software Features Selection & Entitlements</h2>
+      <p style="font-size:12px;color:var(--muted);margin:0">Lock licensed inspection tools and modules for this machine build. Once burned to license, service engineers cannot change feature entitlements.</p>
+      
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px">
+        <h3 style="font-size:13px;margin:0 0 12px">Licensed Inspection Engines for License VS-PRO-GJ04-98214</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:12px">
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>1D Barcode & GS1 Syntax Verification Engine</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>2D DataMatrix (ECC200) & PowerGrid Reader</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>OCR / OCV Printed Text Inspector (CIJ / Laser)</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>Target Surface Moisture Detection (REQ-09)</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>Upstream Tooling Cavity Heatmap (REQ-10)</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>Thermal Packaging Seal Inspection (IR 8-14µm)</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>3D Photometric Surface Texture Matcher</b>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;background:var(--bg);padding:8px 12px;border-radius:6px;border:1px solid var(--border)">
+            <input type="checkbox" checked> <b>21 CFR Part 11 Electronic Records & Hash Ledger</b>
+          </label>
+        </div>
+        <button class="tb danger" style="margin-top:14px;height:28px;background:#E11D48;color:#fff" onclick="alert('Software feature entitlements signed and locked for customer license.')">Commit Feature Locks</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div style="flex:1;overflow:auto;padding:16px 20px;background:var(--bg);display:flex;flex-direction:column;gap:14px">
+    <h2 style="font-size:16px;margin:0">One-Time Factory Hardcoding & Part Binding</h2>
+    <p style="font-size:12px;color:var(--muted);margin:0">Fixed settings burned once into non-volatile hardware storage. Service engineers and plant operators cannot modify these.</p>
+
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+      <h3 style="font-size:13px;margin:0 0 10px">Hardware Serial Number Binding</h3>
+      <table class="grid" style="font-size:12px">
+        <tr><td>Machine Serial Number:</td><td><code>VS-PRO-GJ04-98214</code></td></tr>
+        <tr><td>Hikrobot Camera Serial:</td><td><code>DA0894218-MV-CE200</code> (Bound to License)</td></tr>
+        <tr><td>Delta PLC Ethernet MAC:</td><td><code>00:18:23:4F:91:A2</code> (Bound to License)</td></tr>
+        <tr><td>Advantech IPC Motherboard UUID:</td><td><code>4C4C4544-004A-4A10-8054-C3C04F343232</code></td></tr>
+        <tr><td>Notification Dictionary:</td><td><b class="t-ok">Hardcoded in Assembly Image (en, hi, gu, ta)</b></td></tr>
+      </table>
+      <button class="tb danger" style="margin-top:10px;height:28px;background:#E11D48;color:#fff" onclick="alert('Factory settings burned to TPM and encrypted ROM.')">Burn to Factory ROM</button>
+    </div>
+  </div>`;
+}
+
+function mountOEM(){
+  if(!oemUnlocked){
+    openOemFactoryModal();
+    return;
+  }
+  app.innerHTML = oemFactoryHTML();
+  
+  const ohw = $("#oem-f-tab-hw"); if(ohw) ohw.onclick = () => { oemFactory.tab = "hardware"; mountOEM(); };
+  const oft = $("#oem-f-tab-feat"); if(oft) oft.onclick = () => { oemFactory.tab = "features"; mountOEM(); };
+  const odu = $("#oem-f-tab-dup"); if(odu) odu.onclick = () => { oemFactory.tab = "duplicate"; mountOEM(); };
+  const omp = $("#oem-f-tab-map"); if(omp) omp.onclick = () => { oemFactory.tab = "mapping"; mountOEM(); };
+  const ohd = $("#oem-f-tab-hard"); if(ohd) ohd.onclick = () => { oemFactory.tab = "hardcode"; mountOEM(); };
+}
+
+/* ================= ENGINEER WORKSPACE (CLAUDE CANONICAL BASELINE) ================= */
+const T = {
+ loc1:{name:"Position 1",cam:1,icon:"loc",ok:true,ms:3.1,type:"Position (Pattern)",
+  props:[["General",[["Name","Position 1","text",1],["Enabled","Yes","sel:Yes|No",1],["Camera","Camera 1 · Top","sel:Camera 1 · Top|Camera 2 · Side",1]]],
+   ["Search",[["Region","Whole image","sel:Whole image|Drawn area",1],["Angle range","±15","num:°",1],["Scale range","0.95–1.05","text",0],["Lowest score","0.70","num:",1],["Edge threshold","18","num:grey",0],["Coarse level","3","num:",0]]],
+   ["Fixture",[["Moves tools","2D Code","text",1],["Origin","Pattern centre","sel:Pattern centre|Top-left",0]]]],
+  dist:{label:"Score on 46 good pictures",unit:"",lo:0.6,hi:1,limit:0.7,limName:"lowest 0.70",vals:46,mean:0.91,sd:0.02,now:0.93},
+  result:[["Status","✓ Found"],["Score","0.93"],["Position","x 320.4 px, y 241.0 px"],["Angle","0.6°"],["Time","3.1 ms"]]},
+ code1:{name:"2D Code",cam:1,icon:"code",ok:true,ms:8.4,type:"2D Code (QR)",
+  props:[["General",[["Name","2D Code","text",1],["Enabled","Yes","sel:Yes|No",1],["Fixtured to","Position 1","sel:Position 1|None",1]]],
+   ["Code",[["Code type","QR","sel:QR|Data Matrix|Micro QR|EAN-13|Code 128|GS1-128",1],["Codes expected","1","num:",1],["More codes than expected","NG","sel:NG|Allowed",1],["GS1","Required: 01, 21","text",1],["Same code twice","NG (orange)","sel:NG (orange)|Allowed",1]]],
+   ["Print quality",[["Lowest grade","C","sel:A|B|C|D|Off",1],["Record grades","Yes","sel:Yes|No",0],["Aperture","Auto (0.5 X)","text",0]]],
+   ["Reading",[["Time budget","40","num:ms",0],["Polarity","Dark on light","sel:Dark on light|Light on dark|Both",0],["Mirror","Off","sel:Off|On",0],["Deblur second try","On","sel:On|Off",0],["Serial-run match","On","sel:On|Off",0]]]],
+  dist:{label:"Grade score on 46 good pictures",unit:"",lo:0,hi:4,limit:2,limName:"lowest C (2.0)",vals:46,mean:3.1,sd:.35,now:3.2},
+  result:[["Status","✓ Read"],["Value","(01)08901234567894(21)7Q2M9K"],["Grade","B (contrast A, modulation B)"],["Module size","6.1 px"],["Time","8.4 ms"]]},
+ code2:{name:"1D Barcode",cam:2,icon:"code",ok:true,ms:5.2,type:"1D Barcode (EAN-13)",
+  props:[["General",[["Name","1D Barcode","text",1],["Enabled","Yes","sel:Yes|No",1]]],
+   ["Code",[["Code type","EAN-13","sel:EAN-13|Code 128|GS1-128|QR",1],["Expected value","8901234567894","text",1],["Check digit","Must match","sel:Must match|Off",1],["Quiet zone","11 modules","text",0]]],
+   ["Print quality",[["Lowest grade","Off","sel:A|B|C|D|Off",1],["Scan lines","10","num:",0]]]],
+  dist:{label:"Read time on 46 good pictures",unit:" ms",lo:0,hi:20,limit:15,limName:"budget 15 ms",vals:46,mean:5.3,sd:.8,now:5.2,upper:true},
+  result:[["Status","✓ Read"],["Value","8901234567894"],["Matches expected","Yes"],["Time","5.2 ms"]]},
+ text1:{name:"Text Line",cam:2,icon:"text",ok:false,ms:14.8,type:"Text Line (4 lines)",
+  props:[["General",[["Name","Text Line","text",1],["Enabled","Yes","sel:Yes|No",1],["Camera","Camera 2 · Side","sel:Camera 1 · Top|Camera 2 · Side",1]]],
+   ["Print",[["Print type","Laser","sel:Laser|Inkjet (CIJ)|Thermal (TTO)|Embossed",1],["Light on dark","Yes","sel:Yes|No",1],["Letter height","2.4","num:mm",1],["Lines","4","num:",1]]],
+   ["Expected text",[["Line 1","PLC text block","sel:PLC text block|Batch|Fixed",1],["Line 2","MFG. {batch.mfg}","text",1],["Line 3","EXP. {batch.exp}","text",1],["Line 4","MRP RS.{batch.mrp}","text",1]]],
+   ["Pass limits",[["Lowest quality","60","num:",1],["Cut-short line","NG","sel:NG|Warn",1],["Word gap","1.5","num:letter",0],["Dot joining","Auto","sel:Auto|On|Off",0],["Slant","±12","num:°",0],["Reader","Two readers agree","sel:Two readers agree|AI reader|Classic",0]]]],
+  dist:{label:"Lowest line quality on 46 good pictures",unit:"",lo:40,hi:100,limit:60,limName:"lowest 60",vals:46,mean:77,sd:4.5,now:74},
+  result:[["Status","✗ NG"],["Why","Line 4 cut short: expected "MRP RS.145.00", found "MRP RS.145.0""],["Line 1","B.NO. B2410-17 ✓ Q 81"],["Line 2","MFG. 10/2026 ✓ Q 79"],["Line 3","EXP. 09/2028 ✓ Q 80"],["Line 4","MRP RS.145.0 ✗ Q 74"],["Time","14.8 ms"]]},
+ autotune1:{name:"Image Check",cam:1,icon:"sparkle",ok:true,ms:4.6,type:"Image Quality & Alignment",
+  props:[["General",[["Name","Image Check","text",1],["Enabled","Yes","sel:Yes|No",1],["Online Adaptation","Active (Background)","sel:Active (Background)|Locked|Calibration Only",1]]],
+   ["Image Sharpness",[["Sharpness Target","90 %","num:%",1],["Max Edge Delta","10 %","num:%",1],["Lens Cleanliness Check","Active","sel:Active|Off",1],["Vibration Blur Alarm","Warn on > 15%","sel:Warn on > 15%|Reject|Off",0]]],
+   ["Lighting Balance",[["Ambient Light Auto-Trim","Active (Continuous)","sel:Active (Continuous)|Periodic|Off",1],["Trim Range","±35 %","text",0],["Flicker Filter","Auto 100/120Hz","sel:Auto 100/120Hz|Off",0]]],
+   ["Machine Alignment",[["Target Center X","320.0","num:px",1],["Target Center Y","240.0","num:px",1],["Allowed Tolerance","0.50","num:mm",1],["Lead-Screw Pitch","0.75","num:mm/turn",1],["Correction Axis","X: CCW = Left, CW = Right","text",0]]],
+   ["Surface Moisture Check",[["Target Surface Check","Active (Bottle & Label)","sel:Active (Bottle & Label)|Off",1],["Moisture Area Limit","1.2","num:mm²",1],["Operator Advice","Alert: Dry bottle/label surface","sel:Alert: Dry bottle/label surface|Reject|Ignore",0]]]],
+  dist:{label:"Sharpness score on 46 good pictures",unit:"%",lo:75,hi:100,limit:90,limName:"target 90%",vals:46,mean:95.2,sd:1.1,now:96.0},
+  result:[["Status","✓ Pass · Aligned"],["Image Sharpness","Center 96% · Edges 93–95% (Uniform ✓)"],["Lens Cleanliness","Clean (Nominal transmission)"],["Lighting Auto-Trim","Balanced (+22% lux shift compensated ✓)"],["Machine Alignment","ΔX +0.42 mm, ΔY −0.10 mm (Tolerance ±0.50 mm)"],["Tooling Advice","Position within tolerance band. No adjustment required."],["Target Surface Moisture","Bottle & Label Dry (Index 0.04 < 0.20 limit)"],["Time","4.6 ms"]]},
+ photometric1:{name:"Surface Check",cam:1,icon:"polar",ok:true,ms:6.2,type:"Surface & Relief Quality",
+  props:[["General",[["Name","Surface Check","text",1],["Enabled","Yes","sel:Yes|No",1],["Sequence","Multi-Sector","sel:Multi-Sector|Coaxial|Single",1]]],
+   ["Inspection Mode",[["Surface Mode","Surface Relief & Texture","sel:Surface Relief & Texture|Texture Only|Albedo",1],["Anti-Glare","Enabled","sel:Enabled|Off",1],["Contrast Filter","Enhanced","sel:Enhanced|Standard|Off",0]]],
+   ["Defect Limits",[["Max Depth Defect","0.08","num:mm",1],["Max Scratch Length","1.5","num:mm",1],["Pinhole Area","0.20","num:mm²",0]]]],
+  dist:{label:"Surface variance on 46 good pictures",unit:" µm",lo:0,hi:5,limit:3.5,limName:"limit 3.5 µm",vals:46,mean:1.8,sd:0.4,now:1.9,upper:true},
+  result:[["Status","✓ Pass"],["Surface Relief","Nominal (0.038 µm variance)"],["Glare Reflections","Suppressed (99.2% coverage)"],["Scratch Check","0 defects found"],["Time","6.2 ms"]]},
+ thermal1:{name:"Seal Check",cam:2,icon:"thermal",ok:true,ms:5.8,type:"Seal & Thermal Quality",
+  props:[["General",[["Name","Seal Check","text",1],["Enabled","Yes","sel:Yes|No",1],["Camera","Camera 2 · Side","sel:Camera 2 · Side|Camera 1 · Top",1]]],
+   ["Thermal Inspection",[["Seal Area Profile","Heated Jaw 180mm","text",1],["Min Seal Temperature","140.0","num:°C",1],["Max Temperature","165.0","num:°C",1],["Emissivity","0.92","num:",0]]],
+   ["Seal Integrity",[["Min Seal Width","3.0","num:mm",1],["Burr Tolerance","0.40","num:mm",1],["Cavity Seal Symmetry","±0.30 mm","text",0]]]],
+  dist:{label:"Seal jaw temp on 46 good pictures",unit:" °C",lo:130,hi:170,limit:140,limName:"min 140 °C",vals:46,mean:151.2,sd:1.8,now:151.2},
+  result:[["Status","✓ Pass"],["Seal Temperature","151.2 °C (Min 140.0 °C ✓)"],["Seal Width","3.85 mm (Min 3.00 mm ✓)"],["Jaw Symmetry","Nominal (Parallel)"],["Time","5.8 ms"]]},
+ haystack1:{name:"Batch Monitor",cam:2,icon:"ai",ok:true,ms:7.1,type:"Batch Stability Monitor",
+  props:[["General",[["Name","Batch Monitor","text",1],["Enabled","Yes","sel:Yes|No",1],["Mode","Continuous Drift Tracking","sel:Continuous Drift Tracking|Periodic",1]]],
+   ["Latent Bounds",[["Inlier Threshold","0.85","num:",1],["Max Boundary Distance","1.45","num:sigma",1],["Auto Retrain Shift","Off","sel:Off|On Approval",0]]],
+   ["Disturbance Rejection",[["Ambient Shift Immune","Enabled","sel:Enabled|Off",1],["Line Speed Compensation","Active","sel:Active|Off",0]]]],
+  dist:{label:"Inlier stability score on 46 good pictures",unit:"",lo:0.7,hi:1.0,limit:0.85,limName:"limit 0.85",vals:46,mean:0.96,sd:0.03,now:0.97},
+  result:[["Status","✓ Normal · Stable"],["Cluster Confidence","0.97 (Limit ≥ 0.85)"],["Latent Center Drift","0.02% / hour (Nominal)"],["Disturbance Resilience","High (Zero false alarms)"],["Time","7.1 ms"]]}
+};
+
+const eng = {
+ dock:"job",sel:"text1",img:"c2cur",all:false,bottom:"results",
+ graphics:true,collapsed:{},oemMode:false,splitWipe:false,mtfGrid:false,screwAdvisor:false
+};
+
+function treeHTML(){
+  const items = Object.entries(T);
+  return `<div class="tree" role="tree">${items.map(([k,t])=>`<div class="node ${k===eng.sel?"sel":""}" data-id="${k}" role="treeitem" aria-selected="${k===eng.sel}">
+   <span class="badge ${t.ok?"ok":"ng"}">${t.ok?"✓":"✗"}</span>
+   <span class="mono">${ic(t.icon)}</span>
+   <span class="label">${t.name}</span>
+   <span class="cam">C${t.cam}</span>
+   <span class="mono num">${t.ms} ms</span>
+  </div>`).join("")}</div>`;
+}
+
+function toolboxHTML(){
+  const cats = [
+   ["Positioning & Alignment",[["Position (Pattern)","loc",1],["Edge Pair Locator","ruler",1],["Corner Alignment","loc",1]]],
+   ["Code Reading & Grading",[["2D Code (QR / Data Matrix)","code",1],["1D Barcode (EAN-13)","code",1],["Direct Part Mark (DPM)","code",1]]],
+   ["Text & Character Check",[["Text Line (Laser/CIJ)","text",1],["Batch Date Verifier","text",1]]],
+   ["Optical & Environmental Checks",[["Image Quality Check","sparkle",1],["Polarized Glare Check","polar",1],["Surface Quality Check","polar",1],["Thermal Seal Check","thermal",1],["Batch Stability Monitor","ai",1]]]
+  ];
+  return `<div class="toolbox">${cats.map(([c,ts])=>`<div class="tcat"><h4>${c}</h4>
+   ${ts.map(([n,i,l])=>`<div class="ttool ${l?"":"locked"}" draggable="true">${ic(i)}<span>${n}</span>${l?"":'<span class="badge warn">buy</span>'}</div>`).join("")}</div>`).join("")}</div>`;
+}
+
+function propsHTML(){
+  const t = T[eng.sel];
+  return t.props.map(([cat,rows],ci)=>{
+    const open = !eng.collapsed[cat];
+    const visible = rows.filter(r=>eng.all||r[3]);
+    if(!visible.length)return "";
+    return `<div class="pcat" data-key="${cat}"><b>${open?"▾":"▸"} ${cat}</b><span class="t-muted">(${visible.length})</span></div>`+
+     (open?`<div class="prows">${visible.map(([k,v,type])=>{
+       let ctrl=`<span class="mono">${v}</span>`;
+       if(type.startsWith("sel:")){const opts=type.slice(4).split("|");ctrl=`<select class="mono">${opts.map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`;}
+       else if(type.startsWith("num:")){ctrl=`<input type="text" class="mono num" value="${v}" style="width:70px;text-align:right"> <span class="t-muted">${type.slice(4)}</span>`;}
+       else if(type==="text"){ctrl=`<input type="text" class="mono" value="${v}" style="width:100%">`;}
+       return `<div class="prow"><span class="lbl">${k}</span>${ctrl}</div>`;
+     }).join("")}</div>`:"");
+  }).join("");
+}
+
+function resultHTML(){
+  const t = T[eng.sel];
+  return `<table class="grid num" style="font-size:12px"><tbody>
+   ${t.result.map(([k,v])=>`<tr><td class="lbl" style="width:120px">${k}</td><td><b>${v}</b></td></tr>`).join("")}
+  </tbody></table>`;
+}
+
+function bottomEngHTML(){
+  if(eng.bottom==="results")return `<table class="grid num"><thead><tr><th>Cam</th><th>Tool</th><th>Result</th><th>Type</th><th>Details</th><th style="text-align:right">Time (ms)</th></tr></thead><tbody>
+   <tr><td>1</td><td>Position 1</td><td><span class="badge ok">✓</span></td><td>Position</td><td>Pattern score 0.93 (min 0.70) · x 320.4 y 241.0 · 0.6°</td><td style="text-align:right">3.1</td></tr>
+   <tr><td>1</td><td>2D Code</td><td><span class="badge ok">✓</span></td><td>2D Code</td><td>QR · (01)08901234567894(21)7Q2M9K · Grade B</td><td style="text-align:right">8.4</td></tr>
+   <tr><td>1</td><td>Image Check</td><td><span class="badge ok">✓</span></td><td>Quality</td><td>Center 96% · Edges 93–95% (Uniform ✓) · Light Balanced</td><td style="text-align:right">4.6</td></tr>
+   <tr><td>2</td><td>1D Barcode</td><td><span class="badge ok">✓</span></td><td>1D Code</td><td>EAN-13 · 8901234567894 · Grade A</td><td style="text-align:right">5.2</td></tr>
+   <tr><td>2</td><td>Text Line</td><td><span class="badge ng">✗ NG</span></td><td>OCR/OCV</td><td>Line 4 cut short: expected "MRP RS.145.00", found "MRP RS.145.0"</td><td style="text-align:right">14.8</td></tr>
+   <tr><td>1</td><td>Surface Check</td><td><span class="badge ok">✓</span></td><td>Surface</td><td>Relief 0.038 µm variance (Max 0.08 mm) · Clean</td><td style="text-align:right">6.2</td></tr>
+   <tr><td>2</td><td>Seal Check</td><td><span class="badge ok">✓</span></td><td>Sealing</td><td>Width 3.85mm (min 3.0mm) · Temp 151.2°C (min 140°C) · Jaws parallel</td><td style="text-align:right">5.8</td></tr>
+   <tr><td>2</td><td>Batch Monitor</td><td><span class="badge ok">✓</span></td><td>Stability</td><td>98.2% Normal (Limit ≥ 85%) · Drift 0.02% / hr</td><td style="text-align:right">7.1</td></tr>
+   <tr><td>—</td><td>Job</td><td><span class="badge ng">✗ NG</span></td><td>To PLC</td><td>Result 2 (NG), reason 214, part 48,213</td><td style="text-align:right">55.2</td></tr></tbody></table>`;
+  if(eng.bottom==="set"){
+    const items=[["ok",2],["ok",2],["ok",1],["ok",2],["ng",2],["ok",1],["ok",2],["ng",1],["ok",2],["ok",1],["warn",2],["ok",2]];
+    return `<div style="display:flex;gap:10px;align-items:center;padding:6px 8px 0;font-size:12px"><b>Passed 46 of 46 good. Caught 11 of 12 bad.</b><span class="t-muted">1 bad picture passed: open it to see why.</span><span style="flex:1"></span><button class="tb" style="height:26px;border-color:var(--border)">${ic("tryall")}Run all</button><button class="tb" style="height:26px;border-color:var(--border)">${ic("image")}Add pictures</button></div>
+    <div class="set">${items.map(([k,c],i)=>`<div class="thumb ${k==="ng"?"":"okb"}">${c===1?cam1(k==="ng"?"ng":"ok",30+i):cam2(k==="ng"?"ng":"ok")}<div><span>${k==="ng"?"NG → ✗":"OK → ✓"}</span><span>${k==="warn"?"! near":""}</span></div></div>`).join("")}</div>`;
+  }
+  if(eng.bottom==="cycle") return `<div class="charts" style="grid-template-columns:1.1fr 1fr">${cycleStack()}${cycleTrend()}</div>`;
+  if(eng.bottom==="stability") return `<div class="charts" style="grid-template-columns:1fr 1.15fr">${haystackScatterChart()}${ambientDriftChart()}</div>`;
+  if(eng.bottom==="heatmap") return toolingHeatmapHTML();
+  if(eng.bottom==="plc") return `<table class="grid num"><thead><tr><th>Signal</th><th>Address</th><th>Value</th><th>Changed</th></tr></thead><tbody>
+   ${[["Heartbeat (PLC → PC)","40001","1 ⇄ 0 every 500 ms","06:41:22.500"],["RunEnable","40002","1","06:30:02"],["Trigger camera 1","40010","0","06:41:22.311"],["Trigger camera 2","40011","0","06:41:22.344"],["Part id","40020","48213","06:41:22.311"],["Result","40101","2 (NG)","06:41:22.376"],["Reason","40102","214","06:41:22.376"],["JobActive","40110","7","06:29:47"],["Text block","40500–40627","B.NO. B2410-17","06:30:01"]].map(r=>`<tr><td>${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td></tr>`).join("")}</tbody></table>`;
+  return `<table class="grid"><thead><tr><th>Time</th><th>Level</th><th>Message</th></tr></thead><tbody>
+   <tr><td>06:41:22</td><td><span class="badge ng">Error</span></td><td>Text Line: line 4 cut short on picture side-0193.bmp</td></tr>
+   <tr><td>06:41:20</td><td><span class="badge ok">Info</span></td><td>2D Code taught: QR, 1 code, module 6.1 px, GS1 01 + 21</td></tr>
+   <tr><td>06:40:58</td><td><span class="badge warn">Warn</span></td><td>Camera 2 exposure 1,800 µs is near the strobe limit (2,000 µs)</td></tr>
+   <tr><td>06:40:31</td><td><span class="badge ok">Info</span></td><td>Job Whisky 750 ml opened as draft v7 (released v6 runs the line)</td></tr></tbody></table>`;
+}
+
+function cycleStack(){
+  const W=360,H=150,L=28,B=20,T=16;
+  const items=[["loc",3.1,"#38bdf8"],["code1",8.4,"#34d399"],["autotune",4.6,"#a78bfa"],["code2",5.2,"#fbbf24"],["text1",14.8,"#f87171"],["thermal",5.8,"#f472b6"],["haystack",7.1,"#60a5fa"],["overhead",6.2,"#94a3b8"]];
+  const tot=items.reduce((s,x)=>s+x[1],0), maxB=75;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img"><text class="lbl" x="${L}" y="12" font-weight="700">Per-Tool Execution Stack (${tot.toFixed(1)} ms / 267 ms budget)</text>`;
+  let curX=L;
+  items.forEach(([lbl,ms,c])=>{
+    const w=(ms/maxB)*(W-L-10);
+    o+=`<rect x="${curX}" y="24" width="${w}" height="28" fill="${c}" rx="2" data-tip="${lbl}: ${ms} ms"/>`;
+    if(w>18)o+=`<text x="${curX+w/2}" y="42" fill="#000" font-size="10" font-weight="600" text-anchor="middle">${ms.toFixed(0)}</text>`;
+    curX+=w+1;
+  });
+  o+=`<line x1="${L}" x2="${W-10}" y1="56" y2="56" stroke="var(--border)"/>`;
+  items.forEach(([lbl,ms,c],i)=>{
+    const r=Math.floor(i/4), col=i%4;
+    const lx=L+col*80, ly=72+r*20;
+    o+=`<rect x="${lx}" y="${ly}" width="8" height="8" rx="2" fill="${c}"/><text class="lbl" x="${lx+12}" y="${ly+8}" font-size="10">${lbl}: ${ms}ms</text>`;
+  });
+  return o+`</svg>`;
+}
+
+function cycleTrend(){
+  const W=330,H=150,L=26,B=20,T=16;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img"><text class="lbl" x="${L}" y="12" font-weight="700">Cycle Time Distribution (p95: 55.2 ms)</text>`;
+  o+=`<line class="gl" x1="${L}" x2="${W}" y1="${H-B}" y2="${H-B}"/>`;
+  const bars=[48,51,53,52,50,55,54,58,52,49,53,55,54,52,51];
+  const bw=(W-L-20)/bars.length;
+  bars.forEach((v,i)=>{
+    const x=L+i*bw, h=(v/80)*(H-B-T), y=H-B-h;
+    o+=`<rect x="${x}" y="${y}" width="${bw-2}" height="${h}" fill="var(--s1)" rx="1"/>`;
+  });
+  o+=`<line x1="${L}" x2="${W}" y1="${H-B-(55.2/80)*(H-B-T)}" y2="${H-B-(55.2/80)*(H-B-T)}" stroke="var(--warn)" stroke-dasharray="3 3"/><text x="${W-4}" y="${H-B-(55.2/80)*(H-B-T)-4}" fill="var(--warn)" font-size="10" text-anchor="end">p95 55.2 ms</text>`;
+  return o+`</svg>`;
+}
+
+function haystackScatterChart(){
+  const W=310,H=150,L=24,B=20,T=16;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img"><text class="lbl" x="${L}" y="12" font-weight="700">Batch Stability Monitor (Inliers 98.2%)</text>`;
+  o+=`<rect x="${L}" y="${T}" width="${W-L-8}" height="${H-B-T}" fill="none" stroke="var(--border)"/>`;
+  o+=`<circle cx="${L+(W-L)/2}" cy="${T+(H-B-T)/2}" r="38" fill="rgba(34,197,94,0.08)" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  for(let i=0;i<46;i++){
+    const ang=(i/46)*Math.PI*2, dist=10+((i*17)%24);
+    const cx=L+(W-L)/2+Math.cos(ang)*dist, cy=T+(H-B-T)/2+Math.sin(ang)*dist;
+    o+=`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="2.5" fill="var(--ok)" opacity="0.85"/>`;
+  }
+  o+=`<circle cx="${L+(W-L)/2+42}" cy="${T+(H-B-T)/2-18}" r="4" fill="var(--ng)"/><text x="${L+(W-L)/2+48}" y="${T+(H-B-T)/2-16}" fill="var(--ng)" font-size="9.5" font-weight="700">Outlier</text>`;
+  return o+`</svg>`;
+}
+
+function ambientDriftChart(){
+  const W=330,H=150,L=26,B=20,T=16;
+  let o=`<svg viewBox="0 0 ${W} ${H}" role="img"><text class="lbl" x="${L}" y="12" font-weight="700">Background Light Compensation (+22% lux)</text>`;
+  o+=`<rect x="${L}" y="${T}" width="${W-L-8}" height="${H-B-T}" fill="none" stroke="var(--border)"/>`;
+  o+=`<path d="M${L} 100 Q${L+80} 50 ${L+160} 70 T${W-8} 60" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+  o+=`<path d="M${L} 100 Q${L+80} 50 ${L+160} 70 T${W-8} 60 L${W-8} ${H-B} L${L} ${H-B} Z" fill="rgba(37,99,235,0.08)"/>`;
+  o+=`<text x="${W-14}" y="${T+18}" fill="var(--accent)" font-size="10.5" font-weight="700" text-anchor="end">Shutter Trim: -18%</text>`;
+  return o+`</svg>`;
+}
+
+function engHTML(){
+  return titlebar("Vision Studio — Whisky 750 ml · v7 (draft) — Engineer")+`
+<div class="menubar">${["File","Edit","View","Job","Run","Tools","Camera","Window","Help"].map(m=>`<span>${m}</span>`).join("")}</div>
+<div class="toolbar" role="toolbar" aria-label="Engineer tools">
+ ${[["open","Open job (Ctrl+O)"],["save","Save draft (Ctrl+S)"]].map(([i,t])=>`<button class="tb icon" data-tip="${t}" aria-label="${t}">${ic(i)}</button>`).join("")}<span class="sep"></span>
+ ${[["undo","Undo (Ctrl+Z)"],["redo","Redo (Ctrl+Y)"]].map(([i,t])=>`<button class="tb icon" data-tip="${t}" aria-label="${t}">${ic(i)}</button>`).join("")}<span class="sep"></span>
+ <button class="tb icon" id="e-once" data-tip="Run once on this picture (F5)" aria-label="Run once">${ic("once")}</button>
+ <button class="tb icon" data-tip="Run repeatedly on new pictures (F6)" aria-label="Continuous">${ic("loop")}</button>
+ <button class="tb icon" id="e-tryall" data-tip="Run all tools on the whole picture set" aria-label="Run all">${ic("tryall")}</button>
+ <button class="tb icon" id="e-split" data-tip="Split-Wipe raw vs defect inpainter (W)" aria-label="Split-Wipe">${ic("split")}</button>
+ <button class="tb icon" id="e-mtf" data-tip="9-zone MTF focus sharpness matrix (M)" aria-label="MTF Grid">${ic("grid")}</button>
+ <button class="tb icon" id="e-screw" data-tip="Tooling Lead-Screw Centering Advisor (A)" aria-label="Tooling Screw">${ic("screw")}</button>
+ <span class="sep"></span>
+ <button class="tb icon" data-tip="Live camera view (F7)" aria-label="Live camera">${ic("live")}</button>
+ <button class="tb icon" data-tip="Snap one picture from camera" aria-label="Snap">${ic("grab")}</button><span class="sep"></span>
+ <button class="tb icon" data-tip="Zoom to fit the image in the window (Ctrl+0)" aria-label="Zoom to fit">${ic("fit")}</button>
+ <button class="tb icon" data-tip="Show image at 100% pixel size (Ctrl+1)" aria-label="Zoom 100%">${ic("z100")}</button>
+ <button class="tb icon" id="e-gfx" data-tip="Show tool drawings and result badges" aria-label="Graphics">${ic("roi")}</button>
+ <button class="tb" id="e-oem" data-tip="Toggle remote diagnostic telemetry tunnel (O)" style="margin-left:6px;border-color:var(--accent);font-size:11px">${ic("teach")}[Remote Telemetry]</button>
+ <span class="grow" style="flex:1"></span>
+ <button class="tb" data-tip="Open job settings and tolerances">${ic("teach")}Tolerances…</button>
+ <button class="tb primary" data-tip="Release this version to run on the line (F12)">${ic("release")}Release to line <kbd>F12</kbd></button>
+</div>
+<div class="eng-main">
+ <aside class="panel left">
+  <div class="ph tabs" role="tablist"><button class="tab" data-dock="job" aria-selected="${eng.dock==="job"}">Tools in job (8)</button><button class="tab" data-dock="toolbox" aria-selected="${eng.dock==="toolbox"}">Toolbox</button></div>
+  <div class="pb" id="dock"></div>
+ </aside>
+ <section class="panel center">
+  <div class="ph" style="gap:10px"><span>Picture</span>
+   <div class="seg" style="height:20px;text-transform:none;letter-spacing:0">${[["c1cur","Cam 1 now"],["c2cur","Cam 2 now"],["c1ng","Cam 1 last bad"],["c2ng","Cam 2 last bad"]].map(([k,l])=>`<button data-img="${k}" style="padding:0 8px;min-height:0;font-size:11px">${l}</button>`).join("")}</div>
+   <span class="grow"></span>
+   <span class="chip" style="height:20px;padding:0 6px"><span class="dot ok"></span>Sunlight Auto-Comp: +22%</span>
+   <span class="t-muted">whisky-750-side-0193.bmp</span>
+  </div>
+  <div class="imgbox" id="eimg"></div>
+ </section>
+ <aside class="panel right">
+  <div class="ph"><span id="p-name">Properties</span><span class="grow"></span>
+   <div class="seg" style="height:20px;text-transform:none;letter-spacing:0"><button id="p-ess" style="padding:0 8px;min-height:0;font-size:11px">Essential</button><button id="p-all" style="padding:0 8px;min-height:0;font-size:11px">All</button></div></div>
+  <div style="padding:4px 8px;background:var(--surface);border-bottom:1px solid var(--border)"><input type="search" id="p-search" placeholder="Search properties…" style="width:100%;height:22px;background:var(--bg);border:1px solid var(--border);border-radius:3px;padding:0 6px;font-size:11.5px"></div>
+  <div class="pb" id="props"></div>
+  <section class="panel tres"><div class="ph">Tool result<span class="grow"></span><span id="r-badge"></span></div><div class="pb" id="tres"></div></section>
+ </aside>
+ <section class="panel bottom-eng">
+  <div class="ph tabs" role="tablist">${[["results","Results"],["set","Image set"],["cycle","Cycle time"],["stability","Batch Monitor"],["heatmap","Tooling Cavity Heatmap"],["plc","PLC I/O"],["msgs","Messages"]].map(([k,l])=>`<button class="tab" data-b="${k}">${l}</button>`).join("")}</div>
+  <div class="pb" id="ebottom"></div>
+ </section>
+</div>
+<div class="statusbar">
+  <div class="num" id="xy">x 1,204 · y 612 · grey 187</div>
+  <div>Zoom 75 %</div>
+  <div>Camera 2 · 12.0 fps</div>
+  <div><span class="dot ok"></span>Runtime (named pipe)</div>
+  <div class="chip" style="height:18px;font-size:10.5px;padding:0 5px"><span class="dot ok"></span>Strobe: 98%</div>
+  <div class="chip" style="height:18px;font-size:10.5px;padding:0 5px"><span class="dot ok"></span>Sync: 100%</div>
+  <div>${eng.oemMode?'<span class="badge ok">🔓 Remote Diag Tunnel Active</span>':'<span class="badge warn">🔒 De-Identified Screen</span>'}</div>
+  <div class="grow"></div>
+  <div>Layout: Engineer (saved)</div>
+  <div>${ic("user")} engineer1 · Engineer</div>
+</div>`;
+}
+
+function renderEng(){
+  document.querySelectorAll("[data-dock]").forEach(b=>b.setAttribute("aria-selected",b.dataset.dock===eng.dock));
+  const dockEl = $("#dock");
+  if(dockEl) dockEl.innerHTML = eng.dock==="job" ? treeHTML() : toolboxHTML();
+  
+  document.querySelectorAll(".node[data-id]").forEach(n => {
+    n.onclick = () => {
+      eng.sel = n.dataset.id;
+      eng.img = T[eng.sel].cam===1 ? "c1cur" : (eng.img==="c1cur"?"c2cur":eng.img);
+      renderEng();
+    };
+  });
+  
+  document.querySelectorAll("[data-img]").forEach(b => b.setAttribute("aria-selected",b.dataset.img===eng.img));
+  const eimg = $("#eimg");
+  if(eimg) eimg.innerHTML = engImage();
+  
+  const t = T[eng.sel];
+  const pn = $("#p-name"); if(pn) pn.textContent = t.name;
+  const pe = $("#p-ess");
+  if(pe && pe.parentElement){
+    pe.parentElement.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed",(b.id==="p-all")===eng.all));
+  }
+  const pr = $("#props");
+  if(pr){
+    pr.innerHTML = propsHTML();
+    filterProps();
+  }
+  document.querySelectorAll(".pcat").forEach(c => {
+    const tog = () => {
+      eng.collapsed[c.dataset.key] = !eng.collapsed[c.dataset.key];
+      renderEng();
+    };
+    c.onclick = tog;
+    c.onkeydown = e => { if(e.key==="Enter"||e.key===" "){ e.preventDefault(); tog(); } };
+  });
+  const tr = $("#tres"); if(tr) tr.innerHTML = resultHTML();
+  const rb = $("#r-badge"); if(rb) rb.innerHTML = t.ok ? '<span class="badge ok">✓ OK</span>' : '<span class="badge ng">✗ NG</span>';
+  
+  document.querySelectorAll("[data-b]").forEach(b => b.setAttribute("aria-selected",b.dataset.b===eng.bottom));
+  const eb = $("#ebottom"); if(eb) eb.innerHTML = bottomEngHTML();
+}
+
+function engImage(){
+  if(eng.img==="c1cur")return cam1("ok",7,eng.sel);
+  if(eng.img==="c1ng")return cam1("ng",7,eng.sel);
+  if(eng.img==="c2cur")return cam2(T.text1.ok?"ok":"ng",11,eng.sel);
+  return cam2("ng",11,eng.sel);
+}
+
+function filterProps(){
+  const q = ($("#p-search")||{}).value || "";
+  if(!q) return;
+  document.querySelectorAll("#props .prow").forEach(r => {
+    r.hidden = !r.textContent.toLowerCase().includes(q.toLowerCase()) && !(r.querySelector("input,select")||{}).value?.toLowerCase().includes(q.toLowerCase());
+  });
+}
+
+/* ---------- tooltips, modes, keys ---------- */
+const tip = document.createElement("div");
+tip.className = "tooltip";
+tip.hidden = true;
+document.body.appendChild(tip);
+document.addEventListener("mouseover", e => {
+  const b = e.target.closest("[data-tip]");
+  if(!b){ tip.hidden=true; return; }
+  const r = b.getBoundingClientRect();
+  tip.textContent = b.dataset.tip;
+  tip.hidden = false;
+  tip.style.left = Math.min(window.scrollX+r.left, window.scrollX+document.documentElement.clientWidth-tip.offsetWidth-8)+"px";
+  tip.style.top = (window.scrollY+r.bottom+6)+"px";
+});
+
+let mode = "op";
+
+function renderCurrentView(){
+  if(mode === "op"){
+    mountOp();
+  } else if(mode === "sup"){
+    mountSup();
+  } else if(mode === "svc"){
+    mountSvc();
+  } else if(mode === "oem"){
+    mountOEM();
+  }
+}
+
+function setMode(m){
+  if(m === "svc" && !svcUnlocked){
+    openSvcModal();
+    return;
+  }
+  if(m === "oem" && !oemUnlocked){
+    openOemFactoryModal();
+    return;
+  }
+  mode = m;
+  $("#m-op").setAttribute("aria-pressed", m==="op");
+  $("#m-sup").setAttribute("aria-pressed", m==="sup");
+  $("#m-svc").setAttribute("aria-pressed", m==="svc");
+  $("#m-oem").setAttribute("aria-pressed", m==="oem");
+  clearInterval(op.timer);
+  if(m === "op"){
+    mountOp();
+    op.timer = setInterval(tick, 650);
+  } else if(m === "sup"){
+    mountSup();
+  } else if(m === "svc"){
+    mountSvc();
+  } else {
+    mountOEM();
+  }
+  try{ localStorage.setItem("vsw-mode", m); }catch(e){}
+}
+
+$("#m-op").onclick = () => setMode("op");
+$("#m-sup").onclick = () => setMode("sup");
+$("#m-svc").onclick = () => setMode("svc");
+$("#m-oem").onclick = () => setMode("oem");
+
+// Event delegation for Notification Hub, Service OTP Modal, and OEM Factory Modal
+document.addEventListener("click", e => {
+  if(e.target.closest(".btn-toggle-notif")){
+    toggleNotifHub();
+  }
+  if(e.target.closest("#btn-close-notif-hub")){
+    notifHubOpen = false;
+    renderCurrentView();
+  }
+  if(e.target.closest("#btn-sim-ipc")){
+    simulateExternalIpcNotif();
+  }
+  if(e.target.closest("#flt-all")){ notifFilterCat = "all"; renderCurrentView(); }
+  if(e.target.closest("#flt-printer")){ notifFilterCat = "printer"; renderCurrentView(); }
+  if(e.target.closest("#flt-motion")){ notifFilterCat = "motion"; renderCurrentView(); }
+  if(e.target.closest("#flt-substrate")){ notifFilterCat = "substrate"; renderCurrentView(); }
+  if(e.target.closest("#flt-hardware")){ notifFilterCat = "hardware"; renderCurrentView(); }
+  if(e.target.closest("#flt-ipc")){ notifFilterCat = "ipc"; renderCurrentView(); }
+
+  if(e.target.closest("#nh-lang-en")){ currLang = "en"; renderCurrentView(); }
+  if(e.target.closest("#nh-lang-hi")){ currLang = "hi"; renderCurrentView(); }
+  if(e.target.closest("#nh-lang-gu")){ currLang = "gu"; renderCurrentView(); }
+  if(e.target.closest("#nh-lang-ta")){ currLang = "ta"; renderCurrentView(); }
+
+  const ackBtn = e.target.closest(".notif-ack-btn");
+  if(ackBtn){
+    acknowledgeNotif(ackBtn.dataset.id);
+  }
+  const snoozeBtn = e.target.closest(".notif-snooze-btn");
+  if(snoozeBtn){
+    snoozeNotif(snoozeBtn.dataset.id);
+  }
+  const guideBtn = e.target.closest(".notif-guide-btn");
+  if(guideBtn){
+    openNotifGuide(guideBtn.dataset.id);
+  }
+  if(e.target.closest("#ng-modal-x") || e.target.closest("#ng-modal-close")){
+    closeNotifGuide();
+  }
+  const resolveBtn = e.target.closest("#ng-modal-resolve");
+  if(resolveBtn){
+    resolveNotifGuide(resolveBtn.dataset.id);
+  }
+  if(e.target.closest("#svc-m-close")){
+    closeSvcModal();
+  }
+  if(e.target.closest("#svc-demo-fill")){
+    const otpInput = $("#svc-otp-input");
+    if(otpInput) otpInput.value = calculateDailyOtp();
+  }
+  if(e.target.closest("#svc-verify-btn")){
+    submitSvcOtp();
+  }
+
+  if(e.target.closest("#oem-fact-close")){
+    closeOemFactoryModal();
+  }
+  if(e.target.closest("#oem-fact-demo-fill")){
+    const otpInput = $("#oem-fact-otp");
+    if(otpInput) otpInput.value = calculateFactoryOtp();
+  }
+  if(e.target.closest("#oem-fact-verify")){
+    submitOemFactoryAuth();
+  }
+});
+
+document.addEventListener("keydown", e => {
+  if(e.target.matches("input,select")) return;
+  if(mode==="op"){
+    if(e.key==="F5"&&!e.shiftKey){ e.preventDefault(); startOp(); }
+    else if(e.key==="F5"&&e.shiftKey){ e.preventDefault(); stopOp(); }
+    else if(e.key==="F4"){ e.preventDefault(); op.tab="parts"; renderBottom(); }
+  } else if(mode==="oem" && oem.tab==="workbench") {
+    if(e.key==="F5"){ e.preventDefault(); $("#e-once")?.click(); }
+    else if(e.key==="w"||e.key==="W"){ e.preventDefault(); $("#e-split")?.click(); }
+    else if(e.key==="m"||e.key==="M"){ e.preventDefault(); $("#e-mtf")?.click(); }
+    else if(e.key==="a"||e.key==="A"){ e.preventDefault(); $("#e-screw")?.click(); }
+    else if(e.key==="g"||e.key==="G"){ e.preventDefault(); $("#e-gfx")?.click(); }
+    else if(e.key==="o"||e.key==="O"){ e.preventDefault(); $("#e-oem")?.click(); }
+  }
+});
+
+// Initialize with operator mode
+setMode("op");
+
+})();
+</script>

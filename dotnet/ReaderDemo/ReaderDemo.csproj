@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CodeReader/CodeReader.csproj" />
+  </ItemGroup>
+
+  <!-- copy the native engine next to the app; build it first with CMake (see README) -->
+  <ItemGroup>
+    <None Include="../../engine/build/libcodereader.dylib" Condition="Exists('../../engine/build/libcodereader.dylib')" CopyToOutputDirectory="PreserveNewest" Link="libcodereader.dylib" />
+    <None Include="../../engine/build/codereader.dll" Condition="Exists('../../engine/build/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+    <None Include="../../engine/build/Release/codereader.dll" Condition="Exists('../../engine/build/Release/codereader.dll')" CopyToOutputDirectory="PreserveNewest" Link="codereader.dll" />
+  </ItemGroup>
+
+</Project>

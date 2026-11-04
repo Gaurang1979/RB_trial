@@ -1,0 +1,72 @@
+<!-- Language, colours, sounds and motion of this application. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.DisplayOptionsView"
+             x:DataType="vm:DisplayOptionsViewModel">
+  <Border Classes="panel">
+    <StackPanel Spacing="16">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <Grid ColumnDefinitions="*,24,*">
+        <StackPanel Spacing="16">
+          <TextBlock Text="{Binding LanguageLabel}" Classes="muted" />
+          <ItemsControl ItemsSource="{Binding Languages}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:Choice">
+                <Button Classes="vs" Classes.selected="{Binding Selected}" MinWidth="100" Margin="4" Content="{Binding Text}"
+                        Command="{Binding $parent[ItemsControl].((vm:DisplayOptionsViewModel)DataContext).PickLanguageCommand}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="{Binding ThemeLabel}" Classes="muted" />
+          <ItemsControl ItemsSource="{Binding Themes}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:Choice">
+                <Button Classes="vs" Classes.selected="{Binding Selected}" MinWidth="100" Margin="4" Content="{Binding Text}"
+                        Command="{Binding $parent[ItemsControl].((vm:DisplayOptionsViewModel)DataContext).PickThemeCommand}"
+                        CommandParameter="{Binding}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+        <!-- Sound and motion (requirements 17.15 NXT-04..06): good parts are silent unless turned on. -->
+        <StackPanel Grid.Column="2" Spacing="8" Name="SoundOptions">
+          <TextBlock Text="{l:T display.sound_motion}" Classes="muted" />
+          <Grid ColumnDefinitions="Auto,12,*,8,Auto">
+            <TextBlock Text="{l:T display.volume}" VerticalAlignment="Center" />
+            <Slider Grid.Column="2" Name="Volume" Minimum="0" Maximum="100" SmallChange="5" LargeChange="10"
+                    Value="{Binding Volume}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="4" Classes="mono" Text="{Binding Volume, StringFormat={}{0:0}%}"
+                       MinWidth="40" TextAlignment="Right" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Text="{l:T display.sounds}" Classes="muted" />
+          <ItemsControl ItemsSource="{Binding Sounds}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate DataType="vm:SoundToggle">
+                <CheckBox MinHeight="{DynamicResource Vs.Size.Touch}" Content="{Binding Text}" IsChecked="{Binding On}" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <CheckBox MinHeight="{DynamicResource Vs.Size.Touch}" Name="SpokenAlarms" Content="{l:T display.spoken_alarms}"
+                    IsChecked="{Binding SpokenAlarms}" />
+          <CheckBox MinHeight="{DynamicResource Vs.Size.Touch}" Name="ReduceMotion" Content="{l:T display.reduce_motion}"
+                    IsChecked="{Binding ReduceMotion}" ToolTip.Tip="{l:T display.reduce_motion_hint}" />
+        </StackPanel>
+      </Grid>
+      <Button Classes="vs action primary" Command="{Binding CloseCommand}" HorizontalAlignment="Right">
+        <TextBlock Text="{l:T common.close}" />
+      </Button>
+    </StackPanel>
+  </Border>
+</UserControl>

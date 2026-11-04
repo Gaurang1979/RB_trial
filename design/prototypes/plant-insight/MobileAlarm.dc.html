@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mobile: alarm and guided fix</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; display: flex; flex-direction: column; box-sizing: border-box; overflow: hidden">
+  <header style="padding: 16px 16px 8px; display: flex; align-items: center; gap: 8px">
+    <a href="MobileLines.dc.html" aria-label="Back" style="display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; color: #E6EDF3">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 18l-6-6 6-6"></path></svg></a>
+    <div style="flex: 1; min-width: 0; font-size: 14px; color: #9FB0C0">Line 3 · Camera 2 · 4 min ago</div>
+    <button aria-label="Read aloud" style="width: 48px; height: 48px; background: #16212C; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 12px; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"></path><path d="M16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"></path></svg></button>
+  </header>
+  <div style="padding: 4px 20px 0; display: flex; gap: 14px; align-items: center">
+    <span style="flex: 0 0 auto; width: 56px; height: 56px; border-radius: 14px; background: #E3B341; color: #0E151C; display: flex; align-items: center; justify-content: center; font-size: 30px; font-weight: 700">!</span>
+    <div>
+      <h1 style="margin: 0; font-size: 24px; font-weight: 700">Image is too dark</h1>
+      <div style="font-size: 15px; color: #C4D0DB">Parts may be rejected. Follow the steps.</div>
+    </div>
+  </div>
+  <div style="margin: 16px 20px 0; height: 150px; border-radius: 14px; background: #10171E; border: 1px solid #22303D; display: flex; gap: 8px; padding: 8px; box-sizing: border-box">
+    <div style="flex: 1; border-radius: 10px; background: #1A222B; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; font-size: 12px; color: #9FB0C0">Now</div>
+    <div style="flex: 1; border-radius: 10px; background: #3A4A5B; display: flex; flex-direction: column; justify-content: flex-end; padding: 8px; font-size: 12px; color: #E6EDF3">Should look like this</div>
+  </div>
+  <ol style="list-style: none; margin: 16px 0 0; padding: 0 20px; display: flex; flex-direction: column; gap: 10px; flex: 1; overflow: hidden">
+    <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+      <li>
+        <button onClick="{{s.toggle}}" style="width: 100%; display: flex; gap: 12px; align-items: flex-start; text-align: left; background: {{s.bg}}; color: #E6EDF3; border: 1px solid {{s.border}}; border-radius: 14px; padding: 14px; font: inherit; min-height: 64px">
+          <span style="flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; border: 2px solid {{s.dot}}; color: {{s.dot}}; display: flex; align-items: center; justify-content: center; font-weight: 700">{{s.mark}}</span>
+          <span><span style="display: block; font-weight: 600; font-size: 16px">{{s.title}}</span><span style="display: block; font-size: 14px; color: #9FB0C0">{{s.hint}}</span></span>
+        </button>
+      </li>
+    </sc-for>
+  </ol>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 16px 20px">
+    <button onClick="{{ack}}" style="height: 64px; background: {{ackBg}}; color: #0E151C; border: 0; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 700">{{ackLabel}}</button>
+    <button style="height: 64px; background: #3A1D1B; color: #FFB4AE; border: 1px solid #7A2F2A; border-radius: 14px; font: inherit; font-size: 16px; font-weight: 600">Call supervisor</button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { done: [false, false, false], acked: false }; }
+  renderVals() {
+    const base = [
+      { title: 'Turn the light knob up', hint: 'Knob on the light box, two clicks to the right' },
+      { title: 'Press Auto Light on the station', hint: 'The station sets the camera for you' },
+      { title: 'Wipe the camera window', hint: 'Use the dry cloth only' }
+    ];
+    const steps = base.map((b, i) => {
+      const d = this.state.done[i];
+      return { ...b, mark: d ? '✓' : String(i + 1), dot: d ? '#3FB950' : '#9FB0C0', bg: d ? '#12301B' : '#16212C', border: d ? '#2B6A3A' : '#22303D',
+        toggle: () => { const n = this.state.done.slice(); n[i] = !n[i]; this.setState({ done: n }); } };
+    });
+    return {
+      steps,
+      ack: () => this.setState({ acked: true }),
+      ackLabel: this.state.acked ? '✓ Acknowledged' : 'I am on it',
+      ackBg: this.state.acked ? '#3FB950' : '#58A6FF'
+    };
+  }
+}
+</script>
+</body>
+</html>

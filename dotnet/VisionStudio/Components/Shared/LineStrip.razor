@@ -1,0 +1,15 @@
+@* One chip per fitted instrument with its condition, for the Run screen. *@
+@inject PlcService P
+@if (P.Runtime is not null)
+{
+    var profile = LineProfiles.Profile(P.Options.PlcModel);
+    var health = LineHealth.Evaluate(profile, P.Runtime.Diagnostics(), P.Line).Where(h => h.Health is not (Health.NotFitted or Health.Bypassed)).ToList();
+    <div class="strip">
+        <span class="chip @(P.Runtime.Connected ? "hok" : "hbad")" title="@P.Runtime.LinkName">PLC</span>
+        @foreach (var h in health)
+        {
+            <span class="chip @(h.Health switch { Health.Ok => "hok", Health.Sometimes => "hwarn", Health.Fault => "hbad", _ => "" })" title="@h.Detail">@h.Name</span>
+        }
+        <a class="chip" href="line">⋯</a>
+    </div>
+}

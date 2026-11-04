@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Vision Studio (vs-studio): the Avalonia application that runs, teaches and sets up the
+       line. It talks only to the runtime service over gRPC and holds no state the line depends
+       on (docs/vision-system/ARCHITECTURE.md 2, UI-UX-SPEC.md principle 13). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>vs-studio</AssemblyName>
+    <RootNamespace>VisionSystem.Studio</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <BuiltInComInteropSupport>false</BuiltInComInteropSupport>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Desktop" Version="11.3.22" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.22" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="System.Speech" Version="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../RuntimeContract/RuntimeContract.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="i18n/*.json" LogicalName="i18n.%(Filename).json" />
+  </ItemGroup>
+
+  <!-- Rajdhani, Noto Sans and JetBrains Mono, SIL Open Font License 1.1 (requirements 17.15 NXT-02;
+       docs/vision-system/THIRD-PARTY-LICENCES.md). The licence texts ship beside the fonts. -->
+  <ItemGroup>
+    <AvaloniaResource Include="Assets/Fonts/*.ttf" />
+    <None Include="Assets/Fonts/*-OFL.txt" CopyToOutputDirectory="PreserveNewest" Link="licences/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Studio.Tests" />
+  </ItemGroup>
+
+</Project>

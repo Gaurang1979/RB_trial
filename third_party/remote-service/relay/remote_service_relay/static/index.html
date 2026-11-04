@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Machines · Sundaram remote support</title>
+<link rel="stylesheet" href="/static/relay.css">
+<script src="/static/relay.js" defer></script>
+</head>
+<body data-page="index">
+<header class="top">
+  <strong>Sundaram remote support</strong>
+  <span class="grow"></span>
+  <span id="user" class="muted"></span>
+  <button id="logout" class="link">Sign out</button>
+</header>
+<main class="narrow">
+  <form id="open-form" class="row">
+    <input id="open-id" placeholder="Machine number, e.g. M-1001" required>
+    <button class="primary" type="submit">Open</button>
+  </form>
+  <ul id="machines" class="machines"></ul>
+</main>
+</body>
+</html>

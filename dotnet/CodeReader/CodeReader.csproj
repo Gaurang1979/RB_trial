@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>BarcodeReading</RootNamespace>
+    <AssemblyName>BarcodeReading.CodeReader</AssemblyName>
+    <Version>0.1.0</Version>
+    <Description>.NET wrapper for the codereader engine (QR / Data Matrix aggregation reader).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CodeReader.Tests" />
+  </ItemGroup>
+
+</Project>

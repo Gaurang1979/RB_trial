@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plant floor map</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0E151C}
+a{color:#7CB7FF}a:hover{color:#A9CFFF}
+</style>
+</helmet>
+<div style="min-height: 1060px; background: #0E151C; color: #E6EDF3; font-family: 'IBM Plex Sans', system-ui, sans-serif; box-sizing: border-box">
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; padding: 14px 32px; background: #121C25; border-bottom: 1px solid #22303D">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="2" y="2" width="24" height="24" rx="6" fill="none" stroke="#58A6FF" stroke-width="2.5"></rect><circle cx="14" cy="14" r="5" fill="#58A6FF"></circle></svg>
+      <span style="font-weight: 700; font-size: 18px; letter-spacing: 0.2px">Plant Insight</span>
+    </div>
+    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: #9FB0C0">Plant
+      <select style="background: #0E151C; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 10px; font: inherit; min-height: 40px">
+        <option>[PLANT NAME] · Unit 1</option>
+      </select>
+    </label>
+    <nav aria-label="Areas" style="display: flex; flex-wrap: wrap; gap: 6px">
+      <button style="background: #1F3A57; color: #E6EDF3; border: 1px solid #2F5A86; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">All lines · 12</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">Packing · 5</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">Labelling · 4</button>
+      <button style="background: transparent; color: #C4D0DB; border: 1px solid #2C3C4B; border-radius: 999px; padding: 8px 16px; font: inherit; font-size: 14px; min-height: 40px">Aggregation · 3</button>
+    </nav>
+    <div style="flex: 1 1 auto"></div>
+    <div style="font-size: 14px; color: #9FB0C0">Shift B · 14:00–22:00 · <span style="font-family: 'IBM Plex Mono', monospace; color: #E6EDF3">17:42</span></div>
+    <button style="display: flex; align-items: center; gap: 8px; background: transparent; color: #E6EDF3; border: 1px solid #2C3C4B; border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 14px; min-height: 40px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg>TV mode</button>
+  </header>
+
+  <main style="max-width: 1440px; margin: 0 auto; padding: 24px 32px 40px; box-sizing: border-box">
+    <section aria-label="Plant this shift" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px">
+      <sc-for list="{{kpis}}" as="k" hint-placeholder-count="5">
+        <div style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <div style="font-size: 13px; color: #9FB0C0; text-transform: uppercase; letter-spacing: 0.6px">{{k.label}}</div>
+          <div style="font-family: 'IBM Plex Mono', monospace; font-size: 32px; font-weight: 600; margin-top: 6px; color: {{k.color}}">{{k.value}}</div>
+          <div style="font-size: 13px; color: #9FB0C0; margin-top: 4px">{{k.sub}}</div>
+        </div>
+      </sc-for>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; margin-top: 24px; align-items: flex-start">
+      <section aria-label="Lines" style="flex: 999 1 640px; min-width: 0">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px">
+          <h2 style="margin: 0; font-size: 20px; font-weight: 600">Floor map</h2>
+          <div style="display: flex; gap: 16px; font-size: 13px; color: #9FB0C0; flex-wrap: wrap">
+            <span><b style="color: #3FB950">✓</b> Running</span><span><b style="color: #E3B341">!</b> Slow or warning</span><span><b style="color: #FF7B72">✗</b> Stopped</span><span><b style="color: #79C0FF">⟳</b> Changeover</span>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px">
+          <sc-for list="{{lines}}" as="l" hint-placeholder-count="12">
+            <a href="LineView.dc.html" style="display: block; text-decoration: none; color: #E6EDF3; background: #16212C; border: 1px solid #22303D; border-top: 4px solid {{l.color}}; border-radius: 12px; padding: 14px 16px">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+                <span style="font-weight: 600; font-size: 16px">{{l.name}}</span>
+                <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: {{l.color}}"><span style="font-size: 16px">{{l.icon}}</span>{{l.state}}</span>
+              </div>
+              <div style="font-size: 13px; color: #9FB0C0; margin-top: 2px">{{l.product}}</div>
+              <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px">
+                <div><div style="font-size: 12px; color: #9FB0C0">OEE</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600">{{l.oee}}</div></div>
+                <div><div style="font-size: 12px; color: #9FB0C0">Yield</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600">{{l.yield}}</div></div>
+                <div><div style="font-size: 12px; color: #9FB0C0">Per min</div><div style="font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 600">{{l.rate}}</div></div>
+              </div>
+              <div style="height: 6px; background: #22303D; border-radius: 3px; margin-top: 10px; overflow: hidden"><div style="height: 6px; width: {{l.ratePct}}; background: {{l.color}}"></div></div>
+              <div style="font-size: 13px; color: #C4D0DB; margin-top: 10px; min-height: 18px">{{l.note}}</div>
+            </a>
+          </sc-for>
+        </div>
+      </section>
+
+      <aside style="flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+        <section aria-label="Open alarms" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <h2 style="margin: 0 0 12px; font-size: 17px; font-weight: 600">Open alarms</h2>
+          <sc-for list="{{alarms}}" as="a" hint-placeholder-count="3">
+            <div style="display: flex; gap: 12px; padding: 10px 0; border-top: 1px solid #22303D">
+              <span style="flex: 0 0 auto; width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 700; background: {{a.bg}}; color: #0E151C">{{a.icon}}</span>
+              <div style="min-width: 0">
+                <div style="font-weight: 600; font-size: 14px">{{a.title}}</div>
+                <div style="font-size: 13px; color: #9FB0C0">{{a.where}} · {{a.age}}</div>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+        <section aria-label="Before it becomes NG" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <h2 style="margin: 0 0 4px; font-size: 17px; font-weight: 600">Before it becomes NG</h2>
+          <p style="margin: 0 0 10px; font-size: 13px; color: #9FB0C0">Trends that will reach a limit if nothing changes</p>
+          <sc-for list="{{early}}" as="e" hint-placeholder-count="3">
+            <a href="Quality.dc.html" style="display: block; text-decoration: none; color: #E6EDF3; padding: 10px 0; border-top: 1px solid #22303D">
+              <div style="font-size: 14px; font-weight: 600">{{e.title}}</div>
+              <div style="font-size: 13px; color: #9FB0C0">{{e.detail}}</div>
+            </a>
+          </sc-for>
+        </section>
+        <section aria-label="AI tools" style="background: #16212C; border: 1px solid #22303D; border-radius: 12px; padding: 16px 18px">
+          <h2 style="margin: 0 0 10px; font-size: 17px; font-weight: 600">AI tools</h2>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0"><span>Models in use</span><span style="font-family: 'IBM Plex Mono', monospace">9</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0"><span>Drift warning</span><span style="font-family: 'IBM Plex Mono', monospace; color: #E3B341">! 1</span></div>
+          <div style="display: flex; justify-content: space-between; font-size: 14px; padding: 6px 0"><span>NG images to review</span><span style="font-family: 'IBM Plex Mono', monospace">37</span></div>
+        </section>
+      </aside>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1060}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const C = { run: '#3FB950', warn: '#E3B341', stop: '#FF7B72', change: '#79C0FF' };
+    const mk = (name, product, st, oee, yld, rate, pct, note) => {
+      const s = { run: ['✓', 'Running'], warn: ['!', 'Slow'], stop: ['✗', 'Stopped'], change: ['⟳', 'Changeover'] }[st];
+      return { name, product, color: C[st], icon: s[0], state: s[1], oee, yield: yld, rate, ratePct: pct, note };
+    };
+    return {
+      kpis: [
+        { label: 'Plant OEE', value: '78.4%', sub: 'Target 80% · ▲ 1.2 vs yesterday', color: '#E6EDF3' },
+        { label: 'Yield', value: '99.21%', sub: 'Good parts of all inspected', color: '#3FB950' },
+        { label: 'Inspected this shift', value: '412,880', sub: '3,276 NG', color: '#E6EDF3' },
+        { label: 'Lines running', value: '10 / 12', sub: '1 stopped · 1 changeover', color: '#E6EDF3' },
+        { label: 'Open alarms', value: '3', sub: '1 high priority', color: '#FF7B72' }
+      ],
+      lines: [
+        mk('Line 1', 'Blister 10s · Batch A2291', 'run', '84%', '99.6%', '312', '96%', 'Top NG: missing tablet (41)'),
+        mk('Line 2', 'Blister 14s · Batch A2290', 'run', '81%', '99.4%', '298', '92%', 'Top NG: foil wrinkle (22)'),
+        mk('Line 3', 'Vial label · 10 ml', 'warn', '66%', '98.1%', '188', '71%', 'Slow: 29% under target cycle'),
+        mk('Line 4', 'Carton print · 30 ct', 'run', '79%', '99.0%', '240', '88%', 'Label offset drifting · see trend'),
+        mk('Line 5', 'Bottle cap and seal', 'stop', '42%', '97.8%', '0', '0%', 'Stopped 12 min · PLC not connected'),
+        mk('Line 6', 'Case aggregation 48', 'run', '88%', '99.9%', '6', '94%', 'All codes read · 0 rework'),
+        mk('Line 7', 'Case aggregation 24', 'run', '86%', '99.8%', '9', '90%', ''),
+        mk('Line 8', 'Label and date check', 'change', '—', '—', '0', '0%', 'Changeover 6 min · target 10'),
+        mk('Line 9', 'Pouch print OCR', 'run', '80%', '99.3%', '410', '89%', 'Top NG: faint date (18)'),
+        mk('Line 10', 'Blister 10s · Batch A2292', 'run', '83%', '99.5%', '305', '94%', ''),
+        mk('Line 11', 'Shrink sleeve check', 'run', '77%', '98.9%', '220', '85%', 'Top NG: sleeve skew (31)'),
+        mk('Line 12', 'Pallet label SSCC', 'run', '91%', '100%', '2', '97%', '')
+      ],
+      alarms: [
+        { icon: '✗', bg: '#FF7B72', title: 'PLC not connected', where: 'Line 5 · Station 1', age: '12 min, not acknowledged' },
+        { icon: '!', bg: '#E3B341', title: 'Image too dark', where: 'Line 3 · Camera 2', age: '4 min · Ravi acknowledged' },
+        { icon: '!', bg: '#E3B341', title: 'Focus score falling', where: 'Line 11 · Camera 1', age: '25 min' }
+      ],
+      early: [
+        { title: 'Line 4 · label offset', detail: 'Mean moving to +0.42 mm of the 0.50 mm limit; Cpk 1.12' },
+        { title: 'Line 9 · AI print score', detail: 'Scores 6% lower than at training: new ink lot?' },
+        { title: 'Line 2 · light brightness', detail: 'Down 9% in 5 days: plan a lamp change' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

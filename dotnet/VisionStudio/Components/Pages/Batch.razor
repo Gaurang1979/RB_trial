@@ -1,0 +1,68 @@
+@page "/batch"
+@inject Station S
+@inject NavigationManager Nav
+
+<PageTitle>@T["batch.title"]</PageTitle>
+<h1>@T["batch.title"]</h1>
+
+@if (S.Job is null)
+{
+    <p>@T["batch.no_job"] <a href="">@T["nav.run"]</a></p>
+}
+else
+{
+    var fields = S.Job.BatchFields();
+    <p class="muted">@S.Job.Name</p>
+    @if (fields.Count == 0)
+    {
+        <p>@T["batch.nothing"]</p>
+    }
+    else
+    {
+        <div class="card form">
+            @foreach (var f in fields)
+            {
+                <label>
+                    <span>@f.Label</span>
+                    <input class="big wide" value="@Get(f.Key)" @onchange="e => Values[f.Key] = e.Value?.ToString() ?? string.Empty"
+                           placeholder="@f.Example" disabled="@S.Running" />
+                </label>
+            }
+            <p class="muted">@T["batch.hint"]</p>
+            @if (Message is not null) { <div class="alert">@Message</div> }
+            <div class="row">
+                <button class="big primary" disabled="@S.Running" @onclick="Save">✓ @T["batch.start"]</button>
+                <a class="button big" href="">@T["common.cancel"]</a>
+            </div>
+        </div>
+    }
+}
+
+@inject Recorder Rec
+
+@code {
+    private Dictionary<string, string> Values = new(StringComparer.OrdinalIgnoreCase);
+    private string? Message;
+
+    protected override void OnInitialized()
+    {
+        foreach (var (k, v) in S.Batch.Values) Values[k] = v;
+    }
+
+    private string Get(string key) => Values.TryGetValue(key, out var v) ? v : "";
+
+    [CascadingParameter] private Task<AuthenticationState>? Auth { get; set; }
+
+    private async Task Save()
+    {
+        if (Auth is not null) Rec.User = (await Auth).User.Identity?.Name ?? "";
+        if (S.Job is null) return;
+        var missing = S.Job.BatchFields().Where(f => string.IsNullOrWhiteSpace(Get(f.Key))).Select(f => f.Label).ToList();
+        if (missing.Count > 0) { Message = T["batch.missing"] + " " + string.Join(", ", missing); return; }
+        var b = new BatchFields();
+        foreach (var (k, v) in Values) b.Values[k] = v.Trim();
+        try { S.SetBatch(b, Rec.User); }
+        catch (InvalidOperationException e) { Message = e.Message; return; }
+        Nav.NavigateTo("");
+    }
+}

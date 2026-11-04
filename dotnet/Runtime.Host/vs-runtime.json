@@ -1,0 +1,31 @@
+{
+  "Logging": { "LogLevel": { "Default": "Information", "Microsoft.AspNetCore": "Warning", "Grpc": "Warning" } },
+  "Runtime": {
+    "Endpoint": "",
+    "NetworkPort": 0,
+    "WebPort": 0,
+    "CertificateFile": "",
+    "Source": "",
+    "SimulatorFolder": "",
+    "LineSpeedPpm": 0,
+    "CycleBudgetMs": 0
+  },
+  "Studio": {
+    "JobsFolder": "jobs",
+    "DataFolder": "data",
+    "ModelsFolder": "models",
+    "Language": "en",
+    "FolderIntervalMs": 300,
+    "LicenceRequired": true
+  },
+  "Micro850": {
+    "Enabled": false
+  },
+  "Plant": {
+    "ServerUrl": "",
+    "TokenFile": "",
+    "Plant": "",
+    "Line": "",
+    "Station": ""
+  }
+}

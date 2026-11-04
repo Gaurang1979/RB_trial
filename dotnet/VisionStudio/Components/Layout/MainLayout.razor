@@ -1,0 +1,72 @@
+@inherits LayoutComponentBase
+@inject IJSRuntime JS
+
+<div class="shell">
+    <nav class="side">
+        <div class="brand">@T["app.name"]</div>
+        <NavLink href="" Match="NavLinkMatch.All"><span class="ico">▶</span>@T["nav.run"]</NavLink>
+        <NavLink href="batch"><span class="ico">✎</span>@T["nav.batch"]</NavLink>
+        <AuthorizeView><NavLink href="licence"><span class="ico">⚿</span>@T["nav.licence"]</NavLink></AuthorizeView>
+        <AuthorizeView><NavLink href="reports"><span class="ico">▤</span>@T["nav.reports"]</NavLink></AuthorizeView>
+        <AuthorizeView Roles="Engineer">
+            <NavLink href="teach"><span class="ico">⌖</span>@T["nav.teach"]</NavLink>
+            <NavLink href="test"><span class="ico">▦</span>@T["nav.test"]</NavLink>
+            <NavLink href="tune"><span class="ico">⚖</span>@T["nav.tune"]</NavLink>
+            <NavLink href="jobs"><span class="ico">≡</span>@T["nav.jobs"]</NavLink>
+            <NavLink href="plc"><span class="ico">⇄</span>@T["nav.plc"]</NavLink>
+            <NavLink href="line"><span class="ico">⌁</span>@T["nav.line"]</NavLink>
+        </AuthorizeView>
+        <AuthorizeView>
+            <Authorized>
+                <div class="who">
+                    <div>@(context.User.FindFirst("full_name")?.Value ?? context.User.Identity?.Name)</div>
+                    @if (context.User.Identity?.AuthenticationType != "Open")
+                    {
+                        <form method="post" action="/account/logout"><AntiforgeryToken /><button class="link" type="submit">@T["nav.sign_out"]</button></form>
+                    }
+                </div>
+            </Authorized>
+            <NotAuthorized><a class="who" href="login">@T["nav.sign_in"]</a></NotAuthorized>
+        </AuthorizeView>
+    </nav>
+    <main class="content">
+        <div class="topbar">
+            <div class="themes" role="group" aria-label="@T["theme.label"]">
+                @foreach (var (key, icon) in Themes)
+                {
+                    var k = key;
+                    <button type="button" class="@(_theme == k ? "on" : "")" aria-pressed="@(_theme == k ? "true" : "false")" @onclick="() => SetTheme(k)">@icon @T["theme." + k]</button>
+                }
+            </div>
+        </div>
+        @Body
+    </main>
+</div>
+
+<div id="blazor-error-ui">@T["app.error"] <a href="" class="reload">@T["app.reload"]</a></div>
+
+@code {
+    private static readonly (string Key, string Icon)[] Themes = [("light", "☀"), ("dark", "☾"), ("auto", "◐")];
+    private string _theme = "auto";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            _theme = await JS.InvokeAsync<string>("vsTheme.get");
+            StateHasChanged();
+        }
+        catch (JSException) { }
+        catch (InvalidOperationException) { }
+        catch (JSDisconnectedException) { }
+    }
+
+    private async Task SetTheme(string theme)
+    {
+        _theme = theme;
+        try { await JS.InvokeVoidAsync("vsTheme.set", theme); }
+        catch (JSException) { }
+        catch (JSDisconnectedException) { }
+    }
+}

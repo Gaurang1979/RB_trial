@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service console</title>
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <strong id="title">Service console</strong>
+  <nav id="tabs" class="tabs" hidden>
+    <button data-tab="files" class="on">Files</button>
+    <button data-tab="actions">Actions</button>
+    <button data-tab="data">Data</button>
+    <button data-tab="software" id="software-tab" hidden>Software</button>
+    <button data-tab="corrections" id="corrections-tab" hidden>Corrections</button>
+    <a id="pages-link" href="../../" hidden>Machine pages</a>
+  </nav>
+  <span class="grow"></span>
+  <span id="who" class="muted"></span>
+  <button id="sign-out" class="link" hidden>Sign out</button>
+</header>
+<main>
+  <section id="sign-in" class="card narrow" hidden>
+    <h1>Sign in to this machine</h1>
+    <p class="muted">Everything you do here is recorded in the machine's log and in ERPNext.</p>
+    <form id="sign-in-form" method="post">
+      <label>Today's Service code <input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required></label>
+      <label>Reason <input name="reason" maxlength="200" required placeholder="e.g. Customer call 4711: no-reads on line 2"></label>
+      <button class="primary" type="submit">Sign in</button>
+      <p id="sign-in-error" class="error" role="alert"></p>
+    </form>
+  </section>
+
+  <section id="tab-files" class="tab" hidden>
+    <div class="row">
+      <select id="root" aria-label="Folder"></select>
+      <span id="crumbs" class="crumbs"></span>
+      <span class="grow"></span>
+      <button id="diagnostics" hidden>Download diagnostics</button>
+    </div>
+    <table class="list"><thead><tr><th>Name</th><th>Size</th><th>Changed</th></tr></thead><tbody id="files"></tbody></table>
+    <form id="upload-form" class="row" hidden>
+      <input type="file" id="upload-file" required>
+      <button class="primary" type="submit">Upload here</button>
+      <span id="upload-note" class="muted"></span>
+    </form>
+  </section>
+
+  <section id="tab-actions" class="tab" hidden>
+    <ul id="actions" class="cards"></ul>
+  </section>
+
+  <section id="tab-data" class="tab" hidden>
+    <div class="row">
+      <select id="view" aria-label="View"></select>
+      <span id="params" class="row"></span>
+      <button id="view-show" class="primary">Show</button>
+      <button id="view-csv">CSV</button>
+    </div>
+    <p id="view-note" class="muted"></p>
+    <div class="scroll"><table class="list" id="view-table"></table></div>
+  </section>
+
+  <section id="tab-software" class="tab" hidden>
+    <div class="card">
+      <p><strong id="sw-product"></strong> <span class="muted">in use:</span> <strong id="sw-current"></strong>
+        <span id="sw-previous-box" class="muted">· previous: <span id="sw-previous"></span></span></p>
+      <form id="package-form" class="row">
+        <input type="file" id="package-file" accept=".rspkg" required>
+        <button class="primary" type="submit">Upload and install</button>
+      </form>
+      <p class="muted">Only packages signed by Sundaram for this product are installed, only while the machine is stopped,
+        and only after the operator confirms on its screen. The version before is kept for going back.</p>
+      <button id="rollback">Go back to the previous version</button>
+    </div>
+  </section>
+
+  <section id="tab-corrections" class="tab" hidden>
+    <div class="card">
+      <p class="muted">A correction never changes the recorded data. It is added as a new entry next to the original, with
+        your reason, after a supervisor at the machine approves it with their own sign-in.</p>
+      <form id="find-form" class="row">
+        <select id="kind" aria-label="Kind of record"></select>
+        <input id="record" placeholder="Record (batch, part number…)" required>
+        <button type="submit">Open</button>
+      </form>
+      <form id="correct-form" hidden>
+        <table class="list"><thead><tr><th>Field</th><th>Recorded</th><th>Corrected</th></tr></thead><tbody id="fields"></tbody></table>
+        <label>Reason <input id="correct-reason" minlength="10" maxlength="500" required
+          placeholder="e.g. Batch number typed wrong at batch start; label shows LOT-0457"></label>
+        <button class="primary" type="submit">Ask the supervisor to approve</button>
+      </form>
+    </div>
+  </section>
+
+  <p id="status" class="status" role="status"></p>
+</main>
+</body>
+</html>

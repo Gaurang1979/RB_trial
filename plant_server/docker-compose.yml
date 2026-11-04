@@ -1,0 +1,25 @@
+# UNTESTED: written without Docker available in the build sandbox (the same services were tested natively: Mosquitto 2.0, PostgreSQL 16).
+# Broker is anonymous here for local evaluation only - set up passwords/TLS before any real deployment.
+services:
+  postgres:
+    image: postgres:16
+    environment: {POSTGRES_USER: spi, POSTGRES_PASSWORD: spi, POSTGRES_DB: spi}
+    volumes: [pgdata:/var/lib/postgresql/data]
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes: [./deploy/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro, mqdata:/mosquitto/data]
+    ports: ["1883:1883"]
+  backend:
+    build: {context: ., dockerfile: deploy/Dockerfile}
+    depends_on: [postgres, mosquitto]
+    ports: ["8000:8000"]
+    # LOCAL DEMO ONLY: --mqtt-no-token lets the simulator below publish without gateway tokens. Remove it with the
+    # simulator, and give each real gateway its token (docs/architecture/EDGE.md, "Gateway token").
+    command: ["python", "-m", "backend.serve", "--config", "configs/demo_factory.json", "--host", "0.0.0.0", "--db", "postgresql://spi:spi@postgres:5432/spi", "--mqtt", "mosquitto", "--mqtt-no-token"]
+    environment: {VISION_IMAGE_DIR: /data/vision_images}   # NG images; VISION_IMAGE_LIMIT_BYTES sets the size limit (default 2 GB)
+    volumes: [visionimages:/data/vision_images]           # kept when the backend container is rebuilt or replaced
+  simulator:   # synthetic factory publishing to the broker (remove when real gateways connect)
+    build: {context: ., dockerfile: deploy/Dockerfile}
+    command: ["python", "-m", "simulator", "--config", "configs/demo_factory.json", "--duration", "86400", "--speed", "60", "--mqtt", "mosquitto"]
+    depends_on: [mosquitto, backend]
+volumes: {pgdata: {}, mqdata: {}, visionimages: {}}

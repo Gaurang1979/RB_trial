@@ -1,0 +1,966 @@
+// The contract between the runtime service (vs-runtime) and its clients: Vision Studio, the
+// view-only browser dashboard and plant software (ARCHITECTURE.md section 2, SDK-API.md
+// section 11). Vision Studio is its first client, so the UI uses the same calls as the Remote API.
+//
+// Rules:
+// - Fields are only added, never renumbered or removed (SDK-API.md section 11.3).
+// - Who may call what is decided by the runtime, never by the client (ARCHITECTURE.md
+//   section 2.2): calls that change anything need a Vision Studio session with the right role, or
+//   an `operate` token. A browser session is always read-only.
+// - Calls carry the session in the metadata header `authorization: Bearer <token>`; a token for
+//   plant software is passed the same way.
+// - No token on the local endpoint (named pipe or Unix socket) is the line PC's own screen with
+//   nobody signed in (UI-UX-SPEC principles 10 and 13): it may read (GetStatus, WatchStatus,
+//   ListJobs, StreamResults, WatchFrames, GetImage, GetCounters, WhoAmI, ListUsers) but not
+//   change anything. Over the network a token is always needed.
+// - Text meant for people (error_text, reason_text, advice) comes back in the language asked for
+//   in the `accept-language` header.
+// - A refused call returns ok = false with error_code, error_text (in the asked language) and
+//   error_key (the string-table key, e.g. "runtime.refused.stopFirst"). A call the caller's
+//   rights do not allow fails with gRPC PERMISSION_DENIED. A changing call with no token, and any
+//   call with an unknown or expired token (for example after the runtime restarted), fails with
+//   UNAUTHENTICATED: the client drops its token, goes on reading without one, and asks the user
+//   to sign in before changing anything.
+// - Products are the variants of a job: ListJobs lists them, ChangeJob changes them.
+// - Colours are design-token keys (status.ok, status.ng, ...), never RGB values, so the app and the
+//   browser draw them in the user's theme.
+
+syntax = "proto3";
+package visionstudio.remote.v1;
+
+option csharp_namespace = "VisionStudio.Remote.V1";
+
+import "google/protobuf/timestamp.proto";
+
+// --- Session -------------------------------------------------------------------------------------
+
+service Session {
+  // Signs a user in with a password, a PIN or a badge (card). The runtime checks the user store;
+  // the client never reads it.
+  rpc SignIn(SignInRequest) returns (SignInResponse);
+  rpc SignOut(SignOutRequest) returns (SignOutResponse);
+  // Who the current token belongs to and what it may do.
+  rpc WhoAmI(WhoAmIRequest) returns (WhoAmIResponse);
+  // The users who may sign in, for the sign-in tiles (no secrets). Answered without a token only
+  // on the local endpoint (named pipe or Unix socket), never over the network.
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+}
+
+enum ClientKind {
+  CLIENT_KIND_UNSPECIFIED = 0;
+  STUDIO = 1;        // Vision Studio on the line PC (named pipe or Unix socket)
+  BROWSER = 2;       // the view-only web dashboard: read-only whatever the role
+  PLANT_SOFTWARE = 3; // MES, ERP with a token
+}
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  OPERATOR = 1;
+  SUPERVISOR = 2;
+  ENGINEER = 3;
+  ADMIN = 4;
+  QA = 5;
+  // Added for the learning session (AS-04h): Sundaram Support (field service) and OEM (factory). A runtime user with
+  // either signs in to Vision Studio with a password and today's code (SignInRequest.code); opened, the role may sort
+  // pictures and start or stop learning only, never run the line or apply a proposal.
+  SERVICE = 6;
+  OEM = 7;
+}
+
+message SignInRequest {
+  string user = 1;
+  oneof secret {
+    string password = 2;
+    string pin = 3;
+    // The number a badge reader (USB keyboard wedge) typed. `user` is left empty: the runtime
+    // finds the user whose card it is. Only on the local endpoint; never logged or shown.
+    string card = 5;
+  }
+  ClientKind client = 4;
+  // Added for AS-04h: today's code for this PC's licence, which opens the user's Service role (service OTP) or OEM role
+  // (factory OTP). Taken only on the local endpoint with a password; never logged. Missing or wrong: those roles are
+  // left out, and a user with no other role is refused (error_key runtime.signIn.codeNeeded, codeWrong, codeLocked,
+  // codeLocalOnly, codePassword).
+  string code = 6;
+}
+
+message SignInResponse {
+  bool ok = 1;
+  string token = 2;              // send as `authorization: Bearer <token>`
+  UserInfo user = 3;
+  uint32 error_code = 4;
+  string error_text = 5;         // "Wrong name or password." etc.
+  string error_key = 6;          // string-table key of error_text, for clients that translate
+}
+
+message SignOutRequest {}
+message SignOutResponse {}
+
+message WhoAmIRequest {}
+message WhoAmIResponse {
+  UserInfo user = 1;             // empty for a plant-software token
+  ClientKind client = 2;
+  bool may_operate = 3;          // start, stop, change job, trigger, inputs
+  bool may_change_setup = 4;     // jobs, products, settings, users (Vision Studio only)
+  // Vision Studio signs out after this long without a touch or key (plant setting); 0 = not
+  // set, the app uses 10 minutes (UI-UX-SPEC.md 4.5).
+  uint32 idle_sign_out_seconds = 5;
+  // Added for the job designer: GetJob, SaveJob, ListPictures, TryJob (Engineer, Admin); also GrabPicture,
+  // FindTools and SuggestBlobTolerance.
+  bool may_design_jobs = 6;
+  // Added for the PLC test signal (PlcTestSignal, PLC-INTERFACE.md section 7): Engineer and Admin
+  // in Vision Studio. Only shows or hides the buttons; the runtime checks the call again.
+  bool may_test_plc = 7;
+  // Added for the learning session (AS-04c, AS-04h): list and sort the saved pictures, see the reviews, start and stop
+  // learning and the learning setting. Supervisor, QA, Engineer, Admin, and Service or OEM opened with today's code, in
+  // Vision Studio. Applying a proposal still needs may_change_setup.
+  bool may_learn = 8;
+}
+
+message UserInfo {
+  string name = 1;
+  string full_name = 2;
+  repeated Role roles = 3;
+  bool has_pin = 4;              // may sign in with a PIN
+  bool has_password = 5;
+  bool has_card = 6;             // may sign in with a badge
+}
+
+message ListUsersRequest {}
+message ListUsersResponse { repeated UserInfo users = 1; }
+
+// --- Runtime: state, control, results, live images --------------------------------------------
+
+service VisionRuntime {
+  // From SDK-API.md section 11.1 (same fields and numbers).
+  rpc GetStatus(GetStatusRequest) returns (Status);
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc ChangeJob(ChangeJobRequest) returns (ChangeJobResponse);
+  rpc Trigger(TriggerRequest) returns (TriggerResponse);
+  rpc StreamResults(StreamResultsRequest) returns (stream InspectionResult);
+  rpc GetImage(GetImageRequest) returns (stream ImageChunk);
+  rpc SetInput(SetInputRequest) returns (SetInputResponse);
+  // While the plant server cannot be reached, a second person (Supervisor, QA or Admin) accepts the
+  // changeover at the line PC with their own PIN, password or card (CHANGEOVER-VERIFY.md, owner 2026-11-01).
+  rpc AcceptChangeover(AcceptChangeoverRequest) returns (AcceptChangeoverResponse);
+
+  // Added for Vision Studio and the dashboard (Hybrid 0).
+  // The status now and after every change, until the client cancels. The first message is sent
+  // at once, so a reconnecting client is up to date without a separate GetStatus.
+  rpc WatchStatus(WatchStatusRequest) returns (stream Status);
+  rpc Start(StartRequest) returns (StartResponse);
+  rpc Stop(StopRequest) returns (StopResponse);
+  // Downscaled live frames with the result graphics as vectors, at most `max_fps` per second;
+  // frames the client cannot take in time are dropped, never queued.
+  rpc WatchFrames(WatchFramesRequest) returns (stream LiveFrame);
+  // Counters for the Run screen and the dashboard since the batch started.
+  rpc GetCounters(GetCountersRequest) returns (Counters);
+
+  // Added for the job designer (UI-UX-SPEC.md 4.7, 4.8): the job file as saved (JOB-FILE-FORMAT.md,
+  // JSON), its cameras' stored pictures, and a draft tried on one picture before it is saved. Only
+  // an Engineer or Admin signed in to Vision Studio may call these (PERMISSION_DENIED otherwise).
+  // A job is saved through Job.Validate: one that can never pass is refused, never stored. The open
+  // job is not saved while the line runs, and nothing is tried while it runs (the line needs the CPU).
+  rpc GetJob(GetJobRequest) returns (GetJobResponse);
+  rpc SaveJob(SaveJobRequest) returns (SaveJobResponse);
+  rpc ListPictures(ListPicturesRequest) returns (ListPicturesResponse);
+  rpc TryJob(TryJobRequest) returns (TryJobResponse);
+
+  // Added for the one-click new job (UI-UX-SPEC.md 4.6 steps 2-3, requirements AS-01): one picture taken
+  // from a job camera while the line is stopped and kept with the camera's stored pictures, and the tools
+  // auto find proposes on a picture (the whole picture, or the window the user dragged). Same callers and
+  // the same line-safety rules as the calls above: nothing while the line runs, and a suggestion is never
+  // added to a job by the runtime; the user accepts each one in Vision Studio and saves.
+  rpc GrabPicture(GrabPictureRequest) returns (GrabPictureResponse);
+  rpc FindTools(FindToolsRequest) returns (FindToolsResponse);
+
+  // Added for the Blob tool in Vision Studio (requirements 17.12 BLB-OUT-06): the outline tolerances a Blob
+  // tool's taught outline would need on stored pictures of good parts (BlobTool.AutoTolerance), with the
+  // camera's lens calibration as the runtime uses it. Same callers and line-safety rules as the calls
+  // above: nothing while the line runs, and the suggestion is never applied by the runtime; the engineer
+  // accepts it in Vision Studio and saves.
+  rpc SuggestBlobTolerance(SuggestBlobToleranceRequest) returns (SuggestBlobToleranceResponse);
+
+  // The PLC screen's test signal (PLC-INTERFACE.md section 7): OK or NG with Done on the PLC's
+  // output block for 2 s, so the PLC side can be wired without parts. Only an Engineer or Admin
+  // signed in to Vision Studio (PERMISSION_DENIED otherwise), only in Teach (the line stopped), never
+  // while the PLC sets RunEnable or a part is being handled, and OK never over a latched NG; a
+  // refusal says why (error_key runtime.refused.*). The pulse ends early when RunEnable or a trigger
+  // comes up.
+  rpc PlcTestSignal(PlcTestSignalRequest) returns (PlcTestSignalResponse);
+
+  // Added for the supervisor's NG review and learning from it (owner, 2026-10-31; UI-UX-SPEC.md 4.3):
+  // a bad part's full picture is kept with the supervisor's decision (accepted: it was a good part;
+  // confirmed: it is bad), and the job's score thresholds are tuned on those pictures (AutoTune, AS-03).
+  // Supervisor, QA, Engineer and Admin in Vision Studio only (PERMISSION_DENIED otherwise). A review is
+  // allowed while the line runs (it only copies a picture); learning and applying are refused while it
+  // runs. Nothing changes the job until a person applies a proposal that every confirmed bad picture
+  // still fails; the result is a new job version.
+  rpc ReviewPart(ReviewPartRequest) returns (ReviewPartResponse);
+  rpc GetReviews(GetReviewsRequest) returns (ReviewsSummary);
+  rpc LearnFromReviews(LearnRequest) returns (LearnResponse);
+  rpc ApplyLearning(ApplyLearningRequest) returns (ApplyLearningResponse);
+  // The learning session (owner, 2026-11-04; Supervisor, QA, Engineer, Admin): the saved good and bad pictures
+  // of a job not sorted yet, and the setting that turns the session (and keeping good pictures) on or off.
+  // Sorting a picture is ReviewPart with its image id.
+  rpc ListToSort(ListToSortRequest) returns (ListToSortResponse);
+  rpc GetLearningSettings(GetLearningSettingsRequest) returns (LearningSettings);
+  rpc SetLearningSettings(LearningSettings) returns (SetLearningSettingsResponse);
+  // Remote service (REQ-11, REMOTE-SUPPORT.md 4b): the answer at the line PC to a request in Status.remote_service.requests.
+  // A confirmation is answered by whoever is at the line PC (Vision Studio on the local endpoint); an approval needs a
+  // supervisor's own PIN, password or card there (Supervisor, QA or Admin), checked like a changeover's second person.
+  rpc AnswerRemoteRequest(AnswerRemoteRequestRequest) returns (AnswerRemoteRequestResponse);
+}
+
+message GetStatusRequest {}
+message Status {
+  enum State { STATE_UNSPECIFIED = 0; READY = 1; BUSY = 2; STOPPED = 3; ERROR = 4; TEACH = 5; }
+  State state = 1;
+  string active_job = 2;
+  int32 active_job_number = 3;
+  bool plc_connected = 4;
+  uint32 error_code = 5;            // same codes as PLC-INTERFACE.md
+  string error_text = 6;            // in the requested language
+  uint64 inspections = 7;
+  uint64 ng = 8;
+  string version = 9;
+  // Added for Vision Studio.
+  string active_variant = 10;       // the product (variant) running
+  Source source = 11;
+  repeated CameraState cameras = 12;
+  repeated Alarm alarms = 13;       // active alarms, highest priority first
+  google.protobuf.Timestamp batch_started = 14;
+  bool licence_ok = 15;
+  // Added for Hybrid 1: the line PC's health and the limits the runtime's resource guard works to,
+  // for the health gauges. Empty from a runtime that does not measure it (the stub).
+  PcHealth health = 16;
+  // Added for Start batch: what the operator enters before the line starts (lot, dates, MRP),
+  // in tool order, with the values entered so far. SetInput("batch.<key>") sets one.
+  repeated BatchField batch = 17;
+  // Added for the Run screen (UI-UX-SPEC.md 4.1): the speed the line is set to run at and the time
+  // one part may take, drawn as limit lines on the Overview charts. 0 = not set.
+  float line_speed_ppm = 18;        // parts per minute
+  float cycle_budget_ms = 19;       // 60000 / line_speed_ppm unless set on its own
+  // The PLC link for the Run screen's Batch and PLC card; unset when no PLC is set up (one set up
+  // whose link could not start is sent with link_up false).
+  PlcState plc = 20;
+  // Added for changeover verification (CHANGEOVER-VERIFY.md): a supervisor checks the job and batch
+  // values on another PC or the mobile app before Start is allowed on the cameras.
+  Changeover changeover = 21;
+  // The setup checks at job load (requirements AS-13, AS-14): one or two pictures per camera captured after the
+  // job was loaded and before Run, checked for the lens, the light and each tool's pixels. Advice only: it never
+  // stops Run and never decides a part. Unset when nothing was checked (no job, a job with no tools).
+  SetupCheck setup_check = 22;
+  // Remote service (REQ-11, REQ-15, PROT-30): a Sundaram service engineer is signed in through
+  // support.sundaramtech.com. The line screen shows only a neutral "Remote service active" badge (REQ-08): never
+  // who, nor what they look at. Unset when no remote service session is open.
+  RemoteService remote_service = 23;
+  // The learning session (owner, 2026-11-04): whether it is on, whether the line is idle, and how many pictures of
+  // the open job wait to be sorted. Unset when no job is open.
+  LearningState learning = 24;
+}
+
+// The learning session's state on the line (requirements AS-04, "Learning session"). The Run screen shows a small
+// notice "pictures to sort" when enabled, idle and to_sort > 0; it never starts learning by itself.
+message LearningState {
+  bool enabled = 1;                 // the Supervisor's setting: good pictures are kept and the sorting is offered
+  uint32 idle_minutes = 2;          // the line's idle time before the notice (2..60, default 5)
+  bool idle = 3;                    // the line is stopped, or runs without a part for idle_minutes
+  uint32 idle_seconds = 4;          // since the last part (or since the line stopped)
+  uint32 to_sort = 5;               // pictures of the open job not yet sorted (counted at most every 30 s)
+  bool may_learn = 6;               // learning may start now: stopped, or idle with the PLC's RunEnable off
+  // Review follow-ups (AS-04i), whatever the setting: saved bad pictures of the open job with no review yet, and
+  // how many of them an operator marked "Was OK" (counted with to_sort, at most every 30 s).
+  uint32 bad_to_review = 7;
+  uint32 flagged_ok = 8;
+}
+
+message RemoteService {
+  bool active = 1;
+  google.protobuf.Timestamp since = 2;   // when the first open session signed in
+  // Added for 4b: what remote service asks at the line PC now, oldest first. Never who asks (REQ-08), only what changes.
+  repeated RemoteRequest requests = 3;
+}
+
+message RemoteRequest {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    CONFIRM = 1;   // the operator confirms (a file put in place, an action): Yes or No
+    APPROVE = 2;   // a supervisor approves a correction with their own PIN, password or card
+  }
+  string id = 1;
+  Kind kind = 2;
+  string title = 3;                        // what kind of change, e.g. "Correct batch values"
+  string what = 4;                         // the change in one line
+  repeated RemoteChange changes = 5;       // a correction's fields: old and new value
+  string reason = 6;                       // the engineer's reason (a correction)
+  google.protobuf.Timestamp expires = 7;   // unanswered by then: refused
+}
+
+message RemoteChange {
+  string field = 1;
+  string old_value = 2;
+  string new_value = 3;
+}
+
+message AnswerRemoteRequestRequest {
+  string id = 1;
+  bool approve = 2;                 // false: rejected (no secret needed)
+  string user = 3;                  // an approval: the supervisor; empty with a card
+  oneof secret {
+    string password = 4;
+    string pin = 5;
+    string card = 6;
+  }
+}
+
+message AnswerRemoteRequestResponse {
+  bool ok = 1;
+  uint32 error_code = 2;
+  string error_text = 3;
+  string error_key = 4;
+}
+
+// The setup checks of the loaded job (requirements section 16, "When the picture and pixel checks run").
+message SetupCheck {
+  // CHECKING: pictures are being taken and checked; DONE: the cameras below are the result; STOPPED: Run was
+  // pressed (or the line started) before the check ended, so its pictures were dropped.
+  enum State { STATE_UNSPECIFIED = 0; CHECKING = 1; DONE = 2; STOPPED = 3; }
+  State state = 1;
+  string job = 2;
+  google.protobuf.Timestamp time = 3;   // when the check ended (DONE) or started
+  repeated CameraSetupCheck cameras = 4;  // the job's cameras with tools, in job order (DONE)
+}
+message CameraSetupCheck {
+  string camera = 1;
+  int32 pictures = 2;               // pictures checked, 0 to 2
+  string source = 3;                // "camera": grabbed by software (the PLC's light may be off outside a run);
+                                    // "stored": the camera's stored pictures (a replay line)
+  string error = 4;                 // why no picture came, in plain words; "" when one did
+  PictureCheck picture_check = 5;   // AS-13 on the picture with the most detail
+  repeated ToolResult tools = 6;    // Read code and text tools that measured something: name, kind and pixels (AS-14)
+  repeated string unmeasured = 7;   // Read code and text tools that found nothing to measure on any picture
+}
+
+message PlcState {
+  bool link_up = 1;                 // the PLC is connected on its protocol
+  bool heartbeat_ok = 2;            // its heartbeat changes within the watchdog time (plc_connected = both)
+  bool run_enable = 3;              // RunEnable from the PLC
+  uint32 last_trigger_id = 4;       // TriggerID of the last trigger taken (it may still be inspected); 0 = none yet
+  google.protobuf.Timestamp last_result_time = 5;  // the last part counted; unset = none yet
+  bool last_result_pass = 6;        // that part's result as the PLC was given it
+  string link = 7;                  // the protocol and port, e.g. "ModbusTcp :502"
+}
+
+message Changeover {
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    NOT_NEEDED = 1;   // the check is off for this line, or no plant server is set up
+    WAITING = 2;      // asked; no supervisor has decided yet
+    ACCEPTED = 3;     // Start is allowed
+    REFUSED = 4;      // fix the values, or SetInput("changeover.ask") to ask again
+    NO_SERVER = 5;    // the check is on and the plant server cannot be reached
+  }
+  bool required = 1;
+  State state = 2;
+  string code = 3;                  // first 8 hex characters; the supervisor's screen shows the same
+  string by = 4;                    // who decided
+  google.protobuf.Timestamp at = 5;
+  string note = 6;                  // the supervisor's reason for a refusal
+  bool at_line = 7;                 // accepted at the line PC while the plant server could not be reached
+}
+
+message BatchField {
+  string key = 1;
+  string label = 2;
+  string example = 3;
+  string value = 4;                 // empty: not entered yet (Start is refused until it is)
+}
+
+message PcHealth {
+  float cpu_pct = 1;                // the whole PC, all cores together = 100
+  float ram_pct = 2;                // the whole PC's memory in use
+  float disk_pct = 3;               // the data folder's drive in use
+  float memory_used_pct = 4;        // the runtime's own memory, of its budget
+  enum Pressure { PRESSURE_UNSPECIFIED = 0; NORMAL = 1; ELEVATED = 2; HIGH = 3; CRITICAL = 4; }
+  Pressure pressure = 5;
+  string pressure_reason = 6;
+  bool restart_recommended = 7;     // a leak or lasting critical pressure: restart between batches
+  uint64 frames_missed = 8;         // camera frames lost or dropped since the runtime started (each one an NG part)
+  GuardLimits limits = 9;
+  google.protobuf.Timestamp sampled = 10;
+}
+
+// The resource guard's thresholds (StationGuard GuardOptions), so gauges show the running limits.
+message GuardLimits {
+  uint64 budget_bytes = 1;
+  float elevated_pct = 2;           // of the budget
+  float high_pct = 3;
+  float critical_pct = 4;
+  float system_high_pct = 5;        // the whole PC's memory
+  float system_critical_pct = 6;
+  float disk_high_free_pct = 7;     // free disk below this is High
+  float disk_critical_free_pct = 8;
+}
+
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  CAMERA = 1;
+  REPLAY = 2;                       // images from a folder (bench, demo, macOS)
+}
+
+message CameraState {
+  string name = 1;
+  string serial = 2;
+  bool connected = 3;
+}
+
+message Alarm {
+  enum Level { LEVEL_UNSPECIFIED = 0; INFO = 1; WARNING = 2; ALARM = 3; }
+  uint32 code = 1;
+  Level level = 2;
+  string text = 3;                  // "What is wrong. What to do." (UI-UX-SPEC.md principle 8)
+  string help = 4;                  // the "What do I do?" steps
+  google.protobuf.Timestamp since = 5;
+}
+
+message ListJobsRequest {}
+message ListJobsResponse { repeated JobInfo jobs = 1; }
+message JobInfo {
+  string name = 1; int32 number = 2; string version = 3; repeated string variants = 4;
+  string picture_id = 5;            // product picture for Change product; GetImage
+}
+
+message ChangeJobRequest { oneof job { string name = 1; int32 number = 2; } string variant = 3; }
+message ChangeJobResponse { bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4; }
+
+message TriggerRequest {
+  string part_id = 1;
+  uint32 camera_mask = 2;           // 0 = all cameras of the job
+  bool wait_for_result = 3;         // true: response carries the result
+}
+message TriggerResponse { uint32 trigger_id = 1; InspectionResult result = 2; uint32 error_code = 3; }
+
+message StreamResultsRequest { bool include_values = 1; bool ng_only = 2; }
+
+message InspectionResult {
+  uint64 inspection_id = 1;
+  uint32 trigger_id = 2;
+  google.protobuf.Timestamp time = 3;
+  string job = 4;
+  string part_id = 5;
+  bool pass = 6;
+  float cycle_ms = 7;
+  repeated ToolResult tools = 8;
+  repeated NamedValue outputs = 9;  // the mapped outputs, as on the PLC
+  repeated string image_ids = 10;   // one per camera; for GetImage
+  // Added for Vision Studio.
+  repeated CodeRead codes = 11;     // Code Reader: every code with its state
+  string variant = 12;
+}
+message ToolResult { string name = 1; string kind = 2; bool pass = 3; float confidence = 4;
+                     uint32 reason = 5; string reason_text = 6; float time_ms = 7;
+                     optional float print_quality = 8;    // Check text: PrintQuality 0..100, the lowest
+                                                          // character score (tool spec 7.3); absent for other tools
+                     // A Read text tool set to report only: pass is always true and it never decides the part.
+                     // Show it as information, never as OK. An older runtime leaves it false.
+                     bool report_only = 9;
+                     // Read code with grading on and the part graded: the lowest overall print grade of its
+                     // codes, 4 = A .. 0 = F (tool spec 6.1); absent when not graded or any code could not be graded.
+                     // TryJob grades every picture.
+                     optional float code_grade = 10;
+                     PixelCheck pixels = 11; }            // TryJob only: Read code and text tools' pixel check
+                                                          // (requirements AS-14); absent when nothing was measured
+
+// A tool's pixel check on the tried picture (requirements AS-14): its worst item found against what the tool
+// needs. Advice only, never part of the verdict.
+message PixelCheck {
+  string measure = 1;               // "module" (2D), "bar" (1D narrow bar), "letter" (capital height)
+  float need_px = 2;
+  float unsure_px = 3;              // below this the read is unsure
+  float found_px = 4;               // the worst item's size
+  float factor = 5;                 // times more pixels across the detail; 1 = enough
+  float pixels_times = 6;           // a camera with this many times the pixels
+  float lens_mm = 7;                // the camera's lens focal length; 0 = not known
+  float lens_advised_mm = 8;        // the focal length for the factor; 0 = not known
+  bool accepted = 9;                // "Accept as is" holds for this picture
+  string accepted_by = 10;
+  google.protobuf.Timestamp accepted_at = 11;
+  repeated PixelItem items = 12;
+}
+message PixelItem {
+  string name = 1;                  // "QR", "EAN-13", "text"
+  string measure = 2;               // as PixelCheck.measure
+  float size_px = 3;
+  bool below = 4;                   // under its need
+  repeated Point corners = 5;       // full-image pixels
+}
+message NamedValue { string name = 1; oneof v { double number = 2; string text = 3; bool flag = 4; } }
+
+message CodeRead {
+  enum State { STATE_UNSPECIFIED = 0; READ = 1; MISSED = 2; DUPLICATE = 3; }
+  string text = 1;                  // empty when missed
+  string format = 2;                // "QrCode", "DataMatrix", ...
+  State state = 3;
+  repeated Point corners = 4;       // image space of the full frame
+  string reason = 5;                // why it did not read (MissReason name), when missed
+  map<string, string> gs1 = 6;      // GS1 fields by AI ("01" GTIN, "10" batch, "21" serial, ...)
+  string add_on = 7;                // EAN/UPC 2- or 5-digit add-on, apart from text; empty when none
+  // TryJob: the suggested format of a code that carries GS1 data, its elements in English
+  // ("GS1: GTIN (01), expiry date (17), batch (10)"); empty otherwise. Advice only (AS-15).
+  string field = 8;
+  string tool = 9;                  // TryJob: the tool that read it
+}
+
+message GetImageRequest {
+  string image_id = 1;
+  enum Encoding { ENCODING_UNSPECIFIED = 0; PNG = 1; JPEG = 2; RAW = 3; }
+  Encoding encoding = 2;
+  bool with_graphics = 3;           // burn the result graphics in
+}
+message ImageChunk { bytes data = 1; int32 width = 2; int32 height = 3; string format = 4; }
+
+message SetInputRequest { string name = 1; string value = 2; }
+
+message AcceptChangeoverRequest {
+  string user = 1;                  // the second person; empty with a card
+  oneof secret {
+    string password = 2;
+    string pin = 3;
+    string card = 4;                // the badge reader at the line PC
+  }
+  string code = 5;                  // the 8 characters the dialog showed: they accept what they saw
+}
+message AcceptChangeoverResponse {
+  bool ok = 1;
+  uint32 error_code = 2;
+  string error_text = 3;
+  string error_key = 4;
+}
+message SetInputResponse { bool ok = 1; uint32 error_code = 2; }
+
+message WatchStatusRequest {}
+
+message StartRequest {
+  string job = 1;                   // empty: the current job
+  string variant = 2;               // empty: the current variant
+  Source source = 3;                // UNSPECIFIED: the job's own source
+}
+message StartResponse { bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4; }
+
+message PlcTestSignalRequest { bool ok = 1; }   // true: OK, false: NG
+message PlcTestSignalResponse { bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+                                uint32 pulse_ms = 5; }   // pulse_ms: how long the signal stays on
+
+message StopRequest { string reason = 1; }  // reason code when the plant asks for one
+message StopResponse { bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4; }
+
+message WatchFramesRequest {
+  string camera = 1;                // empty: the job's first camera
+  int32 max_width = 2;              // the runtime scales down to fit; 0 = 1280
+  float max_fps = 3;                // 0 = 5
+  bool ng_only = 4;
+  // Added for the Run screen of a job with more than one camera: every camera's frames, at most
+  // `max_fps` per camera; `camera` is then ignored. A bad part's frame is never held back by
+  // `max_fps` (the Run screen shows every bad part's picture).
+  bool all_cameras = 5;
+}
+
+message LiveFrame {
+  uint64 inspection_id = 1;         // 0 for a frame with no inspection (preview)
+  string camera = 2;
+  bytes jpeg = 3;
+  int32 width = 4;                  // of the JPEG
+  int32 height = 5;
+  float scale = 6;                  // JPEG pixels per full-image pixel; graphics are in JPEG pixels
+  bool pass = 7;
+  repeated Graphic graphics = 8;
+  string image_id = 9;              // full resolution, for GetImage
+  repeated ToolResult tools = 10;   // the tools of this camera for this part (empty for a preview)
+  repeated CodeRead codes = 11;     // the codes they read (corners in full-image pixels)
+}
+
+message Point { float x = 1; float y = 2; }
+
+// A shape drawn over the image by the client, in its theme.
+message Graphic {
+  enum Kind { KIND_UNSPECIFIED = 0; POLYGON = 1; RECT = 2; LINE = 3; CROSS = 4; TEXT = 5; }
+  Kind kind = 1;
+  repeated Point points = 2;        // polygon corners, rect's two corners, line ends, cross centre
+  string colour = 3;                // design-token key: status.ok, status.ng, status.warning,
+                                    // status.duplicate, status.info
+  string label = 4;
+  string tooltip = 5;               // shown on tap
+  // Added for teaching a Blob tool from a clicked spot (requirements 17.12 BLB-OUT-07): TryJob only, the tool
+  // that drew it; empty elsewhere and from an older runtime.
+  string tool = 6;
+}
+
+message GetCountersRequest {}
+message Counters {
+  uint64 total = 1;
+  uint64 ok = 2;
+  uint64 ng = 3;
+  float yield_percent = 4;
+  float median_cycle_ms = 5;
+  float max_cycle_ms = 6;
+  map<string, uint64> ng_reasons = 7;  // reason key -> count, for the Pareto
+  google.protobuf.Timestamp since = 8;
+}
+
+// --- Job designer --------------------------------------------------------------------------------
+
+message GetJobRequest { string name = 1; }  // empty: the open job
+message GetJobResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  string json = 5;                  // the job file (JOB-FILE-FORMAT.md)
+  int32 version = 6;
+  bool open = 7;                    // the job the line has open
+}
+
+message SaveJobRequest { string json = 1; }
+message SaveJobResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  string name = 5;
+  int32 version = 6;                // the version saved (every version is kept)
+}
+
+// The stored pictures of one camera of a draft (its test folder): names only, in name order.
+message ListPicturesRequest { string job_json = 1; int32 camera = 2; }
+message ListPicturesResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  repeated string names = 5;
+}
+
+// One camera's tools of a draft job run once on one picture, as the line would run them.
+message TryJobRequest {
+  string job_json = 1;
+  int32 camera = 2;                 // index into the job's cameras
+  oneof picture {
+    string stored = 3;              // a name from ListPictures
+    string image_id = 4;            // a recent part's image (InspectionResult.image_ids)
+    bytes upload = 5;               // a BMP or PNG file from the engineer's PC
+  }
+  int32 max_width = 6;              // of the returned JPEG; 0 = 1280
+  map<string, string> batch = 7;    // batch values to try with; empty: those entered at the line
+  string plc_part_id = 8;           // as the PLC would send them with the trigger, for a Check
+  repeated int32 plc_user_in = 9;   // text tool whose expected text comes from the PLC
+  // Teach this tool (by name) from the picture first, as a good part: Read code is locked to the
+  // type, count and length read; Read text and Check text get their area, letter height and lines.
+  // The taught draft comes back in taught_json; the picture is then tried with it.
+  string teach_tool = 10;
+  // The PLC's text block as it would come with the trigger (PLC-INTERFACE.md 3.7): first register ->
+  // string, written as the job's line at that register reads it. Empty: no text block.
+  map<int32, string> plc_text = 11;
+  // Added for zoom in job setup (requirements AS-17): the picture is not shown ("Try all pictures"),
+  // so the runtime does not keep it for GetImage and image_id comes back empty.
+  bool not_shown = 12;
+  bool skip_picture_check = 13;     // no picture check (AS-13) on this try, as for "Try all pictures"
+  // Added for teaching a Blob tool from a clicked spot (requirements 17.12 BLB-OUT-07): with teach_tool on a
+  // Blob tool, the spot whose outline is taught, by its number as drawn on the picture (1 = the first);
+  // 0 = the first spot. A number that is not there is refused (never another spot taught). Other tools ignore it.
+  int32 teach_spot = 14;
+}
+message TryJobResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  bool pass = 5;
+  float time_ms = 6;
+  repeated ToolResult tools = 7;
+  repeated CodeRead codes = 8;      // corners in full-image pixels
+  repeated Graphic graphics = 9;    // in JPEG pixels
+  bytes jpeg = 10;
+  int32 width = 11;                 // of the JPEG
+  int32 height = 12;
+  float scale = 13;                 // JPEG pixels per full-image pixel
+  int32 image_width = 14;
+  int32 image_height = 15;
+  repeated TextRead lines = 16;     // what each text tool read, line by line
+  string taught_json = 17;          // with teach_tool: the draft with that tool taught
+  string taught_text = 18;          // with teach_tool: what was found, for the engineer
+  // Added for zoom in job setup (requirements AS-17): the tried picture, kept by the runtime for a
+  // while so GetImage can send it at full resolution without loss (PNG). Empty from an older runtime;
+  // GetImage answers NOT_FOUND once it is no longer kept.
+  string image_id = 19;
+  PictureCheck picture_check = 20;  // the picture's sharpness and light per corner and centre (AS-13)
+}
+
+// The picture check per corner and centre (requirements AS-13), measured on the full picture: advice for the
+// lens and the light only. It never changes a tool or a result; the tools decide as usual.
+message PictureCheck {
+  repeated PictureZone zones = 1;   // top_left, top_right, bottom_left, bottom_right, centre
+  repeated PictureAdvice advice = 2;
+}
+message PictureZone {
+  string zone = 1;                  // "top_left", "top_right", "bottom_left", "bottom_right", "centre"
+  int32 x = 2;                      // the zone's cell of a 3 x 3 grid, full-image pixels
+  int32 y = 3;
+  int32 width = 4;
+  int32 height = 5;
+  float sharpness = 6;              // 0..100 (100: an edge within one pixel); -1: nothing in the zone to judge
+  float brightness = 7;             // mean grey 0..255
+  string state = 8;                 // the mark: "good" (green), "close" (yellow), "bad" (red), "no_detail" (grey)
+}
+message PictureAdvice {
+  // "tilt": one corner or side blurred; "focus": all blurred; "clean_lens": all soft and dull;
+  // "vignetting": corners darker than the centre; "dark", "bright": a zone too dark or too bright
+  string kind = 1;
+  repeated string zones = 2;        // the zones it is about, as PictureZone.zone
+}
+
+// One line a Read text or Check text tool read: "Text should be" is filled in from it.
+message TextRead {
+  string tool = 1;
+  string text = 2;
+  string expected = 3;              // Check text: what the line should say
+  bool pass = 4;
+  float quality = 5;                // 0..100
+  repeated Point corners = 6;       // full-image pixels
+  // The format suggested from the text read (requirement AS-15), as Teach would write the line: a
+  // Read text format ("EXP {EXP:MM/YYYY}") or a Check text template; empty when nothing was read.
+  string format = 7;
+  string field = 8;                 // its field type, as auto find names it ("expiry date", "lot / batch")
+}
+
+// One picture from a job camera, fired once by software. It is stored in the camera's stored-pictures
+// folder; a camera with no folder gets one under the runtime's data folder, returned in job_json.
+message GrabPictureRequest { string job_json = 1; int32 camera = 2; }
+message GrabPictureResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  string name = 5;                  // the stored picture: give it to TryJob or FindTools as `stored`
+  string job_json = 6;              // the draft, with the camera's stored-pictures folder filled in
+}
+
+// A window on the picture, in full-image pixels.
+message Area { int32 x = 1; int32 y = 2; int32 width = 3; int32 height = 4; }
+
+message FindToolsRequest {
+  string job_json = 1;
+  int32 camera = 2;
+  oneof picture {
+    string stored = 3;              // a name from ListPictures or GrabPicture
+    string image_id = 4;            // a recent part's image (InspectionResult.image_ids)
+    bytes upload = 5;               // a BMP or PNG file from the engineer's PC
+  }
+  Area area = 6;                    // the window the user dragged; not set: the whole picture
+}
+message FindToolsResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  repeated ToolSuggestion suggestions = 5;   // codes first, then text from top to bottom
+  float time_ms = 6;
+  // The picture, so it is shown before the camera has any tool to try (as TryJobResponse 10-15).
+  bytes jpeg = 7;
+  int32 width = 8;                  // of the JPEG
+  int32 height = 9;
+  float scale = 10;                 // JPEG pixels per full-image pixel
+  int32 image_width = 11;
+  int32 image_height = 12;
+}
+
+// One tool auto find proposes, already set up from what it read (requirements AS-01).
+message ToolSuggestion {
+  string kind = 1;                  // "code" or "text", as the job file's tool kind
+  string summary = 2;               // "QR Code x 1", "Text, 3 lines: production date, expiry date, lot / batch"
+  repeated string read = 3;         // what was read: one entry per code or text line
+  repeated string fields = 4;       // each entry's field type: "code", "production date", "lot / batch", ...
+  repeated Point outline = 5;       // full-image pixels
+  string tool_json = 6;             // the tool as in the job file (JOB-FILE-FORMAT.md), camera and name to be set
+}
+
+// The outline tolerances suggested for one Blob tool from stored pictures of good parts (BLB-OUT-06).
+message SuggestBlobToleranceRequest {
+  string job_json = 1;
+  int32 camera = 2;                 // index into the job's cameras
+  string tool = 3;                  // the Blob tool, by name: a tool of this camera with its outline taught
+  repeated string pictures = 4;     // names from ListPictures, good parts only: 3 to 30
+}
+message SuggestBlobToleranceResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  // False (with ok true) when there is no suggestion: a picture shows no single closed outline found on the
+  // grey (a missing, cut, broken or doubled part is not a good part); reason_text says so. Never a made-up limit.
+  bool found = 5;
+  float max_deviation = 6;          // suggested largest deviation from the taught outline, in `unit`
+  float max_dent_depth = 7;         // suggested largest dent, in `unit`
+  string unit = 8;                  // "px" or "mm", the tool's outline unit
+  int32 pictures = 9;               // the pictures measured
+  float worst_deviation = 10;       // the worst good values measured, in `unit`
+  float worst_dent = 11;
+  string reason_text = 12;          // with found false: why nothing is suggested
+  LensCalibration calibration = 13; // the camera's calibration as the runtime uses it; not set: none (px only)
+}
+
+// A camera's lens and scale at the part's plane (chessboard calibration; job file Cameras[].Calibration):
+// what a client needs to offer sizes in mm. The job JSON carries the same values.
+message LensCalibration {
+  float fx = 1; float fy = 2; float cx = 3; float cy = 4;
+  float k1 = 5; float k2 = 6; float p1 = 7; float p2 = 8; float k3 = 9;
+  float mm_per_px = 10;             // 0: no real size
+  float rms_px = 11;                // the calibration's residual
+}
+
+// --- NG review and learning --------------------------------------------------------------------
+
+enum ReviewDecision {
+  REVIEW_DECISION_UNSPECIFIED = 0;
+  ACCEPTED = 1;                     // the part was good: the check should have passed it
+  CONFIRMED_NG = 2;                 // the part is bad: the check was right
+}
+
+message ReviewPartRequest {
+  string image_id = 1;              // a bad part's image (InspectionResult.image_ids), "<inspection>-<camera>"
+  ReviewDecision decision = 2;
+  string note = 3;                  // optional, the supervisor's words
+  // Owner, 2026-10-31: a part the software finds clearly bad (wrong data, wrong or missing print, out of
+  // tolerance) is not accepted on one tap: the first ACCEPTED is answered looks_bad with the faults, and the
+  // supervisor double-checks. Set confirm_looks_bad to accept it all the same: it is then kept as a record
+  // only, never in the learning set ("mention not to add in good records to avoid bad images teaching").
+  bool confirm_looks_bad = 4;
+  reserved 5;
+  // Owner, 2026-11-04: a bad picture the software could not read (no code, part or print found, an unsure read)
+  // is not accepted as good on one tap either: the first ACCEPTED is answered unreadable, and the supervisor
+  // validates it again. With confirm_unreadable it is learned as good unless keep_as_record is set.
+  bool confirm_unreadable = 6;
+  bool keep_as_record = 7;          // keep the decision as a record only, never in the learning set
+}
+message ReviewPartResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  ReviewsSummary summary = 5;       // the counts after this review
+  bool looks_bad = 6;               // not saved: the software found it clearly bad; ask the supervisor to double-check
+  repeated string faults = 7;       // what it found, in words ("Check text 1: a character is wrong")
+  bool learned = 8;                 // saved into the learning set (false: kept as a record only)
+  bool unreadable = 9;              // not saved: the software could not read it; ask for a second validation
+  bool possible_escape = 10;        // a part the software passed was rejected: a bad part may have passed
+}
+
+message GetReviewsRequest { string job = 1; }   // empty: the open job
+message ReviewsSummary {
+  string job = 1;
+  repeated CameraReviews cameras = 2;
+}
+message CameraReviews {
+  int32 camera = 1;
+  string name = 2;
+  uint32 accepted = 3;              // accepted and in the learning set
+  uint32 confirmed_ng = 4;
+  uint32 accepted_record_only = 5;  // accepted after a double-check, kept out of the learning set
+}
+
+message LearnRequest { string job = 1; int32 camera = 2; }   // empty job: the open job
+message LearnResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  string proposal_id = 5;           // to apply; empty when nothing may be applied
+  repeated TunedSetting settings = 6;
+  string before = 7;                // "38 of 40 good parts pass, all 12 bad parts fail, slowest 35 ms"
+  string after = 8;
+  bool can_apply = 9;               // every confirmed bad picture fails, no good picture that passed is lost
+  string problem = 10;              // why nothing is proposed, in the supervisor's words
+  repeated string still_rejected = 11;   // accepted pictures that still fail whatever the settings
+  uint32 accepted = 12;
+  uint32 confirmed_ng = 13;
+  // Acceptable % (good pictures that pass) and not acceptable % (bad pictures that fail), 0..100, now and with
+  // the proposal; -1 when there is no picture of that kind or nothing was proposed.
+  float good_pass_pct_before = 14;
+  float bad_fail_pct_before = 15;
+  float good_pass_pct_after = 16;
+  float bad_fail_pct_after = 17;
+}
+message TunedSetting {
+  string tool = 1;
+  string setting = 2;               // "lowest match", "strictness"
+  string current = 3;               // as shown, e.g. "0.70", "60"
+  string proposed = 4;
+  bool looser = 5;                  // the check would accept more
+}
+
+message ApplyLearningRequest { string proposal_id = 1; }
+
+message ListToSortRequest {
+  string job = 1;                   // empty: the open job
+  int32 camera = 2;                 // -1: every camera
+}
+message ListToSortResponse {
+  repeated SortItem items = 1;      // newest first, at most 500
+  uint32 total = 2;                 // all not sorted, beyond the 500 too
+}
+message SortItem {
+  string image_id = 1;              // its image name; GetImage shows it, ReviewPart sorts it
+  int32 camera = 2;
+  string camera_name = 3;
+  bool ok = 4;                      // what the software decided
+  repeated string faults = 5;       // a bad picture: what it found, in words
+  google.protobuf.Timestamp time = 6;
+  bool near_limit = 7;              // a good picture kept because it passed close to a limit
+  string flagged_ok_by = 8;         // an operator marked this bad part "Was OK" (AS-04k); empty: not marked
+  google.protobuf.Timestamp flagged_ok_at = 9;
+}
+message GetLearningSettingsRequest {}
+message LearningSettings {
+  bool enabled = 1;                 // default true
+  uint32 idle_minutes = 2;          // 2..60, default 5
+  string changed_by = 3;            // read only
+  google.protobuf.Timestamp changed_at = 4;   // read only
+}
+message SetLearningSettingsResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  LearningSettings settings = 5;
+}
+message ApplyLearningResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  string job = 5;
+  int32 version = 6;                // the new version; the one before stays in the job history
+}
+
+// --- Review follow-ups (requirements AS-04i..k) --------------------------------------------------------------------
+
+// The reviewed pictures and the operator's "Was OK" flag, a service of its own beside VisionRuntime on the same
+// channel and sign-in. A decision is changed with VisionRuntime.ReviewPart and the reviewed picture's image_id, by the
+// same rules as a first review (clearly bad accepted: a record only; unreadable: the second validation); GetImage
+// shows a reviewed picture by that id. A change or removal is an audit-trail event, and a learning proposal made
+// before it cannot be applied (the reviews changed).
+service NgReviews {
+  // Supervisor, QA, Engineer and Admin in Vision Studio, and Support or OEM opened with today's code (AS-04h); PERMISSION_DENIED otherwise.
+  rpc ListReviewed(ListReviewedRequest) returns (ListReviewedResponse);
+  rpc RemoveReview(RemoveReviewRequest) returns (RemoveReviewResponse);
+  // Anyone signed in to Vision Studio who may run the line, operators too. Only a bad part not reviewed yet; it never
+  // changes the job or teaches anything: it is shown to the supervisor, whose decision clears it.
+  rpc FlagWasOk(FlagWasOkRequest) returns (FlagWasOkResponse);
+}
+
+message ListReviewedRequest {
+  string job = 1;                   // empty: the open job
+  int32 camera = 2;                 // -1: every camera
+}
+message ListReviewedResponse {
+  repeated ReviewedPicture items = 1;   // newest decision first, at most 500
+  uint32 total = 2;
+  repeated WasOkFlag flags = 3;     // the bad parts of the job marked "Was OK" and not reviewed yet
+}
+message ReviewedPicture {
+  string image_id = 1;              // its key: GetImage shows it, ReviewPart changes it, RemoveReview removes it
+  int32 camera = 2;
+  string camera_name = 3;
+  ReviewDecision decision = 4;
+  bool learned = 5;                 // in the learning set (accepted or confirmed); false: accepted as a record only
+  string user = 6;
+  google.protobuf.Timestamp time = 7;
+  repeated string faults = 8;       // what the software found, in words
+  bool software_ok = 9;             // the software passed the part (a good picture of the learning session)
+  string note = 10;
+}
+message WasOkFlag {
+  string image_id = 1;
+  int32 camera = 2;
+  string user = 3;
+  google.protobuf.Timestamp time = 4;
+}
+message RemoveReviewRequest { string image_id = 1; }
+message RemoveReviewResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+  ReviewsSummary summary = 5;       // the counts after the removal
+}
+message FlagWasOkRequest {
+  string image_id = 1;              // a bad part's image (InspectionResult.image_ids)
+  string note = 2;                  // optional, the operator's words
+}
+message FlagWasOkResponse {
+  bool ok = 1; uint32 error_code = 2; string error_text = 3; string error_key = 4;
+}

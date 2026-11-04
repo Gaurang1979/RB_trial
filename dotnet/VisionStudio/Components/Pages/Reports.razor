@@ -1,0 +1,210 @@
+@page "/reports"
+@attribute [Authorize]
+@using VisionReports
+@inject ReportService R
+
+<PageTitle>@T["rep.title"]</PageTitle>
+<div class="runbar">
+    <h1>@T["rep.title"]</h1>
+</div>
+
+<div class="card">
+    <div class="row">
+        @foreach (var p in Presets)
+        {
+            <button class="@(Preset == p ? "primary" : "")" @onclick="() => Pick(p)">@T["rep.p_" + p]</button>
+        }
+    </div>
+    @if (Preset == "batch")
+    {
+        <div class="row">
+            <select @bind="BatchId" @bind:after="Show">
+                @foreach (var b in Batches)
+                {
+                    <option value="@b.Id">@b.Name — @b.Job — @b.StartedUtc.ToLocalTime().ToString("dd-MM-yyyy HH:mm")</option>
+                }
+            </select>
+            @if (Batches.Count == 0) { <span class="muted">@T["rep.no_batches"]</span> }
+        </div>
+    }
+    @if (Preset == "custom")
+    {
+        <div class="row">
+            <label>@T["rep.from"] <input type="datetime-local" @bind="From" @bind:after="Show" /></label>
+            <label>@T["rep.to"] <input type="datetime-local" @bind="To" @bind:after="Show" /></label>
+        </div>
+    }
+    <div class="row">
+        <b>@Title</b><span class="muted">@From.ToString("dd-MM-yyyy HH:mm") – @To.ToString("dd-MM-yyyy HH:mm")</span>
+    </div>
+    <div class="row">
+        @foreach (var s in SectionList)
+        {
+            <label class="chk"><input type="checkbox" checked="@Sections.HasFlag(s)" @onchange="e => Toggle(s, (bool)e.Value!)" /> @T["rep.s_" + s.ToString().ToLowerInvariant()]</label>
+        }
+    </div>
+    <div class="row">
+        <a class="button big primary" href="@Link("pdf")" target="_blank">⤓ PDF</a>
+        <a class="button big" href="@Link("xlsx")" target="_blank">⤓ Excel</a>
+        <button class="big" @onclick="Show">↻ @T["rep.refresh"]</button>
+    </div>
+</div>
+
+@if (Data is { } d)
+{
+    <div class="tiles">
+        <div class="tile"><span>@T["rep.inspected"]</span><b>@d.Parts.ToString("N0")</b></div>
+        <div class="tile"><span>@T["rep.good"]</span><b class="good">@d.Good.ToString("N0")</b></div>
+        <div class="tile"><span>@T["rep.rejected"]</span><b class="@(d.Rejected > 0 ? "bad" : "")">@d.Rejected.ToString("N0")</b></div>
+        <div class="tile"><span>@T["rep.yield"]</span><b>@d.YieldPct.ToString("0.0") %</b></div>
+        <div class="tile"><span>@T["rep.per_min"]</span><b>@d.AvgPerMinute.ToString("0")</b></div>
+        <div class="tile"><span>@T["rep.stopped"]</span><b>@ReportData.Duration(d.StoppedSeconds)</b></div>
+    </div>
+    <div class="card">
+        <h3>@T["rep.findings"]</h3>
+        <ul class="findings">@foreach (var f in d.Insights) { <li>@f</li> }</ul>
+    </div>
+    <div class="two">
+        <div class="card">
+            <h3>@T["rep.reasons"]</h3>
+            @if (d.Reasons.Count == 0) { <p class="muted">@T["rep.none"]</p> }
+            @foreach (var r in d.Reasons.Take(10))
+            {
+                <div class="barrow"><span>@r.Name</span><i style="width:@(Math.Max(1, r.Share).ToString("0", System.Globalization.CultureInfo.InvariantCulture))%"></i><b>@r.Count (@r.Share.ToString("0") %)</b></div>
+            }
+        </div>
+        <div class="card">
+            <h3>@T["rep.length"]</h3>
+            @if (d.Length is { } l)
+            {
+                <p>@T.Format("rep.length_line", l.Mean.ToString("0.0"), (3 * l.Sd).ToString("0.0"), l.Min.ToString("0.0"), l.Max.ToString("0.0"), l.Count)</p>
+                @if (d.Cpk is { } cpk) { <p class="muted">Cpk @cpk.ToString("0.00") (@(d.NominalMm?.ToString("0.#")) mm ±@d.TolerancePct %)</p> }
+            }
+            else { <p class="muted">@T["rep.no_length"]</p> }
+            @if (d.Gap is { } g) { <p>@T.Format("rep.gap_line", g.Mean.ToString("0.0"), g.Min.ToString("0.0"))</p> }
+            <p>@T.Format("rep.touch_line", d.TouchingGroups, d.TouchingProducts, d.LengthOut, d.SmallGaps)</p>
+        </div>
+    </div>
+    <div class="card">
+        <h3>@T.Format("rep.reject_list", d.RejectList.Count)</h3>
+        <table class="tools">
+            <tr><th>@T["rep.time"]</th><th>@T["rep.part"]</th><th>@T["rep.batch"]</th><th>mm</th><th>@T["rep.reason"]</th></tr>
+            @foreach (var p in d.RejectList.AsEnumerable().Reverse().Take(50))
+            {
+                <tr><td>@p.TimeUtc.ToLocalTime().ToString("dd-MM HH:mm:ss")</td><td>@p.PartId</td><td>@p.Batch</td>
+                    <td>@(p.LengthMm?.ToString("0.0") ?? "–")</td><td>@p.Reason</td></tr>
+            }
+        </table>
+        @if (d.RejectList.Count > 50) { <p class="muted">@T["rep.more_in_files"]</p> }
+    </div>
+}
+
+<div class="card">
+    <h3>@T["rep.saved"]</h3>
+    <p class="muted">@T["rep.saved_hint"]</p>
+    <table class="tools">
+        @foreach (var f in R.Files().Take(60))
+        {
+            <tr><td><a href="@("reports/file/" + Uri.EscapeDataString(f.Name))" target="_blank">@f.Name</a></td>
+                <td class="muted">@f.LastWriteTime.ToString("dd-MM-yyyy HH:mm")</td><td class="num muted">@((f.Length / 1024).ToString("N0")) kB</td></tr>
+        }
+    </table>
+</div>
+
+<AuthorizeView Roles="Engineer,QA">
+    <div class="card form">
+        <h3>@T["rep.settings"]</h3>
+        <label><span>@T["rep.line_name"]</span><input @bind="Set.LineName" /></label>
+        @foreach (var s in Set.Shifts)
+        {
+            <label><span>@T["rep.shift"]</span><input @bind="s.Name" style="width:140px" /> <input type="time" value="@s.Start" @onchange="@(e => s.Start = e.Value?.ToString() ?? s.Start)" />
+                <button class="link" @onclick="() => Set.Shifts.Remove(s)">✕</button></label>
+        }
+        <div class="row"><button @onclick="@(() => Set.Shifts.Add(new ShiftDef { Name = "Shift", Start = "00:00" }))">+ @T["rep.add_shift"]</button></div>
+        <label><span>@T["rep.auto"]</span>
+            <label class="chk"><input type="checkbox" @bind="Set.AutoPdf" /> PDF</label>
+            <label class="chk"><input type="checkbox" @bind="Set.AutoExcel" /> Excel</label>
+            <label class="chk"><input type="checkbox" @bind="Set.AutoBatch" /> @T["rep.auto_batch"]</label>
+        </label>
+        <label><span>@T["rep.keep_days"]</span><input type="number" @bind="Set.KeepDays" style="width:100px" /></label>
+        <div class="row"><button class="primary" @onclick="SaveSettings">✓ @T["rep.save"]</button> @if (Saved) { <span class="good">@T["rep.saved_ok"]</span> }</div>
+    </div>
+</AuthorizeView>
+
+@code {
+    private static readonly string[] Presets = { "shift", "prev_shift", "today", "yesterday", "week", "batch", "custom" };
+    private static readonly ReportSections[] SectionList =
+        { ReportSections.Summary, ReportSections.Rejects, ReportSections.Cameras, ReportSections.Length, ReportSections.Events, ReportSections.PartList };
+
+    private string Preset = "shift";
+    private DateTime From, To;
+    private string Title = "";
+    private string? BatchName;
+    private long BatchId;
+    private List<BatchRow> Batches = new();
+    private ReportSections Sections = ReportSections.All;
+    private ReportData? Data;
+    private ReportSettings Set = new();
+    private bool Saved;
+
+    protected override void OnInitialized()
+    {
+        Set = System.Text.Json.JsonSerializer.Deserialize<ReportSettings>(System.Text.Json.JsonSerializer.Serialize(R.Settings))!;
+        Batches = R.Log.Batches();
+        Pick("shift");
+    }
+
+    private void Pick(string p)
+    {
+        Preset = p;
+        BatchName = null;
+        var now = DateTime.Now;
+        switch (p)
+        {
+            case "shift": { var s = R.CurrentShift(); (From, To, Title) = (s.FromLocal, s.ToLocal, s.Title); break; }
+            case "prev_shift": { var s = R.PreviousShift(); (From, To, Title) = (s.FromLocal, s.ToLocal, s.Title); break; }
+            case "today": (From, To, Title) = (now.Date, now.Date.AddDays(1), $"Daily report — {now:dd-MM-yyyy}"); break;
+            case "yesterday": (From, To, Title) = (now.Date.AddDays(-1), now.Date, $"Daily report — {now.AddDays(-1):dd-MM-yyyy}"); break;
+            case "week": (From, To, Title) = (now.Date.AddDays(-6), now.Date.AddDays(1), $"Weekly report — {now.Date.AddDays(-6):dd-MM} to {now:dd-MM-yyyy}"); break;
+            case "batch":
+                if (BatchId == 0 && Batches.Count > 0) BatchId = Batches[0].Id;
+                break;
+            case "custom":
+                if (Title.Length == 0 || From == default) (From, To) = (now.AddHours(-8), now);
+                Title = "Production report";
+                break;
+        }
+        Show();
+    }
+
+    private void Show()
+    {
+        if (Preset == "batch")
+        {
+            if (Batches.FirstOrDefault(b => b.Id == BatchId) is not { } b) { Data = null; return; }
+            BatchName = b.Name;
+            From = b.StartedUtc.ToLocalTime();
+            To = (b.EndedUtc ?? DateTime.UtcNow.AddMinutes(1)).ToLocalTime();
+            Title = $"Batch {b.Name} report";
+        }
+        else if (Preset == "custom") Title = "Production report";
+        Data = R.Build(Query());
+    }
+
+    private ReportQuery Query() => new(From.ToUniversalTime(), To.ToUniversalTime(), BatchName, Title) { Sections = Sections };
+
+    private void Toggle(ReportSections s, bool on) { Sections = on ? Sections | s : Sections & ~s; }
+
+    private string Link(string format)
+    {
+        static string Iso(DateTime t) => Uri.EscapeDataString(t.ToString("yyyy-MM-ddTHH:mm:ss", System.Globalization.CultureInfo.InvariantCulture));
+        return $"reports/make?format={format}&from={Iso(From)}&to={Iso(To)}&title={Uri.EscapeDataString(Title)}&sections={(int)Sections}" +
+               (BatchName is null ? "" : $"&batch={Uri.EscapeDataString(BatchName)}");
+    }
+
+    private void SaveSettings()
+    {
+        R.Save(Set);
+        Saved = true;
+    }
+}

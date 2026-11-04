@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>VisionReports</RootNamespace>
+    <Description>Inspection and part results log (SQLite) and the production reports (PDF, Excel).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VisionCore\VisionCore.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.104.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+    <PackageReference Include="SkiaSharp" Version="2.88.9" />
+    <!-- ClosedXML brings 8.0.0, which has high-severity advisories (GHSA-f32c-w444-8ppv, GHSA-qj66-m88j-hmgj) -->
+    <PackageReference Include="System.IO.Packaging" Version="10.0.14" />
+  </ItemGroup>
+
+</Project>

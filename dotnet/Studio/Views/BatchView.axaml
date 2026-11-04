@@ -1,0 +1,38 @@
+<!-- Start batch: one large field per value the job checks, then Save. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:VisionSystem.Studio.ViewModels"
+             xmlns:ui="using:VisionSystem.Studio.Controls"
+             xmlns:l="using:VisionSystem.Studio.Localization"
+             x:Class="VisionSystem.Studio.Views.BatchView"
+             x:DataType="vm:BatchViewModel">
+  <Border Classes="panel" MinWidth="640">
+    <StackPanel Spacing="8">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <TextBlock Text="{l:T batch.none}" Classes="muted" IsVisible="{Binding !HasFields}" />
+      <ItemsControl ItemsSource="{Binding Fields}" Name="BatchFields">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate DataType="vm:BatchFieldEntry">
+            <Grid ColumnDefinitions="220,*" Margin="0,6">
+              <TextBlock Text="{Binding Label}" FontSize="{DynamicResource Vs.Font.Title}" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Text="{Binding Value}" Watermark="{Binding Example}" MinHeight="{DynamicResource Vs.Size.Touch}"
+                       FontSize="{DynamicResource Vs.Font.Title}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Border Classes="toned" ui:Ui.Tone="Ng" Padding="{DynamicResource Vs.Pad.S}" CornerRadius="{DynamicResource Vs.Radius.S}"
+              IsVisible="{Binding Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" MaxWidth="700" />
+      </Border>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Classes="vs action" Command="{Binding BackCommand}" Name="BatchBack">
+          <TextBlock Text="{l:T common.back}" />
+        </Button>
+        <Button Classes="vs action primary" Command="{Binding SaveCommand}" IsEnabled="{Binding !Busy}" Name="BatchSave">
+          <TextBlock Text="{l:T batch.save}" />
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

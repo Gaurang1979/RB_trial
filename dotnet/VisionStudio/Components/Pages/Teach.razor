@@ -1,0 +1,1752 @@
+@page "/teach"
+@page "/teach/{JobName}"
+@attribute [Authorize(Roles = "Engineer")]
+@implements IDisposable
+@inject JobStore Jobs
+@inject ModelPaths Models
+@inject ImageCache Images
+@inject CameraDrivers Drivers
+@inject Station S
+@inject NavigationManager Nav
+@inject Microsoft.Extensions.Options.IOptions<StudioOptions> Studio
+@using BarcodeReading
+
+<PageTitle>@T["teach.title"]</PageTitle>
+
+<div class="runbar">
+    <input class="big" placeholder="@T["teach.job_name"]" @bind="Draft.Name" />
+    <input class="big num" type="number" min="0" max="999" title="@T["teach.job_number"]" placeholder="@T["teach.job_number"]" @bind="Draft.Number" />
+    <button class="big primary" @onclick="Save">✓ @T["common.save"]</button>
+    <button class="big" @onclick="Try" disabled="@(Image is null)">▶ @T["teach.try"]</button>
+    <div class="spacer"></div>
+    @if (Message is not null) { <span class="@(MessageBad ? "bad" : "good")">@Message</span> }
+</div>
+
+<div class="tabs">
+    @for (int i = 0; i < Draft.Cameras.Count; i++)
+    {
+        int k = i;
+        <button class="tab @(Cam == k ? "on" : "")" @onclick="() => SelectCamera(k)">📷 @Draft.Cameras[k].Name</button>
+    }
+    @if (Draft.Cameras.Count < Job.MaxCameras)
+    {
+        <button class="tab" @onclick="AddCamera">+ @T["teach.add_camera"]</button>
+    }
+</div>
+
+<div class="teach">
+    <div class="canvasbox">
+        @if (Frame is not null)
+        {
+            <div class="canvas" style="width:@(Frame.Width)px;height:@(Frame.Height)px">
+                <img src="img/@(Key).jpg?v=@Version" width="@Frame.Width" height="@Frame.Height" draggable="false" />
+                @if (Drag is { } d)
+                {
+                    <div class="drag" style="left:@(Math.Min(d.X0, d.X1))px;top:@(Math.Min(d.Y0, d.Y1))px;width:@(Math.Abs(d.X1 - d.X0))px;height:@(Math.Abs(d.Y1 - d.Y0))px"></div>
+                }
+                @if (Selected?.Roi is { } r)
+                {
+                    <div class="sel" style="left:@(r.X * Frame.Scale)px;top:@(r.Y * Frame.Scale)px;width:@(r.Width * Frame.Scale)px;height:@(r.Height * Frame.Scale)px"></div>
+                }
+                <div class="capture" @onpointerdown="Down" @onpointermove="Move" @onpointerup="Up" @onpointerleave="Up"></div>
+            </div>
+            <p class="muted">@Image?.Name  ·  @Image?.Width × @Image?.Height  ·  @T["teach.draw_hint"]</p>
+        }
+        else
+        {
+            <div class="noimg">@T["teach.no_image"]</div>
+        }
+        <div class="row">
+            <button @onclick="Grab">📷 @T["teach.grab"]</button>
+            <input class="wide" placeholder="@T["teach.image_path"]" @bind="ImagePath" @bind:event="oninput" />
+            <button @onclick="LoadPath">@T["teach.load"]</button>
+            <button @onclick="() => Step(-1)">◀</button>
+            <button @onclick="() => Step(1)">▶</button>
+        </div>
+        @if (TryResult is not null)
+        {
+            <table class="tools">
+                @foreach (var t in TryResult.Tools)
+                {
+                    <tr class="@ToolNotice.Row(t)"><td>@ToolNotice.Mark(t)</td><td>@t.ToolName</td><td>@t.Summary</td><td class="num">@t.TimeMs.ToString("0") ms</td></tr>
+                    @foreach (var d in t.Details) { <tr class="sub"><td></td><td colspan="3">@d</td></tr> }
+                }
+            </table>
+        }
+    </div>
+
+    <div class="panel">
+        <h3>@T["teach.camera"]</h3>
+        <div class="form">
+            <label><span>@T["teach.camera_name"]</span><input @bind="CamCfg.Name" /></label>
+            <label><span>@T["teach.camera_unit"]</span>
+                <select @bind="CamCfg.Serial">
+                    <option value="">@T["teach.camera_first"]</option>
+                    @foreach (var c in CameraList) { <option value="@c.Serial">@c.Label (@c.Serial)</option> }
+                    @if (!string.IsNullOrEmpty(CamCfg.Serial) && CameraList.All(c => c.Serial != CamCfg.Serial)) { <option value="@CamCfg.Serial">@CamCfg.Serial</option> }
+                </select>
+                <button @onclick="ListCameras">↻</button>
+            </label>
+            <label><span>@T["teach.exposure"]</span><input type="number" @bind="CamCfg.ExposureUs" /></label>
+            <label><span>@T["teach.gain"]</span><input type="number" step="0.5" @bind="CamCfg.GainDb" /></label>
+            <label><span>@T["teach.test_folder"]</span><input class="wide" @bind="CamCfg.TestFolder" /></label>
+        </div>
+
+        <h3>@T["teach.toolbox"]</h3>
+        <div class="row">
+            <button class="tool" @onclick="AddLocate">⌖ @T["tool.locate"]</button>
+            <button class="tool" @onclick="AddCode">▥ @T["tool.code"]</button>
+            <button class="tool" @onclick="() => AddText(TextMode.Read)">Aa @T["tool.read_text"]</button>
+            <button class="tool" @onclick="() => AddText(TextMode.Check)">A✓ @T["tool.check_text"]</button>
+            <button class="tool" @onclick="AddMeasure">📏 @T["tool.measure"]</button>
+            <button class="tool" @onclick="AddBlob">◌ @T["tool.blob"]</button>
+            <button class="tool" @onclick="AddInspect">🔍 @T["tool.inspect"]</button>
+            <button class="tool" @onclick="AddAnomaly">🔴 @T["tool.anomaly"]</button>
+            <button class="tool" @onclick="AddThermal">♨ @T["tool.thermal"]</button>
+            <button class="tool" @onclick="AddInfrared">🔬 @T["tool.infrared"]</button>
+            <button class="tool" @onclick="AddPolar">👓 @T["tool.polar"]</button>
+            <button class="tool" @onclick="AddPhotometric">🔦 @T["tool.photometric"]</button>
+            <button class="tool" @onclick="AddWavelet">〰 @T["tool.wavelet"]</button>
+            <button class="tool" @onclick="AddInpaint">🖌 @T["tool.inpaint"]</button>
+            <button class="tool" @onclick="AddRectify">📐 @T["tool.rectify"]</button>
+            <button class="tool" @onclick="AddDrift">🧭 @T["tool.drift"]</button>
+            <button class="tool" @onclick="AddDeform">🥨 @T["tool.deform"]</button>
+            <button class="tool" @onclick="AddPhase">🎯 @T["tool.phase"]</button>
+            <button class="tool" @onclick="AddMetamorphic">🧪 @T["tool.metamorphic"]</button>
+            <button class="tool" @onclick="AddAutotune">🩺 @T["tool.autotune"]</button>
+        </div>
+
+        <h3>@T["teach.tools"]</h3>
+        @foreach (var t in Draft.Tools.Where(t => t.Camera == Cam))
+        {
+            <div class="toolrow @(t == Selected ? "on" : "")" @onclick="() => Select(t)">
+                <span>@(t switch { LocateToolConfig => "⌖", CodeToolConfig => "▥", MeasureToolConfig => "📏", BlobToolConfig => "◌", InspectToolConfig => "🔍", AnomalyToolConfig => "🔴", ThermalToolConfig => "♨", InfraredToolConfig => "🔬", PolarToolConfig => "👓", PhotometricToolConfig => "🔦", WaveletToolConfig => "〰", InpaintToolConfig => "🖌", RectifyToolConfig => "📐", DriftToolConfig => "🧭", DeformToolConfig => "🥨", PhaseToolConfig => "🎯", MetamorphicToolConfig => "🧪", AutotuneToolConfig => "🩺", _ => "Aa" }) @t.Name</span>
+                <span class="muted">@(t.Roi is { } r ? $"{r.Width}×{r.Height}" : T["teach.whole_image"])</span>
+                @if (ToolNotice.Of(t) == TextTool.ReportOnlyExplain)
+                {
+                    <span class="muted" title="@T[TextTool.ReportOnlyExplain]">ⓘ @T["text.report_only_tag"]</span>
+                }
+                else if (ToolNotice.Of(t) == TextTool.NoRuleExplain)
+                {
+                    <span class="bad" title="@T[TextTool.NoRuleExplain]">⚠ @T["text.no_rule_tag"]</span>
+                }
+                <button class="link" @onclick="() => Remove(t)" @onclick:stopPropagation>✕</button>
+            </div>
+        }
+
+        @if (Selected is not null)
+        {
+            <h3>@Selected.Name</h3>
+            <div class="form">
+                <label><span>@T["teach.tool_name"]</span><input @bind="Selected.Name" /></label>
+                <label><span>@T["teach.region"]</span>
+                    <span>@(Selected.Roi is { } rr ? $"{rr.X}, {rr.Y}  {rr.Width}×{rr.Height}" : T["teach.whole_image"])</span>
+                    <button @onclick="() => { Selected.Roi = null; Redraw(); }">@T["teach.whole_image"]</button>
+                </label>
+                @if (Selected is LocateToolConfig loc)
+                {
+                    <p class="muted">@T["locate.hint"]</p>
+                    @if (loc.Quality is { } q)
+                    {
+                        <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                <span style="font-size: 12px; font-weight: 700; color: var(--muted);">SHAPE MODEL QUALITY</span>
+                                <span style="font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; background: @(q.IsSufficient ? "var(--ok-bg)" : "var(--ng-bg)"); color: @(q.IsSufficient ? "var(--ok)" : "var(--ng)");">
+                                    @q.Rating (@q.Score.ToString("0.0")%)
+                                </span>
+                            </div>
+                            <div style="font-size: 11px; font-family: ui-monospace, monospace; color: var(--muted); display: flex; gap: 12px;">
+                                <span>Edges: <strong>@q.EdgeCount</strong></span>
+                                <span>Entropy: <strong>@q.OrientationEntropy.ToString("0.00")</strong></span>
+                                <span>Contrast: <strong>@q.ContrastStdDev.ToString("0.0")</strong></span>
+                            </div>
+                            @if (q.Warnings.Length > 0)
+                            {
+                                <div style="margin-top: 6px; font-size: 11px; color: var(--warn); display: flex; flex-direction: column; gap: 2px;">
+                                    @foreach (var w in q.Warnings)
+                                    {
+                                        <span>⚠️ @w</span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    <label><span>@T["locate.max_angle"]</span><input type="number" @bind="loc.MaxAngleDeg" /></label>
+                    <label><span>@T["locate.min_score"]</span><input type="number" step="0.05" @bind="loc.MinScore" /></label>
+                    <label><span>Polarity Metric</span>
+                        <select @bind="loc.Metric">
+                            <option value="@LocateMetric.UsePolarity">Standard (Use Polarity)</option>
+                            <option value="@LocateMetric.IgnoreGlobalPolarity">Ignore Global Inversion (White/Black)</option>
+                            <option value="@LocateMetric.IgnoreLocalPolarity">Ignore Local Polarity (Specular/Foil)</option>
+                        </select>
+                    </label>
+                    <label><span>Search Mode</span>
+                        <select @bind="loc.SearchMode">
+                            <option value="@LocateSearchMode.EdgeGeometric">Edge Geometric (PatMax-style)</option>
+                            <option value="@LocateSearchMode.Correlation">Normalized Correlation</option>
+                        </select>
+                    </label>
+                    <label><span>@T["locate.search"]</span>
+                        <span>@(loc.SearchArea is { } sa ? $"{sa.X}, {sa.Y}  {sa.Width}×{sa.Height}" : T["teach.whole_image"])</span>
+                    </label>
+                    <label><span>@T["locate.pattern"]</span>
+                        <span>@(loc.Pattern is not null ? $"{loc.PatternWidth}×{loc.PatternHeight}" : T["locate.not_taught"])</span>
+                    </label>
+                    <button @onclick="TeachPattern">✨ @T["teach.auto_find"]</button>
+                }
+                @if (Selected is MeasureToolConfig measure)
+                {
+                    <p class="muted">@T["measure.hint"]</p>
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; font-weight: 700; color: var(--muted);">CALIPER FEATURES (@measure.Features.Count)</span>
+                            <button type="button" class="button" style="padding: 2px 8px; font-size: 11px; min-height: 28px;" @onclick="AddMeasureCaliper">+ Add Caliper</button>
+                        </div>
+                        @foreach (var f in measure.Features)
+                        {
+                            <div style="padding: 6px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 4px; font-size: 12px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>@f.Name (@f.GetType().Name.Replace("Feature", ""))</strong>
+                                    <span class="muted">Threshold: @(f.Threshold == 0 ? "Auto" : f.Threshold.ToString("0"))</span>
+                                </div>
+                                @if (f is CaliperFeature cf)
+                                {
+                                    <div style="display: flex; gap: 8px; font-size: 11px; color: var(--muted); margin-top: 3px;">
+                                        <span>Mode: @cf.Mode</span>
+                                        <span>Polarity: @cf.Polarity</span>
+                                        <span>Box: @cf.Box.Length×@cf.Box.Height px</span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+
+                    <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span style="font-size: 12px; font-weight: 700; color: var(--muted);">TOLERANCE CHECKS (@measure.Checks.Count)</span>
+                            <button type="button" class="button" style="padding: 2px 8px; font-size: 11px; min-height: 28px;" @onclick="AddMeasureCheck">+ Add Check</button>
+                        </div>
+                        @foreach (var ch in measure.Checks)
+                        {
+                            <div style="padding: 6px; background: rgba(0,0,0,0.3); border-radius: 6px; margin-bottom: 4px; font-size: 12px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <strong>@ch.Name (@ch.Value on @ch.Feature)</strong>
+                                    <span style="color: var(--cyan); font-family: ui-monospace, monospace;">@(ch.Min?.ToString("0.0") ?? "–") .. @(ch.Max?.ToString("0.0") ?? "–") @ch.Unit</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
+                                    <span class="muted small">Min:</span>
+                                    <input type="number" step="0.1" style="width: 80px; min-height: 32px; padding: 2px 6px;" @bind="ch.Min" />
+                                    <span class="muted small">Max:</span>
+                                    <input type="number" step="0.1" style="width: 80px; min-height: 32px; padding: 2px 6px;" @bind="ch.Max" />
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                @if (Selected is BlobToolConfig blob)
+                {
+                    <p class="muted">@T["blob.hint"]</p>
+                    <label><span>Min Area (px)</span><input type="number" @bind="blob.MinArea" /></label>
+                    <label><span>Max Area (px)</span><input type="number" @bind="blob.MaxArea" /></label>
+                    <label><span>Blob Polarity</span>
+                        <select @bind="blob.Polarity">
+                            <option value="@BlobPolarity.LightOnDark">Bright on dark</option>
+                            <option value="@BlobPolarity.DarkOnLight">Dark on bright</option>
+                        </select>
+                    </label>
+                    <label><span>Threshold Mode</span>
+                        <select @bind="blob.Threshold">
+                            <option value="@BlobThreshold.Auto">Automatic (Otsu)</option>
+                            <option value="@BlobThreshold.Fixed">Fixed Level</option>
+                        </select>
+                    </label>
+                    @if (blob.Threshold == BlobThreshold.Fixed)
+                    {
+                        <label><span>Fixed Threshold</span><input type="number" min="0" max="255" @bind="blob.Level" /></label>
+                    }
+                    <label><span>Count Tolerance</span>
+                        <span style="display: flex; gap: 6px; align-items: center;">
+                            <input type="number" style="width: 80px;" placeholder="Min" @bind="blob.MinCount" />
+                            <span>..</span>
+                            <input type="number" style="width: 80px;" placeholder="Max" @bind="blob.MaxCount" />
+                        </span>
+                    </label>
+                }
+                @if (Selected is InspectToolConfig ins)
+                {
+                    <p class="muted">@T["inspect.hint"]</p>
+                    <label><span>Sensitivity (k·σ)</span><input type="number" step="0.1" min="0.1" max="5.0" @bind="ins.Sensitivity" /></label>
+                    <label><span>Base Offset (grey)</span><input type="number" step="1" min="1" max="50" @bind="ins.BaseOffset" /></label>
+                    <label><span>Edge Tolerance (px)</span><input type="number" step="0.5" min="0" max="10" @bind="ins.EdgeTolerancePx" /></label>
+                    <label><span>Min Defect Area (px)</span><input type="number" min="1" max="1000" @bind="ins.MinDefectAreaPx" /></label>
+                    <label class="check">
+                        <input type="checkbox" @bind="ins.NormalizeLighting" />
+                        <span>Normalize Lighting Drift</span>
+                    </label>
+                }
+                @if (Selected is AnomalyToolConfig anom)
+                {
+                    <p class="muted">@T["anomaly.hint"]</p>
+                    <label><span>Sensitivity</span><input type="number" step="0.1" min="0.5" max="2.0" @bind="anom.Sensitivity" /></label>
+                    <label><span>Patch Size (px)</span><input type="number" step="2" min="8" max="64" @bind="anom.PatchSize" /></label>
+                    <label><span>Min Defect Area (px)</span><input type="number" min="5" max="1000" @bind="anom.MinDefectAreaPx" /></label>
+                }
+                @if (Selected is ThermalToolConfig therm)
+                {
+                    <p class="muted">@T["thermal.hint"]</p>
+                    <label><span>@T["thermal.mode"]</span>
+                        <select @bind="therm.Mode">
+                            <option value="@ThermalInspectionMode.BottleInductionSeal">@T["thermal.bottle"]</option>
+                            <option value="@ThermalInspectionMode.PouchHeatSeal">@T["thermal.pouch"]</option>
+                            <option value="@ThermalInspectionMode.HotMeltGlue">@T["thermal.glue"]</option>
+                            <option value="@ThermalInspectionMode.BlisterPocket">@T["thermal.blister"]</option>
+                        </select>
+                    </label>
+                    <div class="row">
+                        <label><span>T Min (°C)</span><input type="number" step="1" @bind="therm.TMinCalib" /></label>
+                        <label><span>T Max (°C)</span><input type="number" step="1" @bind="therm.TMaxCalib" /></label>
+                    </div>
+
+                    @if (therm.Mode == ThermalInspectionMode.BottleInductionSeal)
+                    {
+                        <div class="row">
+                            <label><span>Inner Radius (px)</span><input type="number" min="5" @bind="therm.BottleInnerRadiusPx" /></label>
+                            <label><span>Outer Radius (px)</span><input type="number" min="10" @bind="therm.BottleOuterRadiusPx" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Min Seal Temp (°C)</span><input type="number" step="1" @bind="therm.BottleMinSealTempC" /></label>
+                            <label><span>Max Seal Temp (°C)</span><input type="number" step="1" @bind="therm.BottleMaxSealTempC" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Max Cold Gap (°)</span><input type="number" step="1" min="0" max="180" @bind="therm.BottleMaxColdGapDeg" /></label>
+                            <label><span>Missing Foil (°C)</span><input type="number" step="1" @bind="therm.BottleMissingFoilTempC" /></label>
+                        </div>
+                    }
+                    else if (therm.Mode == ThermalInspectionMode.PouchHeatSeal)
+                    {
+                        <div class="row">
+                            <label><span>Min Seal Temp (°C)</span><input type="number" step="1" @bind="therm.PouchMinSealTempC" /></label>
+                            <label><span>Min Width (px)</span><input type="number" step="1" min="1" @bind="therm.PouchMinSealWidthPx" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Max Void Length (px)</span><input type="number" step="1" min="0" @bind="therm.PouchMaxVoidLengthPx" /></label>
+                            <label><span>Contam Drop (°C)</span><input type="number" step="1" @bind="therm.PouchContaminationDropC" /></label>
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" @bind="therm.PouchIsVertical" />
+                            <span>Vertical Seam</span>
+                        </label>
+                    }
+                    else if (therm.Mode == ThermalInspectionMode.HotMeltGlue)
+                    {
+                        <div class="row">
+                            <label><span>Expected Beads</span><input type="number" min="1" max="16" @bind="therm.GlueExpectedBeads" /></label>
+                            <label><span>Min Glue Temp (°C)</span><input type="number" step="1" @bind="therm.GlueMinTempC" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Min Bead Length (px)</span><input type="number" step="1" @bind="therm.GlueMinBeadLengthPx" /></label>
+                            <label><span>Max Bead Gap (px)</span><input type="number" step="1" @bind="therm.GlueMaxBeadGapPx" /></label>
+                        </div>
+                        <label class="check">
+                            <input type="checkbox" @bind="therm.GlueIsVertical" />
+                            <span>Vertical Dispense</span>
+                        </label>
+                    }
+                    else if (therm.Mode == ThermalInspectionMode.BlisterPocket)
+                    {
+                        <div class="row">
+                            <label><span>Rows</span><input type="number" min="1" max="10" @bind="therm.BlisterRows" /></label>
+                            <label><span>Cols</span><input type="number" min="1" max="20" @bind="therm.BlisterCols" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Min Barrier Width (px)</span><input type="number" step="1" min="1" @bind="therm.BlisterMinBarrierWidthPx" /></label>
+                            <label><span>Min Seal Temp (°C)</span><input type="number" step="1" @bind="therm.BlisterMinSealTempC" /></label>
+                        </div>
+                    }
+                }
+                @if (Selected is InfraredToolConfig ir)
+                {
+                    <p class="muted">@T["infrared.hint"]</p>
+                    <label><span>@T["infrared.mode"]</span>
+                        <select @bind="ir.Mode">
+                            <option value="@InfraredInspectionMode.FillLevel">@T["infrared.fill_level"]</option>
+                            <option value="@InfraredInspectionMode.MetamericInk">@T["infrared.metameric"]</option>
+                            <option value="@InfraredInspectionMode.MoistureBarrier">@T["infrared.moisture"]</option>
+                            <option value="@InfraredInspectionMode.CrackDetection">@T["infrared.cracks"]</option>
+                        </select>
+                    </label>
+
+                    @if (ir.Mode == InfraredInspectionMode.FillLevel)
+                    {
+                        <div class="row">
+                            <label><span>Pixels / mm</span><input type="number" step="0.1" min="0.1" @bind="ir.PxPerMm" /></label>
+                            <label><span>Target Fill (mm)</span><input type="number" step="0.5" @bind="ir.TargetFillMm" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Underfill Tol (mm)</span><input type="number" step="0.1" min="0.1" @bind="ir.TolUnderfillMm" /></label>
+                            <label><span>Overfill Tol (mm)</span><input type="number" step="0.1" min="0.1" @bind="ir.TolOverfillMm" /></label>
+                        </div>
+                        <div class="row">
+                            <label><span>Min Contrast</span><input type="number" step="1" min="1" @bind="ir.MinMeniscusContrast" /></label>
+                            <label class="check">
+                                <input type="checkbox" @bind="ir.IgnoreFoam" />
+                                <span>Ignore Foam</span>
+                            </label>
+                        </div>
+                    }
+                    else if (ir.Mode == InfraredInspectionMode.MetamericInk)
+                    {
+                        <div class="row">
+                            <label><span>Dye NDMI Thresh</span><input type="number" step="0.05" @bind="ir.DyeNdmiThresh" /></label>
+                            <label><span>Carbon NDMI Max</span><input type="number" step="0.05" @bind="ir.CarbonNdmiMax" /></label>
+                        </div>
+                        <label><span>Min Security Area (px)</span><input type="number" step="10" min="10" @bind="ir.MinSecurityAreaPx" /></label>
+                    }
+                    else if (ir.Mode == InfraredInspectionMode.MoistureBarrier)
+                    {
+                        <div class="row">
+                            <label><span>Absorption Thresh</span><input type="number" step="1" @bind="ir.AbsorptionThresh" /></label>
+                            <label><span>Min Safe Barrier (px)</span><input type="number" step="1" min="1" @bind="ir.MinSafeBarrierPx" /></label>
+                        </div>
+                    }
+                    else if (ir.Mode == InfraredInspectionMode.CrackDetection)
+                    {
+                        <div class="row">
+                            <label><span>Hessian Sigma</span><input type="number" step="0.1" min="0.5" @bind="ir.HessianSigma" /></label>
+                            <label><span>Response Thresh</span><input type="number" step="0.5" min="1" @bind="ir.CrackResponseThresh" /></label>
+                        </div>
+                        <label><span>Min Crack Length (px)</span><input type="number" step="1" min="3" @bind="ir.MinCrackLengthPx" /></label>
+                    }
+                }
+                @if (Selected is PolarToolConfig pol)
+                {
+                    <p class="muted">@T["polar.hint"]</p>
+                    <label><span>@T["polar.mode"]</span>
+                        <select @bind="pol.Mode">
+                            <option value="@PolarInspectionMode.GlareRemoval">@T["polar.glare"]</option>
+                            <option value="@PolarInspectionMode.StressBirefringence">@T["polar.stress"]</option>
+                            <option value="@PolarInspectionMode.SpecularSaliency">@T["polar.specular"]</option>
+                        </select>
+                    </label>
+
+                    @if (pol.Mode == PolarInspectionMode.GlareRemoval)
+                    {
+                        <div class="row">
+                            <label><span>Glare Suppress Alpha</span><input type="number" step="0.05" min="0.1" max="1.0" @bind="pol.GlareSuppressAlpha" /></label>
+                            <label><span>Max Glare Area (%)</span><input type="number" step="0.5" min="0.1" max="100.0" @bind="pol.MaxAllowedGlarePct" /></label>
+                        </div>
+                    }
+                    else if (pol.Mode == PolarInspectionMode.StressBirefringence)
+                    {
+                        <div class="row">
+                            <label><span>Stress Gradient Thresh (°)</span><input type="number" step="5" min="5" @bind="pol.StressGradientThresh" /></label>
+                            <label><span>DoLP Defect Thresh</span><input type="number" step="0.05" min="0.05" max="1.0" @bind="pol.DolpDefectThresh" /></label>
+                        </div>
+                    }
+                    else if (pol.Mode == PolarInspectionMode.SpecularSaliency)
+                    {
+                        <div class="row">
+                            <label><span>Specular Gain</span><input type="number" step="0.1" min="0.5" @bind="pol.SpecularGain" /></label>
+                            <label><span>DoLP Defect Thresh</span><input type="number" step="0.05" min="0.05" max="1.0" @bind="pol.DolpDefectThresh" /></label>
+                        </div>
+                    }
+                }
+                @if (Selected is PhotometricToolConfig photo)
+                {
+                    <p class="muted">@T["photometric.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["photometric.mode"]</span>
+                            <select @bind="photo.Mode">
+                                <option value="@PhotometricMode.CurvatureRelief">@T["photometric.mode.relief"]</option>
+                                <option value="@PhotometricMode.EmbossPresence">@T["photometric.mode.emboss"]</option>
+                                <option value="@PhotometricMode.AlbedoInspection">@T["photometric.mode.albedo"]</option>
+                                <option value="@PhotometricMode.VirtualLighting">@T["photometric.mode.virtual"]</option>
+                            </select>
+                        </label>
+                        <label><span>Strobe Layout</span>
+                            <select @bind="photo.Layout">
+                                <option value="@PhotometricLayout.Quadrant2x2">Quadrant 2×2</option>
+                                <option value="@PhotometricLayout.VerticalStripes4x1">Vertical Stripes 4×1</option>
+                                <option value="@PhotometricLayout.HorizontalStripes1x4">Horizontal Stripes 1×4</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    @if (photo.Mode == PhotometricMode.CurvatureRelief)
+                    {
+                        <div class="row">
+                            <label><span>Relief Thresh</span><input type="number" step="1" min="1" max="127" @bind="photo.ReliefThreshold" /></label>
+                            <label><span>Max Defect Area (px)</span><input type="number" step="5" min="0" @bind="photo.MaxAllowedDefectPx" /></label>
+                            <label><span>Shape Contrast Gain</span><input type="number" step="10" min="10" @bind="photo.ShapeContrastGain" /></label>
+                        </div>
+                    }
+                    else if (photo.Mode == PhotometricMode.EmbossPresence)
+                    {
+                        <div class="row">
+                            <label><span>Relief Thresh</span><input type="number" step="1" min="1" max="127" @bind="photo.ReliefThreshold" /></label>
+                            <label><span>Min Feature Px</span><input type="number" step="10" min="1" @bind="photo.MinFeaturePx" /></label>
+                            <label><span>Max Feature Px</span><input type="number" step="50" min="1" @bind="photo.MaxFeaturePx" /></label>
+                        </div>
+                    }
+                    else if (photo.Mode == PhotometricMode.AlbedoInspection)
+                    {
+                        <div class="row">
+                            <label><span>Albedo Gamma</span><input type="number" step="0.1" min="0.1" max="5.0" @bind="photo.AlbedoGamma" /></label>
+                            <label><span>Shape Contrast Gain</span><input type="number" step="10" min="10" @bind="photo.ShapeContrastGain" /></label>
+                        </div>
+                    }
+                    else if (photo.Mode == PhotometricMode.VirtualLighting)
+                    {
+                        <div class="row">
+                            <label><span>Virtual Tilt (°)</span><input type="number" step="5" min="0" max="360" @bind="photo.VirtualTiltDeg" /></label>
+                            <label><span>Virtual Slant (°)</span><input type="number" step="5" min="0" max="90" @bind="photo.VirtualSlantDeg" /></label>
+                            <label><span>Albedo Gamma</span><input type="number" step="0.1" min="0.1" max="5.0" @bind="photo.AlbedoGamma" /></label>
+                        </div>
+                    }
+                }
+                @if (Selected is WaveletToolConfig wave)
+                {
+                    <p class="muted">@T["wavelet.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["wavelet.mode"]</span>
+                            <select @bind="wave.Mode">
+                                <option value="@WaveletInspectionMode.ScratchDetection">@T["wavelet.scratch"]</option>
+                                <option value="@WaveletInspectionMode.PinholeDefect">@T["wavelet.pinhole"]</option>
+                                <option value="@WaveletInspectionMode.TextureFiltering">@T["wavelet.texture"]</option>
+                            </select>
+                        </label>
+                        <label><span>Texture Orientation</span>
+                            <select @bind="wave.TextureMode">
+                                <option value="@TextureOrientation.Auto">Auto-Detect</option>
+                                <option value="@TextureOrientation.Horizontal">Horizontal Grain</option>
+                                <option value="@TextureOrientation.Vertical">Vertical Grain</option>
+                                <option value="@TextureOrientation.Diagonal">Diagonal (45°)</option>
+                                <option value="@TextureOrientation.KnurledGrid">Knurled Grid / Cross-Hatch</option>
+                            </select>
+                        </label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>Wavelet Levels</span><input type="number" step="1" min="1" max="4" @bind="wave.Levels" /></label>
+                        <label><span>Suppression</span><input type="number" step="0.05" min="0.1" max="1.0" @bind="wave.SuppressionStrength" /></label>
+                        <label><span>Scratch Gain</span><input type="number" step="0.5" min="1.0" max="10.0" @bind="wave.ScratchGain" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>Contrast Thresh</span><input type="number" step="5" min="5" max="150" @bind="wave.DefectContrastThresh" /></label>
+                        <label><span>Min Area (px)</span><input type="number" step="1" min="1" max="500" @bind="wave.MinDefectAreaPx" /></label>
+                        <label><span>Max Allowed (px)</span><input type="number" step="5" min="0" max="1000" @bind="wave.MaxAllowedDefectPx" /></label>
+                    </div>
+                }
+                @if (Selected is InpaintToolConfig inp)
+                {
+                    <p class="muted">@T["inpaint.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["inpaint.method"]</span>
+                            <select @bind="inp.Method">
+                                <option value="@InpaintNative.InpaintMethod.Telea">Fast Marching (Telea)</option>
+                                <option value="@InpaintNative.InpaintMethod.NavierStokes">Navier-Stokes (Fluid)</option>
+                                <option value="@InpaintNative.InpaintMethod.Harmonic">Harmonic Laplacian</option>
+                            </select>
+                        </label>
+                        <label><span>Glare Threshold</span><input type="number" step="1" min="200" max="255" @bind="inp.GlareThreshold" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>Halo Radius</span><input type="number" step="1" min="0" max="10" @bind="inp.HaloRadius" /></label>
+                        <label><span>Inpaint Radius</span><input type="number" step="1" min="1" max="15" @bind="inp.InpaintRadius" /></label>
+                        <label><span>Max Glare Area (%)</span><input type="number" step="1" min="1" max="100" @bind="inp.MaxAllowedGlarePct" /></label>
+                    </div>
+                }
+                @if (Selected is RectifyToolConfig rect)
+                {
+                    <p class="muted">@T["rectify.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["rectify.linespeed"]</span><input type="number" step="10" min="0" max="5000" @bind="rect.LineSpeedMmS" /></label>
+                        <label><span>@T["rectify.mmperpx"]</span><input type="number" step="0.01" min="0.001" max="10" @bind="rect.MmPerPx" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["rectify.rowtime"]</span><input type="number" step="0.5" min="0.1" max="500" @bind="rect.RowTimeUs" /></label>
+                        <label><span>@T["rectify.motionangle"]</span><input type="number" step="1" min="-180" max="180" @bind="rect.MotionAngleDeg" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="rect.Bilinear" /> <span>@T["rectify.bilinear"]</span></label>
+                        <label><span>@T["rectify.maxshear"]</span><input type="number" step="0.5" min="0.1" max="45" @bind="rect.MaxAllowedShearDeg" /></label>
+                    </div>
+                }
+                @if (Selected is DriftToolConfig drift)
+                {
+                    <p class="muted">@T["drift.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["drift.window"]</span><input type="number" step="5" min="5" max="500" @bind="drift.WindowSize" /></label>
+                        <label><span>@T["drift.threshold"]</span><input type="number" step="0.5" min="1.0" max="20.0" @bind="drift.WarnDistanceThreshold" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["drift.dirt_sigma"]</span><input type="number" step="0.5" min="0.5" max="10.0" @bind="drift.DirtSharpnessSigma" /></label>
+                        <label><span>@T["drift.light_sigma"]</span><input type="number" step="0.5" min="0.5" max="10.0" @bind="drift.LightDropSigma" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["drift.grid_step"]</span><input type="number" step="1" min="1" max="16" @bind="drift.GridStep" /></label>
+                        <label><input type="checkbox" @bind="drift.FailOnDrift" /> <span>@T["drift.fail_on_drift"]</span></label>
+                    </div>
+                    <label><span>@T["drift.baseline"]</span>
+                        <span>@(drift.Baseline.Count >= DriftToolConfig.MinSamples ? T.Format("drift.baseline_samples", drift.Baseline.Count) : T["locate.not_taught"])</span>
+                    </label>
+                    <button @onclick="() => TeachDriftBaseline(drift)">✨ @T["drift.teach_baseline"]</button>
+                }
+                @if (Selected is DeformToolConfig def)
+                {
+                    <p class="muted">@T["deform.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["deform.mesh_cols"]</span><input type="number" step="1" min="3" max="25" @bind="def.MeshCols" /></label>
+                        <label><span>@T["deform.mesh_rows"]</span><input type="number" step="1" min="3" max="25" @bind="def.MeshRows" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["deform.pyramids"]</span><input type="number" step="1" min="1" max="5" @bind="def.PyramidLevels" /></label>
+                        <label><span>@T["deform.smoothness"]</span><input type="number" step="0.05" min="0.05" max="2.0" @bind="def.SmoothnessWeight" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["deform.rupture_thresh"]</span><input type="number" step="0.05" min="0.1" max="1.5" @bind="def.RuptureStrainThreshold" /></label>
+                        <label><span>@T["deform.crumple_thresh"]</span><input type="number" step="5" min="5" max="200" @bind="def.CrumpleBendingThreshold" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["deform.min_score"]</span><input type="number" step="0.05" min="0.1" max="1.0" @bind="def.MinAlignmentScore" /></label>
+                    </div>
+                    <label><span>@T["reference.label"]</span>
+                        <span>@(def.Reference is not null ? $"{def.ReferenceWidth}×{def.ReferenceHeight}" : T["locate.not_taught"])</span>
+                    </label>
+                    <button @onclick="() => TeachReference(def, def.Teach)">✨ @T["reference.teach"]</button>
+                }
+                @if (Selected is PhaseToolConfig ph)
+                {
+                    <p class="muted">@T["phase.hint"]</p>
+                    <div class="row">
+                        <label><input type="checkbox" @bind="ph.EstimateRotation" /> <span>@T["phase.rotation"]</span></label>
+                        <label><input type="checkbox" @bind="ph.EstimateScale" /> <span>@T["phase.scale"]</span></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["phase.min_score"]</span><input type="number" step="0.02" min="0.05" max="1.0" @bind="ph.MinCorrelationScore" /></label>
+                        <label><span>@T["phase.min_psr"]</span><input type="number" step="0.5" min="2.0" max="50.0" @bind="ph.MinPsr" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="ph.ApplyHannWindow" /> <span>@T["phase.hann"]</span></label>
+                    </div>
+                    <label><span>@T["reference.label"]</span>
+                        <span>@(ph.Reference is not null ? $"{ph.ReferenceWidth}×{ph.ReferenceHeight}" : T["locate.not_taught"])</span>
+                    </label>
+                    <button @onclick="() => TeachReference(ph, ph.Teach)">✨ @T["reference.teach"]</button>
+                }
+                @if (Selected is MetamorphicToolConfig meta)
+                {
+                    <p class="muted">@T["metamorphic.hint"]</p>
+                    <div class="row">
+                        <label><span>@T["metamorphic.max_rotation"]</span><input type="number" step="0.5" min="0.5" max="45.0" @bind="meta.MaxRotationDeg" /></label>
+                        <label><span>@T["metamorphic.rotation_steps"]</span><input type="number" step="2" min="3" max="31" @bind="meta.RotationSteps" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["metamorphic.max_illum_gain"]</span><input type="number" step="0.02" min="0.01" max="0.50" @bind="meta.MaxIllumGainDelta" /></label>
+                        <label><span>@T["metamorphic.illum_steps"]</span><input type="number" step="1" min="3" max="15" @bind="meta.IllumSteps" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["metamorphic.max_scale"]</span><input type="number" step="0.01" min="0.01" max="0.30" @bind="meta.MaxScaleDelta" /></label>
+                        <label><span>@T["metamorphic.scale_steps"]</span><input type="number" step="1" min="3" max="15" @bind="meta.ScaleSteps" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["metamorphic.max_noise"]</span><input type="number" step="1.0" min="0.0" max="25.0" @bind="meta.MaxNoiseSigma" /></label>
+                        <label><span>@T["metamorphic.noise_steps"]</span><input type="number" step="1" min="2" max="10" @bind="meta.NoiseSteps" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["metamorphic.max_jitter"]</span><input type="number" step="0.05" min="0.1" max="5.0" @bind="meta.MaxAllowedJitterPx" /></label>
+                        <label><span>@T["metamorphic.min_confidence"]</span><input type="number" step="0.05" min="0.1" max="0.99" @bind="meta.MinAcceptableConfidence" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="meta.FailOnNonRobust" /> <span>@T["metamorphic.fail_on_non_robust"]</span></label>
+                    </div>
+                }
+                @if (Selected is AutotuneToolConfig at)
+                {
+                    <p class="muted">@T["autotune.hint"]</p>
+                    <div class="row">
+                        <label><input type="checkbox" @bind="at.CheckMountTilt" /> <span>@T["autotune.check_tilt"]</span></label>
+                        <label><span>@T["autotune.min_uniformity"]</span><input type="number" step="0.05" min="0.30" max="0.95" @bind="at.MinAcceptableUniformity" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="at.AnalyzeLighting" /> <span>@T["autotune.analyze_lighting"]</span></label>
+                        <label><span>@T["autotune.target_mean"]</span><input type="number" step="5" min="50" max="220" @bind="at.TargetMeanDn" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="at.CheckLensDust" /> <span>@T["autotune.check_dust"]</span></label>
+                        <label><span>@T["autotune.max_dust_spots"]</span><input type="number" step="1" min="1" max="20" @bind="at.MaxAllowedDustSpots" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="at.TrackApplicator" /> <span>@T["autotune.track_applicator"]</span></label>
+                        <label><span>@T["autotune.max_eccentricity"]</span><input type="number" step="0.1" min="0.2" max="5.0" @bind="at.MaxAllowedEccentricityMm" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><span>@T["autotune.px_per_mm"]</span><input type="number" step="0.5" min="1.0" max="100.0" @bind="at.PxPerMm" /></label>
+                        <label><span>@T["autotune.screw_pitch"]</span><input type="number" step="0.1" min="0.1" max="2.0" @bind="at.ScrewPitchMmPerTurn" /></label>
+                    </div>
+
+                    <div class="row">
+                        <label><input type="checkbox" @bind="at.FailOnCriticalTilt" /> <span>@T["autotune.fail_on_critical"]</span></label>
+                    </div>
+                }
+                @if (Selected is CodeToolConfig code)
+                {
+                    <label><span>@T["code.type"]</span>
+                        <select @bind="code.Format">
+                            @foreach (var f in CodeFormats.Single)
+                            {
+                                <option value="@f">@CodeFormats.Name(f)</option>
+                            }
+                        </select>
+                    </label>
+                    @if (CodeFormats.IsLinear(code.Format) && !CodeFormats.HasFixedLength(code.Format))
+                    {
+                        <label><span>@T["code.min_length"]</span><input type="number" min="0" max="4096" @bind="code.MinLength" /></label>
+                        <label><span>@T["code.max_length"]</span><input type="number" min="0" max="4096" @bind="code.MaxLength" /></label>
+                    }
+                    @if (CodeFormats.IsPharmacode(code.Format))
+                    {
+                        <label><span>@T["code.bars"]</span><input type="number" min="@PharmacodeBarsField.Fewest" max="@PharmacodeBarsField.Most"
+                            placeholder="@PharmacodeBarsField.Range(code)" @bind:get="PharmacodeBarsField.Get(code)" @bind:set="v => PharmacodeBarsField.Set(code, v)" /></label>
+                    }
+                    @if (CodeFormats.IsLinear(code.Format) && code.Format != CodeFormat.DataBar)
+                    {
+                        <label><span>@T["code.quiet_zone"]</span><input type="checkbox" @bind="code.QuietZoneCheck" /></label>
+                    }
+                    @if (code.Format is CodeFormat.Code39 or CodeFormat.Itf or CodeFormat.Codabar)
+                    {
+                        <label><span>@T["code.check_digit"]</span>
+                            <select @bind="code.CheckDigit">
+                                <option value="@CheckDigitRule.AsRead">@T["code.check_digit.as_read"]</option>
+                                <option value="@CheckDigitRule.Verify">@T["code.check_digit.verify"]</option>
+                                <option value="@CheckDigitRule.Strip">@T["code.check_digit.strip"]</option>
+                            </select>
+                        </label>
+                    }
+                    @if (CodeTool.SetupProblem(code) is { } problem)
+                    {
+                        <p class="muted">⚠ @problem</p>
+                    }
+                    <label><span>@T["code.count"]</span><input type="number" min="1" @bind="code.ExpectedCount" /></label>
+                    <label><span>@T["code.min_grade"]</span>
+                        <select @bind="code.MinGrade">
+                            <option value="-1">@T["code.min_grade_off"]</option>
+                            <option value="4">A</option>
+                            <option value="3">B</option>
+                            <option value="2">C</option>
+                            <option value="1">D</option>
+                        </select>
+                    </label>
+                    <label><span>@T["code.record_grades"]</span><input type="checkbox" @bind="code.RecordGrades" /></label>
+                    @if (code.Grading)
+                    {
+                        <label><span>@T["code.grade_every"]</span><input type="number" min="1" max="10000" @bind="code.GradeEvery" /></label>
+                    }
+                    <label><span>@T["code.gs1"]</span>
+                        <input type="checkbox" checked="@(code.Gs1 is not null)" @onchange="e => code.Gs1 = (bool)e.Value! ? (code.Gs1 ?? new Gs1Rules()) : null" />
+                    </label>
+                    @if (code.Gs1 is { } gs1)
+                    {
+                        <label><span>@T["code.gs1_required"]</span>
+                            <input value="@(Gs1Typed.GetValueOrDefault((code, "ais")) ?? string.Join(" ", gs1.Required))" placeholder="01 10 17 21"
+                                   @onchange="e => SetGs1Ais(code, gs1, e.Value?.ToString())" />
+                            <button type="button" title="@T["code.gs1_pharma_hint"]" @onclick="() => SetGs1Ais(code, gs1, Gs1RequiredPresets.Format(Gs1RequiredPresets.Pharma))">@T["code.gs1_pharma"]</button>
+                            @if (Gs1Errors.GetValueOrDefault((code, "ais")) is { } aisError) { <span class="muted">⚠ @aisError</span> }
+                        </label>
+                        <label><span>@T["code.gs1_values"]</span>
+                            <input class="wide" value="@(Gs1Typed.GetValueOrDefault((code, "values")) ?? CodeTeach.FormatAiValues(code.Gs1Values))" placeholder="01={GTIN}; 10={BATCH}"
+                                   @onchange="e => SetGs1Values(code, e.Value?.ToString())" />
+                            @if (Gs1Errors.GetValueOrDefault((code, "values")) is { } valuesError) { <span class="muted">⚠ @valuesError</span> }
+                        </label>
+                        <label><span>@T["code.gs1_not_past"]</span><input type="checkbox" @bind="gs1.ExpiryNotPast" /></label>
+                    }
+                    <label><span>@T["code.expected"]</span><input class="wide" placeholder="{GTIN}" @bind="code.Expected" /></label>
+                    <button @onclick="AutoFindCode">✨ @T["teach.auto_find"]</button>
+                }
+                @if (Selected is TextToolConfig text)
+                {
+                    <label><span>@T["text.mode"]</span>
+                        <select @bind="text.Mode">
+                            <option value="@TextMode.Read">@T["tool.read_text"]</option>
+                            <option value="@TextMode.Check">@T["tool.check_text"]</option>
+                        </select>
+                    </label>
+                    <label><span>@T["text.print"]</span>
+                        <select @bind="text.Print">
+                            <option value="@PrintType.Auto">@T["text.print_auto"]</option>
+                            <option value="@PrintType.Solid">@T["text.print_solid"]</option>
+                            <option value="@PrintType.DotMatrix">@T["text.print_dot"]</option>
+                        </select>
+                    </label>
+                    <label><span>@T["text.char_height"]</span><input type="number" @bind="text.CharHeightPx" /></label>
+                    <label><span>@T["text.min_quality"]</span><input type="number" @bind="text.MinQuality" /></label>
+                    <label><span>@T["text.reader"]</span>
+                        <select @bind="text.Reader">
+                            <option value="@OcrReader.Ai">@T["text.reader_ai"]</option>
+                            <option value="@OcrReader.Font">@T["text.reader_font"]</option>
+                        </select>
+                    </label>
+                    @if (text.Reader == OcrReader.Font)
+                    {
+                        <label><span>@T["text.font_from"]</span>
+                            <select value="@(text.Rendered is null ? "print" : "system")" @onchange="e => SetFontFrom(text, (string?)e.Value)">
+                                <option value="print">@T["text.font_from_print"]</option>
+                                <option value="system">@T["text.font_from_system"]</option>
+                            </select>
+                        </label>
+                        @if (text.Rendered is { } rf)
+                        {
+                            <p class="muted">@T["text.render_hint"]</p>
+                            <label><span>@T["text.render_family"]</span>
+                                <select @bind="rf.Family">
+                                    <option value=""></option>
+                                    @foreach (var f in SystemFonts.Value) { <option value="@f">@f</option> }
+                                </select>
+                            </label>
+                            <label><span>@T["text.render_size"]</span><input type="number" min="@FontRender.MinSizePx" max="@FontRender.MaxSizePx" @bind="rf.SizePx" /></label>
+                            <label><span>@T["text.render_bold"]</span><input type="checkbox" @bind="rf.Bold" /></label>
+                            <label><span>@T["text.render_chars"]</span><input class="wide" @bind="rf.Characters" /></label>
+                            <button @onclick="() => DrawFont(text)">@T["text.render_draw"]</button>
+                        }
+                        else
+                        {
+                        <p class="muted">@T.Format("text.font_hint", TextTool.FontGlyphs(text.Font))</p>
+                        <div class="line">
+                            <span>@T["text.font_line"]</span>
+                            <input type="number" min="1" max="32" @bind="FontLine" />
+                            <input class="wide" @bind="FontText" placeholder="LOT A12345" />
+                            <button @onclick="() => TeachFont(FontText)">@T["text.font_teach"]</button>
+                            <button class="link" @onclick="ClearFont">@T["text.font_clear"]</button>
+                        </div>
+                        @if (!string.IsNullOrEmpty(text.Font))
+                        {
+                            <button @onclick="ReadFontLine">@T["text.font_read"]</button>
+                        }
+                        @if (FontCells is { } cells && FontCellsTool == text)
+                        {
+                            <p class="muted">@T["text.font_ask_hint"]</p>
+                            <div class="line">
+                                @for (int i = 0; i < cells.Count; i++)
+                                {
+                                    int k = i;
+                                    <input class="char @(cells[k].Sure ? "" : "unsure")" size="1" maxlength="2" title="@(cells[k].Sure ? "" : T.Format("text.font_read_as", cells[k].Read))"
+                                           value="@cells[k].Typed" @onchange="e => cells[k].Typed = e.Value?.ToString() ?? string.Empty" />
+                                }
+                                <button @onclick="TeachAsked">@T["text.font_teach"]</button>
+                            </div>
+                        }
+                        @if (TryResult?.Tools.FirstOrDefault(r => r.ToolName == text.Name)?.Lines is { } ran && FontTeach.Candidates(ran) is { Count: > 0 } toTeach)
+                        {
+                            <p class="muted">@T["text.font_char_hint"]</p>
+                            @for (int i = 0; i < toTeach.Count; i++)
+                            {
+                                var cand = toTeach[i];
+                                int k = i;
+                                <div class="line">
+                                    <span>@T.Format("text.font_char_at", cand.Line + 1, cand.Char.Found.Length > 0 ? cand.Char.Found : "?")</span>
+                                    @if (cand.Char.Status == CharStatus.Unknown) { <span class="muted">@T["text.font_not_taught"]</span> }
+                                    @if (cand.Should.Length > 0) { <span class="muted">@T.Format("text.font_char_should", cand.Should)</span> }
+                                    <input class="char" size="1" maxlength="2" value="@CharTyped.GetValueOrDefault(k)" @onchange="e => CharTyped[k] = e.Value?.ToString() ?? string.Empty" />
+                                    <button @onclick="() => TeachOneChar(cand, k)">@T["text.font_teach_char"]</button>
+                                </div>
+                            }
+                        }
+                        }
+                    }
+                    <button @onclick="AutoFindText">✨ @T["teach.auto_find"]</button>
+                    @if (text.Mode == TextMode.Check)
+                    {
+                        <p class="muted">@T["text.lines_hint"]</p>
+                        @for (int i = 0; i < text.Lines.Count; i++)
+                        {
+                            var line = text.Lines[i];
+                            int k = i;
+                            <div class="line">
+                                <span>@(k + 1)</span>
+                                <select @bind="line.Entry">
+                                    <option value="@LineEntry.Template">@T["text.template"]</option>
+                                    <option value="@LineEntry.FullText">@T["text.full_text"]</option>
+                                </select>
+                                <input class="wide" @bind="line.Template" placeholder="@(line.Entry == LineEntry.Template ? "₹ {MRP}, {BATCH}" : "")" />
+                                <button class="link" @onclick="() => text.Lines.RemoveAt(k)">✕</button>
+                            </div>
+                        }
+                        <button @onclick="() => text.Lines.Add(new TextLineSpec())">+ @T["text.add_line"]</button>
+                    }
+                    else
+                    {
+                        <label><span>@T["text.report_only"]</span><input type="checkbox" @bind="text.ReportOnly" /></label>
+                        @if (ToolNotice.Of(text) is { } notice)
+                        {
+                            <p class="@(notice == TextTool.NoRuleExplain ? "bad" : "muted")">@(notice == TextTool.NoRuleExplain ? "⚠" : "ⓘ") @T[notice]</p>
+                        }
+                        <p class="muted">@T["text.formats_hint"]</p>
+                        @for (int i = 0; i < text.Lines.Count; i++)
+                        {
+                            var line = text.Lines[i];
+                            int k = i;
+                            <div class="line">
+                                <span>@(k + 1)</span>
+                                <input class="wide" @bind="line.Template" placeholder="LOT {A:1}{D:5}" />
+                                <span class="muted">@FormatError(line.Template, text.MonthLanguages)</span>
+                                <button class="link" @onclick="() => text.Lines.RemoveAt(k)">✕</button>
+                            </div>
+                        }
+                        @if (TextTool.SetupProblem(text) is { } problem)
+                        {
+                            <p class="muted">⚠ @problem</p>
+                        }
+                        <button @onclick="() => text.Lines.Add(new TextLineSpec { Entry = LineEntry.Format })">+ @T["text.add_format"]</button>
+                        <div class="line">
+                            <span>@T["text.month_languages"]</span>
+                            @foreach (var lang in TextFormat.MonthNames.Keys)
+                            {
+                                var monthLang = lang;
+                                <label title="@string.Join(" ", TextFormat.MonthNames[monthLang].Select(m => m[0]))">
+                                    <input type="checkbox" checked="@MonthLanguages.Has(text, monthLang)" @onchange="e => MonthLanguages.Set(text, monthLang, e.Value is true)" />
+                                    @MonthLanguages.Name(monthLang)
+                                </label>
+                            }
+                        </div>
+                        <label><span>@T["text.expiry_months"]</span><input type="number" min="0" max="240" @bind="text.Dates.ExpiryMonths" /></label>
+                        <label><span>@T["text.mfd_within_days"]</span><input type="number" min="0" max="366" @bind="text.Dates.MfdWithinDays" /></label>
+                    }
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public string? JobName { get; set; }
+    /// <summary>An NG image from the Run page's list (its path under ng-images, NgTeachLink): loaded with its job and camera.</summary>
+    [SupplyParameterFromQuery(Name = "ng")] public string? Ng { get; set; }
+    private string? _ngLoaded;
+
+    private Job Draft = new() { Name = "" };
+    private int Cam;
+    private CameraConfig CamCfg => Draft.Cameras[Cam];
+    private ToolConfig? Selected;
+    private readonly Dictionary<int, GrayImage> TeachImages = new();
+    private GrayImage? Image => TeachImages.TryGetValue(Cam, out var i) ? i : null;
+    private Render.Frame? Frame;
+    private int Version;
+    private readonly string Key = "teach-" + Guid.NewGuid().ToString("N")[..8];
+    private string? ImagePath;
+    private int FontLine = 1;
+    private string FontText = "";
+    private string? Message;
+    private bool MessageBad;
+    private JobResult? TryResult;
+    private IReadOnlyList<CameraInfo> CameraList = Array.Empty<CameraInfo>();
+    private record DragBox(double X0, double Y0, double X1, double Y1);
+    private DragBox? Drag;
+
+    protected override void OnParametersSet()
+    {
+        if (Ng is not null && JobName is null)
+        {
+            if (Ng != _ngLoaded) LoadNgImage(Ng);
+            return;
+        }
+        Job? j = null;
+        try { if (JobName is not null) j = Jobs.LoadForEdit(JobName); }
+        catch (JobLoadException e) { Say(e.Message, true); }
+        if (j is not null)
+        {
+            if (j.LoadProblems.Count > 0) Say(string.Join("; ", j.LoadProblems), true);
+            Draft = JobStore.Clone(j);
+            for (int i = 0; i < Draft.Cameras.Count; i++)
+                if (Draft.Cameras[i].ReferenceImage is { } p && File.Exists(p))
+                    TeachImages[i] = GrayImage.Load(p);
+        }
+        Redraw();
+    }
+
+    /// <summary>The picture of an NG image link, in the job and on the camera that saved it; a new job when that job is gone.</summary>
+    private void LoadNgImage(string rel)
+    {
+        _ngLoaded = rel;
+        var path = NgTeachLink.Resolve(Path.Combine(Studio.Value.DataFolder, "ng-images"), rel);
+        if (path is null) { Say(T["teach.ng_missing"], true); Redraw(); return; }
+        var owner = NgTeachLink.Owner(NgTeachLink.Label(path), Jobs.Names().Select(n => Jobs.TryLoad(n, forEdit: true)).OfType<Job>());
+        if (owner is { } o)
+        {
+            Draft = JobStore.Clone(o.Job);
+            for (int i = 0; i < Draft.Cameras.Count; i++)
+                if (Draft.Cameras[i].ReferenceImage is { } p && File.Exists(p))
+                    TeachImages[i] = GrayImage.Load(p);
+            Cam = o.Camera;
+        }
+        try
+        {
+            SetImage(GrayImage.Load(path), path);
+            Say(owner is null ? T["teach.ng_no_job"] : T.Format("teach.ng_loaded", Draft.Name, CamCfg.Name), owner is null);
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    private void Say(string m, bool bad = false) { Message = m; MessageBad = bad; }
+
+    private void SelectCamera(int i) { Cam = i; Selected = null; TryResult = null; Redraw(); }
+
+    private void AddCamera()
+    {
+        Draft.Cameras.Add(new CameraConfig { Name = $"Camera {Draft.Cameras.Count + 1}" });
+        SelectCamera(Draft.Cameras.Count - 1);
+    }
+
+    private void ListCameras()
+    {
+        CameraList = Drivers.List();
+        Say(CameraList.Count == 0 ? T["teach.no_cameras"] : T.Format("teach.cameras_found", CameraList.Count), CameraList.Count == 0);
+    }
+
+    private void Grab()
+    {
+        try
+        {
+            using var c = Drivers.Open(CamCfg);
+            var img = c.Grab(3000) ?? throw new InvalidOperationException(T["teach.no_frame"]);
+            var folder = Path.Combine(AppContext.BaseDirectory, "data", "teach");
+            Directory.CreateDirectory(folder);
+            // the image naming pattern (owner, 2026-10-31), with the day's grab count as its serial
+            var path = Path.Combine(folder, S.GrabName(Draft.Number, Cam) + ".bmp");
+            BarcodeReading.BmpImage.SaveGray(path, img.Pixels, img.Width, img.Height);
+            SetImage(GrayImage.Load(path), path);
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    private void LoadPath()
+    {
+        var p = ImagePath?.Trim().Trim('"');
+        if (string.IsNullOrEmpty(p)) return;
+        try
+        {
+            if (Directory.Exists(p))
+            {
+                CamCfg.TestFolder = p;
+                var files = FolderSource.List(p);
+                if (files.Count == 0) { Say(T["teach.no_bmp"], true); return; }
+                p = files[0];
+            }
+            SetImage(GrayImage.Load(p), p);
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    private void Step(int d)
+    {
+        var folder = CamCfg.TestFolder ?? (Image is null ? null : Path.GetDirectoryName(CamCfg.ReferenceImage));
+        if (folder is null) return;
+        var files = FolderSource.List(folder).ToList();
+        if (files.Count == 0) return;
+        int at = Math.Max(0, files.IndexOf(CamCfg.ReferenceImage ?? ""));
+        var p = files[((at + d) % files.Count + files.Count) % files.Count];
+        SetImage(GrayImage.Load(p), p);
+    }
+
+    private void SetImage(GrayImage img, string path)
+    {
+        TeachImages[Cam] = img;
+        CamCfg.ReferenceImage = path;
+        ImagePath = path;
+        TryResult = null;
+        FontCells = null;
+        Redraw();
+    }
+
+    private void Redraw(IEnumerable<Graphic>? graphics = null)
+    {
+        if (Image is null) { Frame = null; return; }
+        // 760 px wide: the teach screen fits a 1366 x 768 panel PC beside the tool panel
+        Frame = Render.Draw(Image, graphics, Draft.Tools.Where(t => t.Camera == Cam && t.Roi is not null && t != Selected).Select(t => t.Roi!), 760);
+        Images.Put(Key, Frame);
+        Version++;
+    }
+
+    // ---- region drawing (pointer: mouse or touch)
+    private void Down(PointerEventArgs e) { if (Selected is not null) Drag = new(e.OffsetX, e.OffsetY, e.OffsetX, e.OffsetY); }
+    private void Move(PointerEventArgs e) { if (Drag is { } d) Drag = d with { X1 = e.OffsetX, Y1 = e.OffsetY }; }
+    private void Up(PointerEventArgs e)
+    {
+        if (Drag is not { } d || Selected is null || Frame is null) { Drag = null; return; }
+        Drag = null;
+        double x0 = Math.Min(d.X0, d.X1), y0 = Math.Min(d.Y0, d.Y1), w = Math.Abs(d.X1 - d.X0), h = Math.Abs(d.Y1 - d.Y0);
+        if (w < 8 || h < 8) return;
+        Selected.Roi = new RoiBox((int)(x0 / Frame.Scale), (int)(y0 / Frame.Scale), (int)(w / Frame.Scale), (int)(h / Frame.Scale));
+        Redraw();
+    }
+
+    // ---- tools
+    private string NextName(string stem)
+    {
+        for (int i = 1; ; i++)
+            if (Draft.Tools.All(t => !t.Name.Equals($"{stem} {i}", StringComparison.OrdinalIgnoreCase))) return $"{stem} {i}";
+    }
+
+    private void AddLocate()
+    {
+        if (Draft.Tools.Any(t => t is LocateToolConfig && t.Camera == Cam)) { Say(T["locate.one_per_camera"], true); return; }
+        Selected = new LocateToolConfig { Name = NextName(T["tool.locate"]), Camera = Cam };
+        Draft.Tools.Insert(0, Selected);    // runs first: the other tools follow it
+        Say(T["locate.draw_now"]);
+        Redraw();
+    }
+
+    /// <summary>Takes the marked area as the pattern and checks it is found again in this picture.</summary>
+    private void TeachPattern()
+    {
+        if (Image is null || Selected is not LocateToolConfig loc) return;
+        try
+        {
+            loc.Teach(Image);
+            using var tool = new LocateTool(loc);
+            var (r, _) = tool.Find(Image);
+            Say(T.Format("locate.taught", loc.PatternWidth, loc.PatternHeight, r.TimeMs.ToString("0")), !r.Pass);
+            Redraw(r.Graphics);
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    /// <summary>Takes the marked area of this picture (a good part) as the tool's reference (requirements 17.10 AUD-01).</summary>
+    private void TeachReference(ITaughtReference tool, Action<GrayImage> teach)
+    {
+        if (Image is null) return;
+        try
+        {
+            teach(Image);
+            Say(T.Format("reference.taught", tool.ReferenceWidth, tool.ReferenceHeight));
+            Redraw();
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    /// <summary>Teaches the drift baseline from this picture and the good-part pictures in the camera's test folder.</summary>
+    private void TeachDriftBaseline(DriftToolConfig drift)
+    {
+        if (Image is null) return;
+        try
+        {
+            var more = CamCfg.TestFolder is { } f ? FolderSource.List(f).Take(49).Select(GrayImage.Load) : Enumerable.Empty<GrayImage>();
+            int n = drift.Teach(more.Prepend(Image));
+            Say(T.Format("drift.baseline_taught", n));
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    private void AddCode()
+    {
+        Selected = new CodeToolConfig { Name = NextName(T["tool.code"]), Camera = Cam };
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddText(TextMode mode)
+    {
+        Selected = new TextToolConfig { Name = NextName(mode == TextMode.Read ? T["tool.read_text"] : T["tool.check_text"]), Camera = Cam, Mode = mode };
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddMeasure()
+    {
+        var m = new MeasureToolConfig { Name = NextName(T["tool.measure"]), Camera = Cam };
+        m.Features.Add(new CaliperFeature
+        {
+            Name = "Width 1",
+            Mode = CaliperMode.Pair,
+            Polarity = EdgePolarity.DarkToLight,
+            Box = new RotBox(100, 100, 60, 20, 0)
+        });
+        m.Checks.Add(new MeasureCheck
+        {
+            Name = "Width",
+            Value = MeasureValue.Width,
+            Feature = "Width 1",
+            Unit = MeasureUnit.Px
+        });
+        Selected = m;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddMeasureCaliper()
+    {
+        if (Selected is not MeasureToolConfig measure) return;
+        int idx = measure.Features.Count + 1;
+        measure.Features.Add(new CaliperFeature
+        {
+            Name = $"Caliper {idx}",
+            Mode = CaliperMode.Single,
+            Polarity = EdgePolarity.DarkToLight,
+            Box = new RotBox(100 + idx * 10, 100 + idx * 10, 50, 20, 0)
+        });
+        Say($"Added Caliper {idx}");
+        Redraw();
+    }
+
+    private void AddMeasureCheck()
+    {
+        if (Selected is not MeasureToolConfig measure) return;
+        var firstFeature = measure.Features.FirstOrDefault()?.Name ?? "Feature 1";
+        int idx = measure.Checks.Count + 1;
+        measure.Checks.Add(new MeasureCheck
+        {
+            Name = $"Check {idx}",
+            Value = MeasureValue.Width,
+            Feature = firstFeature,
+            Unit = MeasureUnit.Px
+        });
+        Say($"Added Check {idx}");
+        Redraw();
+    }
+
+    private void AddBlob()
+    {
+        var b = new BlobToolConfig
+        {
+            Name = NextName(T["tool.blob"]),
+            Camera = Cam,
+            Threshold = BlobThreshold.Auto,
+            Polarity = BlobPolarity.DarkOnLight,
+            MinArea = 20,
+            MinCount = 1,
+            MaxCount = 100
+        };
+        Selected = b;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddInspect()
+    {
+        var ins = new InspectToolConfig
+        {
+            Name = NextName(T["tool.inspect"]),
+            Camera = Cam,
+            Sensitivity = 1.0f,
+            BaseOffset = 12.0f,
+            EdgeTolerancePx = 1.5f,
+            MinDefectAreaPx = 15,
+            NormalizeLighting = true
+        };
+        Selected = ins;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddAnomaly()
+    {
+        var anom = new AnomalyToolConfig
+        {
+            Name = NextName(T["tool.anomaly"]),
+            Camera = Cam,
+            Sensitivity = 1.0f,
+            PatchSize = 16,
+            MinDefectAreaPx = 20
+        };
+        Selected = anom;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddThermal()
+    {
+        var therm = new ThermalToolConfig
+        {
+            Name = NextName(T["tool.thermal"]),
+            Camera = Cam,
+            Mode = ThermalInspectionMode.BottleInductionSeal,
+            BottleInnerRadiusPx = 25.0f,
+            BottleOuterRadiusPx = 45.0f
+        };
+        Selected = therm;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddInfrared()
+    {
+        var ir = new InfraredToolConfig
+        {
+            Name = NextName(T["tool.infrared"]),
+            Camera = Cam,
+            Mode = InfraredInspectionMode.FillLevel,
+            TargetFillMm = 30.0f,
+            PxPerMm = 5.0f
+        };
+        Selected = ir;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddPolar()
+    {
+        var pol = new PolarToolConfig
+        {
+            Name = NextName(T["tool.polar"]),
+            Camera = Cam,
+            Mode = PolarInspectionMode.GlareRemoval,
+            GlareSuppressAlpha = 0.95f
+        };
+        Selected = pol;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddPhotometric()
+    {
+        var photo = new PhotometricToolConfig
+        {
+            Name = NextName(T["tool.photometric"]),
+            Camera = Cam,
+            Mode = PhotometricMode.CurvatureRelief,
+            Layout = PhotometricLayout.Quadrant2x2,
+            ShapeContrastGain = 140.0f
+        };
+        Selected = photo;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddWavelet()
+    {
+        var wave = new WaveletToolConfig
+        {
+            Name = NextName(T["tool.wavelet"]),
+            Camera = Cam,
+            Mode = WaveletInspectionMode.ScratchDetection,
+            TextureMode = TextureOrientation.Auto,
+            SuppressionStrength = 0.85f
+        };
+        Selected = wave;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddInpaint()
+    {
+        var inp = new InpaintToolConfig
+        {
+            Name = NextName(T["tool.inpaint"]),
+            Camera = Cam,
+            GlareThreshold = 250,
+            Method = InpaintNative.InpaintMethod.Telea
+        };
+        Selected = inp;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddRectify()
+    {
+        var rect = new RectifyToolConfig
+        {
+            Name = NextName(T["tool.rectify"]),
+            Camera = Cam,
+            LineSpeedMmS = 300.0f,
+            MmPerPx = 0.08f,
+            RowTimeUs = 22.5f,
+            MotionAngleDeg = 0.0f,
+            Bilinear = true,
+            MaxAllowedShearDeg = 15.0f
+        };
+        Selected = rect;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddDrift()
+    {
+        var drift = new DriftToolConfig
+        {
+            Name = NextName(T["tool.drift"]),
+            Camera = Cam,
+            WindowSize = 50,
+            WarnDistanceThreshold = 4.5f,
+            DirtSharpnessSigma = 2.0f,
+            LightDropSigma = 2.0f,
+            GridStep = 4,
+            FailOnDrift = true
+        };
+        Selected = drift;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddDeform()
+    {
+        var def = new DeformToolConfig
+        {
+            Name = NextName(T["tool.deform"]),
+            Camera = Cam,
+            MeshCols = 9,
+            MeshRows = 9,
+            PyramidLevels = 3,
+            MaxIterationsPerLevel = 15,
+            SmoothnessWeight = 0.35f,
+            RuptureStrainThreshold = 0.35f,
+            CrumpleBendingThreshold = 40.0f,
+            MinAlignmentScore = 0.70f,
+            UnwarpInPlace = true
+        };
+        Selected = def;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddPhase()
+    {
+        var ph = new PhaseToolConfig
+        {
+            Name = NextName(T["tool.phase"]),
+            Camera = Cam,
+            EstimateRotation = true,
+            EstimateScale = false,
+            MinCorrelationScore = 0.15f,
+            MinPsr = 7.0f,
+            ApplyHannWindow = true
+        };
+        Selected = ph;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddMetamorphic()
+    {
+        var meta = new MetamorphicToolConfig
+        {
+            Name = NextName(T["tool.metamorphic"]),
+            Camera = Cam,
+            MaxRotationDeg = 3.0f,
+            RotationSteps = 7,
+            MaxIllumGainDelta = 0.10f,
+            IllumSteps = 5,
+            MaxScaleDelta = 0.05f,
+            ScaleSteps = 5,
+            MaxNoiseSigma = 5.0f,
+            NoiseSteps = 4,
+            MaxQuietZonePx = 8,
+            MaxAllowedJitterPx = 0.75f,
+            MinAcceptableConfidence = 0.60f,
+            FailOnNonRobust = true
+        };
+        Selected = meta;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void AddAutotune()
+    {
+        var at = new AutotuneToolConfig
+        {
+            Name = NextName(T["tool.autotune"]),
+            Camera = Cam,
+            CheckMountTilt = true,
+            MinAcceptableUniformity = 0.65f,
+            AnalyzeLighting = true,
+            TargetMeanDn = 128.0f,
+            CheckLensDust = false,
+            MaxAllowedDustSpots = 4,
+            TrackApplicator = false,
+            PxPerMm = 10.0f,
+            ScrewPitchMmPerTurn = 0.5f,
+            MaxAllowedEccentricityMm = 1.20f,
+            FailOnCriticalTilt = false
+        };
+        Selected = at;
+        Draft.Tools.Add(Selected);
+        Say(T["teach.draw_now"]);
+        Redraw();
+    }
+
+    private void Select(ToolConfig t) { Selected = t; Redraw(); }
+
+    private void Remove(ToolConfig t)
+    {
+        Draft.Tools.Remove(t);
+        if (Selected == t) Selected = null;
+        Redraw();
+    }
+
+    // what the engineer typed into a GS1 field that did not parse, and why: shown until corrected, so a
+    // rejected entry never looks applied
+    private readonly Dictionary<(CodeToolConfig, string), string> Gs1Typed = new();
+    private readonly Dictionary<(CodeToolConfig, string), string> Gs1Errors = new();
+
+    private void SetGs1Ais(CodeToolConfig code, Gs1Rules g, string? text)
+    {
+        try
+        {
+            g.Required = CodeTeach.ParseAis(text ?? "");
+            Gs1Typed.Remove((code, "ais"));
+            Gs1Errors.Remove((code, "ais"));
+        }
+        catch (FormatException e)
+        {
+            Gs1Typed[(code, "ais")] = text ?? "";
+            Gs1Errors[(code, "ais")] = e.Message;
+        }
+    }
+
+    private void SetGs1Values(CodeToolConfig code, string? text)
+    {
+        try
+        {
+            code.Gs1Values = CodeTeach.ParseAiValues(text ?? "");
+            Gs1Typed.Remove((code, "values"));
+            Gs1Errors.Remove((code, "values"));
+        }
+        catch (FormatException e)
+        {
+            Gs1Typed[(code, "values")] = text ?? "";
+            Gs1Errors[(code, "values")] = e.Message;
+        }
+    }
+
+    /// <summary>Find codes of any type in the region (or whole image) and lock the tool to them (CodeTeach.Lock).</summary>
+    private void AutoFindCode()
+    {
+        if (Image is null || Selected is not CodeToolConfig code) return;
+        // every type and every code in the area (count 0: the reader does not stop at the first)
+        var probe = new CodeToolConfig { Name = code.Name, Format = CodeFormat.Any, ExpectedCount = 0, Roi = code.Roi, TimeBudgetMs = 1500 };
+        using var tool = new CodeTool(probe, Models, teaching: true);
+        var r = tool.Run(Image, new BatchFields());
+        var mine = CodeTeach.Lock(code, tool.LastCodes);
+        if (mine.Count == 0) { Say(T["teach.no_code"], true); return; }
+        var shown = r.Graphics.Where(g => mine.Any(c => c.Text == g.Label)).ToList();
+        var pts = shown.SelectMany(g => g.Points).ToList();
+        if (pts.Count > 0) code.Roi = Pad(pts, 0.25);
+        Say(T.Format("teach.found_code", CodeFormats.Name(code.Format), mine.Count == 1 ? mine[0].Text : T.Format("teach.codes_read", mine.Count)));
+        Redraw(shown);
+    }
+
+    private static readonly Lazy<IReadOnlyList<string>> SystemFonts = new(FontRender.Families);
+
+    // a font taught from print and one drawn from a system font are not mixed: changing where it comes from clears it
+    private void SetFontFrom(TextToolConfig text, string? from)
+    {
+        bool system = from == "system";
+        if (system == text.Rendered is not null) return;
+        text.Rendered = system ? new RenderedFont { SizePx = text.CharHeightPx } : null;
+        text.Font = "";
+        FontCells = null;
+    }
+
+    /// <summary>Draws the system font's characters and teaches them (also done when the job is saved).</summary>
+    private void DrawFont(TextToolConfig text)
+    {
+        if (FontRender.Prepare(text) is { } problem) Say(T.Format("text.font_refused", problem), true);
+        else Say(T.Format("text.render_drawn", TextTool.FontGlyphs(text.Font)));
+    }
+
+    private void ClearFont()
+    {
+        if (Selected is not TextToolConfig text) return;
+        text.Font = "";
+        FontCells = null;
+        Say(T["text.font_cleared"]);
+    }
+
+    // the font's read of the line to teach, one cell per character: a sure one shows what was read, an
+    // unsure one starts empty for the engineer to type; any cell can be changed (a new character can read
+    // as a taught one with confidence, as an 8 for a B)
+    private sealed class FontCell
+    {
+        public required string Read { get; init; }
+        public required bool Sure { get; init; }
+        public string Typed { get; set; } = "";
+    }
+    private List<FontCell>? FontCells;
+    private TextToolConfig? FontCellsTool;
+    private readonly Dictionary<int, string> CharTyped = new();
+
+    private OcrEngine FontEngine(TextToolConfig text)
+    {
+        var settings = text.ToSettings();
+        settings.Reader = OcrReader.Font;
+        settings.TimeBudgetMs = 1000;   // teaching runs once
+        var eng = new OcrEngine(settings);
+        try { if (!string.IsNullOrEmpty(text.Font)) eng.SetFont(text.Font); }
+        catch { eng.Dispose(); throw; }
+        return eng;
+    }
+
+    /// <summary>Reads line FontLine with the font taught so far and asks only about the characters it is unsure of.</summary>
+    private void ReadFontLine()
+    {
+        if (Image is null || Selected is not TextToolConfig text || string.IsNullOrEmpty(text.Font)) return;
+        try
+        {
+            using var eng = FontEngine(text);
+            eng.SetExpected(Array.Empty<string>());
+            var r = eng.Run(Image.Pixels, Image.Width, Image.Height, Image.Stride);
+            if (FontLine < 1 || FontLine > r.Lines.Count || r.Lines[FontLine - 1].Chars.Count == 0)
+            {
+                Say(T.Format("text.font_no_line", FontLine, r.Lines.Count), true);
+                FontCells = null;
+                return;
+            }
+            FontCells = FontTeach.Asks(r.Lines[FontLine - 1]).Select(a => new FontCell { Read = a.Read, Sure = a.Sure, Typed = a.Sure ? a.Read : "" }).ToList();
+            FontCellsTool = text;
+            int unsure = FontCells.Count(c => !c.Sure);
+            Say(unsure == 0 ? T["text.font_all_sure"] : T.Format("text.font_ask", unsure));
+        }
+        catch (InvalidOperationException e) { Say(T.Format("text.font_refused", e.Message), true); }
+    }
+
+    private void TeachAsked()
+    {
+        if (FontCells is null) return;
+        if (FontTeach.Compose(FontCells.Select(c => (string?)c.Typed).ToList(), out int bad) is not { } line)
+        {
+            Say(T.Format("text.font_type_cell", bad + 1), true);
+            return;
+        }
+        if (TeachFont(line)) FontCells = null;
+    }
+
+    /// <summary>"Teach this character": one character of the tried picture, without teaching its line again.</summary>
+    private void TeachOneChar(FontTeach.Candidate cand, int k)
+    {
+        if (Image is null || Selected is not TextToolConfig text) return;
+        var typed = CharTyped.GetValueOrDefault(k)?.Trim() ?? "";
+        if (FontTeach.Compose(new[] { typed }, out _) is null) { Say(T["text.font_type_char"], true); return; }
+        try
+        {
+            using var eng = FontEngine(text);
+            eng.TeachChar(Image.Pixels, Image.Width, Image.Height, Image.Stride, cand.At, typed);
+            text.Font = eng.GetFont();
+            CharTyped.Clear();
+            Try();   // the list shows what is still not OK
+            Say(T.Format("text.font_char_taught", typed, eng.FontGlyphs));
+        }
+        catch (InvalidOperationException e) { Say(T.Format("text.font_refused", e.Message), true); }
+    }
+
+    /// <summary>Teaches the taught-font reader the characters printed on one line of this image; false when refused.</summary>
+    private bool TeachFont(string lineText)
+    {
+        if (Image is null || Selected is not TextToolConfig text) return false;
+        if (string.IsNullOrWhiteSpace(lineText)) { Say(T["text.font_type_text"], true); return false; }
+        try
+        {
+            using var eng = FontEngine(text);
+            int n = eng.TeachFont(Image.Pixels, Image.Width, Image.Height, Image.Stride, FontLine - 1, lineText);
+            text.Font = eng.GetFont();
+            Say(T.Format("text.font_taught", n, eng.FontGlyphs));
+            FontText = "";
+            return true;
+        }
+        catch (InvalidOperationException e)
+        {
+            Say(T.Format("text.font_refused", e.Message), true);
+            return false;
+        }
+    }
+
+    /// <summary>Read the text in the region, size the tool to it and fill the lines (time printed -> {TIME}).</summary>
+    private void AutoFindText()
+    {
+        if (Image is null || Selected is not TextToolConfig text) return;
+        bool font = text.Reader == OcrReader.Font;
+        if (font && string.IsNullOrWhiteSpace(text.Font)) { Say(T["text.font_first"], true); return; }
+        if (!font && !File.Exists(Models.OcrNet)) { Say(T["teach.no_ocr_model"], true); return; }
+        List<OcrLine> lines;
+        try { lines = TextTeach.Read(Image, text, Models); }
+        catch (InvalidOperationException e)
+        {
+            Say(T.Format("text.font_refused", e.Message), true);
+            return;
+        }
+        if (lines.Count == 0) { Say(T["teach.no_text"], true); return; }
+        // keep the lines that sit together with the best-read one (a block), not stray label print
+        lines = TextTeach.MainBlock(lines);
+        TextTeach.Fill(text, lines, Image);
+        Say(T.Format("teach.found_text", lines.Count));
+        Redraw(lines.Select(l => new Graphic(l.Corners, GraphicKind.Info, l.Text)));
+    }
+
+    /// <summary>Why a format line does not compile; empty when it does.</summary>
+    private static string FormatError(string template, List<string> monthLanguages)
+    {
+        if (string.IsNullOrWhiteSpace(template)) return "";
+        try { TextFormat.Parse(template, monthLanguages); return ""; }
+        catch (FormatException e) { return e.Message; }
+    }
+
+    private RoiBox Pad(List<VisionCore.PointF> pts, double frac) => AutoFind.Pad(pts, frac, Image!.Width, Image.Height);
+
+    private void Try()
+    {
+        if (Image is null) return;
+        try
+        {
+            Draft.Validate();
+            using var runner = new JobRunner(Draft, Models);
+            var batch = S.Job?.Name == Draft.Name ? S.Batch : new BatchFields();
+            TryResult = runner.Run(Cam, Image, batch);
+            Say(TryResult.Pass ? "✓ OK" : "✗ " + TryResult.FirstProblem, !TryResult.Pass);
+            Redraw(TryResult.Tools.SelectMany(t => t.Graphics));
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    private void Save()
+    {
+        // a GS1 field with an entry that did not parse: the job is not saved with the old rules
+        if (Gs1Errors.FirstOrDefault(kv => Draft.Tools.Contains(kv.Key.Item1)) is { Key.Item1: { } tool, Value: { } why })
+        {
+            Say($"{tool.Name}: {why}", true);
+            return;
+        }
+        try
+        {
+            Jobs.Save(Draft, "teach");
+            if (S.Job?.Name == Draft.Name) S.Reload();
+            Say(T.Format("teach.saved", Draft.Name, Draft.Version));
+        }
+        catch (Exception e) { Say(e.Message, true); }
+    }
+
+    public void Dispose() => Images.Remove(Key);
+}

@@ -1,0 +1,7 @@
+bin/
+obj/
+.venv/
+__pycache__/
+relay-data/
+*.user
+.DS_Store
